@@ -45,17 +45,24 @@ nddev::desktop_configure() {
     return 0
   fi
 
-  # One sudo prompt for the whole run.
-  info "Authenticating sudo (one prompt for the whole script)"
-  sudo -v || die "sudo authentication failed"
-  ( while true; do sudo -n true; sleep 60; done 2>/dev/null ) & SUDO_KEEPALIVE=$!
-  trap 'kill $SUDO_KEEPALIVE 2>/dev/null || true' EXIT
+  # Each step is independent: one failing step does not abort the others.
+  # Steps that need sudo call nddev::_sudo_refresh first.
+  info "Authenticating sudo (will be refreshed as needed)"
+  sudo -v || die "sudo authentication failed — cannot continue"
 
-  nddev::_gnome_dock_bottom
-  nddev::_russian_keyboard_layout
-  nddev::_install_browseros
-  nddev::_remove_firefox
+  nddev::_gnome_dock_bottom || warn "GNOME dock step reported an error (continuing)"
+  nddev::_russian_keyboard_layout || warn "Russian keyboard step reported an error (continuing)"
+  nddev::_install_browseros || warn "BrowserOS install step reported an error (continuing)"
+  nddev::_remove_firefox || warn "Firefox removal step reported an error (continuing)"
   ok "desktop customization complete"
+}
+
+# Refresh sudo timestamp before a sudo-requiring step. Dies if it cannot.
+nddev::_sudo_refresh() {
+  if ! sudo -n true 2>/dev/null; then
+    info "Refreshing sudo credentials"
+    sudo -v || die "sudo authentication expired and could not be refreshed"
+  fi
 }
 
 # ----------------------------- GNOME dock -----------------------------
@@ -79,6 +86,7 @@ nddev::_russian_keyboard_layout() {
   [ -f /usr/share/X11/xkb/symbols/ru ] \
     || { warn "Russian xkb data missing — install: sudo apt install xkb-data"; return 0; }
 
+  nddev::_sudo_refresh
   # System locale.
   sudo sed -i 's/^# *ru_RU\.UTF-8 UTF-8/ru_RU.UTF-8 UTF-8/' /etc/locale.gen
   sudo locale-gen >/dev/null 2>&1
@@ -101,6 +109,7 @@ nddev::_install_browseros() {
     return 0
   fi
 
+  nddev::_sudo_refresh
   info "Downloading BrowserOS .deb"
   wget -nv -O "$BROWSEROS_DEB_TMP" "$BROWSEROS_DEB_URL"
   ok "downloaded ($(du -h "$BROWSEROS_DEB_TMP" | cut -f1))"
@@ -117,6 +126,7 @@ nddev::_install_browseros() {
 # ----------------------------- Firefox removal -----------------------------
 nddev::_remove_firefox() {
   info "Removing Firefox (snap + apt stub)"
+  nddev::_sudo_refresh
   # Snap first (Ubuntu's primary firefox is snap).
   if snap list firefox >/dev/null 2>&1; then
     sudo snap remove --purge firefox

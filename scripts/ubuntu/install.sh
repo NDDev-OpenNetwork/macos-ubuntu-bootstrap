@@ -605,6 +605,13 @@ install_gui_apps() {
   # The active harness set (codex, zcode) is owned by its GDS modules; the ZCode
   # desktop app is installed by nddev-zcode-app, not by this bootstrap.
   rldyour::log "info" "harness desktop apps are owned by their GDS modules; no GUI harness is installed here."
+  # Desktop customization: GNOME dock, Russian layout, BrowserOS, Firefox removal.
+  rldyour::section "Configure Ubuntu desktop (dock, keyboard, browser)"
+  local desktop_script
+  desktop_script="$(dirname "${BASH_SOURCE[0]}")/desktop.sh"
+  if [ -f "$desktop_script" ]; then
+    rldyour::run bash "$desktop_script" || rldyour::log "warn" "desktop customization reported issues (non-fatal)"
+  fi
 }
 
 run_server_layer() {

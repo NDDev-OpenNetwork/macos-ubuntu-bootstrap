@@ -13,7 +13,7 @@ The module provides bootstrap automation and validation for:
 
 - Code of Conduct: [CODE_OF_CONDUCT.md](./CODE_OF_CONDUCT.md)
 - Security policy: [SECURITY.md](./SECURITY.md)
-- Branch protection: [`.github/branch-protection/main.json`](./.github/branch-protection/main.json)
+- Branch protection: [`.github/rulesets/branch-main.json`](./.github/rulesets/branch-main.json)
 - CI workflow: [`.github/workflows/ci.yml`](./.github/workflows/ci.yml)
 - Contract: [config/rldyour-contract.json](./config/rldyour-contract.json)
 

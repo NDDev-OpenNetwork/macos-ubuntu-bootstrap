@@ -30,7 +30,7 @@ HOMEBREW_INSTALLER_TEAM="927JGANW46"
 # its compiler/linker for project builds.
 BREW_SOURCE_PACKAGES=(
   git curl ca-certificates node bun uv python
-  shellcheck shfmt llvm gopls docker-language-server
+  shellcheck shfmt llvm go gopls rust rust-analyzer docker-language-server
   vscode-langservers-extracted taplo marksman markdown-oxide
   terraform-ls helm-ls cmake-language-server
   pyright basedpyright ruff ty jdtls kotlin-language-server

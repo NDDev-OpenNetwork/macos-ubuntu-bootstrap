@@ -2,9 +2,9 @@
   "schema_version": 2,
   "adapter": {
     "id": "macos-ubuntu-bootstrap",
-    "version": "2.0.0"
+    "version": "2.1.0"
   },
-  "verified_on": "2026-07-10",
+  "verified_on": "2026-08-02",
   "targets": {
     "macos": {
       "architectures": [
@@ -93,6 +93,27 @@
       "x64-baseline": "a063908ae08b7852ca10939bbdc6ceed3ddabce8fb9402dce83d65d73b36e6c7",
       "arm64": "a27ffb63a8310375836e0d6f668ae17fa8d8d18b88c37c821c65331973a19a3b"
     },
+    "ubuntu_go": "1.26.5",
+    "ubuntu_go_sha256": {
+      "amd64": "5c2c3b16caefa1d968a94c1daca04a7ca301a496d9b086e17ad77bb81393f053",
+      "arm64": "fe4789e92b1f33358680864bbe8704289e7bb5fc207d80623c308935bd696d49"
+    },
+    "ubuntu_gopls": "v0.23.0",
+    "ubuntu_gopls_provenance": "go-module-checksum-database",
+    "ubuntu_rust": "1.97.1",
+    "ubuntu_rust_channel_date": "2026-07-16",
+    "ubuntu_rust_sha256": {
+      "x86_64": "88f28fa9af20594179f85d6df67078dfd6fa93e2f6da5e1e9b0ac4997988ca4f",
+      "aarch64": "9a7a2c336b4787f1b72f6bab7c35d5b7af2fd03cbd39b4fc721466a70d402a7d"
+    },
+    "ubuntu_rust_components": [
+      "rustc",
+      "cargo",
+      "rust-std",
+      "clippy-preview",
+      "rustfmt-preview",
+      "rust-analyzer-preview"
+    ],
     "purpose": "ai-cli-and-language-server-host-only",
     "managed_receipt": "ubuntu-runtime-v1"
   },

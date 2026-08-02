@@ -39,6 +39,25 @@ BUN_VERSION="1.3.14"
 BUN_SHA256_X64="951ee2aee855f08595aeec6225226a298d3fea83a3dcd6465c09cbccdf7e848f"
 BUN_SHA256_X64_BASELINE="a063908ae08b7852ca10939bbdc6ceed3ddabce8fb9402dce83d65d73b36e6c7"
 BUN_SHA256_ARM64="a27ffb63a8310375836e0d6f668ae17fa8d8d18b88c37c821c65331973a19a3b"
+# Go and Rust are desktop language-server hosts, exactly like Node and uv: they
+# back gopls and rust-analyzer over the estate's Go and Rust sources. Installing
+# them does not authorize local project builds; the desktop execution policy
+# stays `source-lsp-only` and the server profile never receives them (project
+# builds belong in Docker under `container-execution-only`).
+GO_VERSION="1.26.5"
+GO_SHA256_AMD64="5c2c3b16caefa1d968a94c1daca04a7ca301a496d9b086e17ad77bb81393f053"
+GO_SHA256_ARM64="fe4789e92b1f33358680864bbe8704289e7bb5fc207d80623c308935bd696d49"
+# gopls publishes no prebuilt archive. It is pinned to an exact version and its
+# provenance comes from the Go module checksum database (sum.golang.org), which
+# is a transparency log rather than a hash this repository tracks. GOFLAGS and
+# GONOSUMDB are never relaxed.
+GOPLS_VERSION="v0.23.0"
+# One combined archive per architecture carries rustc, cargo, rust-std, clippy,
+# rustfmt and rust-analyzer, so a single tracked hash covers the whole host.
+RUST_VERSION="1.97.1"
+RUST_CHANNEL_DATE="2026-07-16"
+RUST_SHA256_X86_64="88f28fa9af20594179f85d6df67078dfd6fa93e2f6da5e1e9b0ac4997988ca4f"
+RUST_SHA256_AARCH64="9a7a2c336b4787f1b72f6bab7c35d5b7af2fd03cbd39b4fc721466a70d402a7d"
 # Prompt/history/completion pillars — parity with the macOS brew baseline
 # (starship, atuin, carapace). Installed as pinned standalone artifacts, never
 # via apt (stale) or a piped install script. Linux x64 + arm64 tarball SHA-256
@@ -364,6 +383,161 @@ ensure_uv() {
   "$HOME/.local/bin/uv" --version | grep -Fq "uv ${UV_VERSION}"
 }
 
+# Go and Rust back gopls and rust-analyzer. Both are desktop-only: the server
+# profile is `container-execution-only`, so a compiler on the host would be
+# exactly the local build capability that policy removes.
+install_compiled_language_hosts() {
+  if [ "$PROFILE" != "desktop" ]; then
+    rldyour::log "info" "compiled-language LSP hosts skipped: profile=$PROFILE builds run in Docker"
+    return 0
+  fi
+  ensure_go
+  ensure_rust
+}
+
+ensure_go() {
+  rldyour::section "Ensure Go ${GO_VERSION} (gopls host)"
+  local arch sha filename url archive stage destination parent
+  case "$(uname -m)" in
+    x86_64|amd64) arch="amd64"; sha="$GO_SHA256_AMD64" ;;
+    aarch64|arm64) arch="arm64"; sha="$GO_SHA256_ARM64" ;;
+    *) rldyour::log "error" "Go ${GO_VERSION} has no tracked artifact for $(uname -m)"; return 1 ;;
+  esac
+  filename="go${GO_VERSION}.linux-${arch}.tar.gz"
+  url="https://go.dev/dl/${filename}"
+  destination="$HOME/.local/share/rldyour/go/${GO_VERSION}"
+  parent="$(dirname "$destination")"
+  if [ "$RLDYOUR_DRY_RUN" -eq 1 ]; then
+    rldyour::log "info" "[DRY-RUN] verify or install managed Go ${GO_VERSION} from the tracked SHA-256 artifact, then install gopls ${GOPLS_VERSION} through the module checksum database; external PATH binaries are preserved but never trusted"
+    return 0
+  fi
+  mkdir -p "$HOME/.local/bin" "$parent"
+  if [ -e "$destination" ] || [ -L "$destination" ]; then
+    if ! rldyour::ubuntu::validate_runtime_receipt \
+      "$destination" go "$GO_VERSION" "$sha" bin/go bin/gofmt ||
+      [ "$("$destination/bin/go" version 2>/dev/null | awk '{ print $3 }')" != "go${GO_VERSION}" ]; then
+      rldyour::log "error" "unmanaged or tampered Go destination exists; preserved: $destination"
+      return 1
+    fi
+  else
+    archive="$(mktemp)"; stage="$(mktemp -d "$parent/.go-${GO_VERSION}.tmp.XXXXXX")"
+    trap 'rm -rf "$archive"; [ -z "${stage:-}" ] || rm -rf "$stage"' RETURN
+    rldyour::download_verified_file "$url" "$sha" "$archive" || return 1
+    tar -xzf "$archive" --strip-components=1 -C "$stage"
+    [ "$("$stage/bin/go" version 2>/dev/null | awk '{ print $3 }')" = "go${GO_VERSION}" ] || {
+      rldyour::log "error" "staged Go artifact did not report go${GO_VERSION}"
+      return 1
+    }
+    rldyour::ubuntu::write_runtime_receipt \
+      "$stage" go "$GO_VERSION" "$sha" bin/go bin/gofmt || return 1
+    mv "$stage" "$destination"
+    stage=""
+    rm -f "$archive"
+    trap - RETURN
+  fi
+  rldyour::ubuntu::preflight_managed_link go "$HOME/.local/share/rldyour/go"
+  rldyour::ubuntu::preflight_managed_link gofmt "$HOME/.local/share/rldyour/go"
+  ensure_managed_tool_link go "$destination/bin/go" "$HOME/.local/share/rldyour/go"
+  ensure_managed_tool_link gofmt "$destination/bin/gofmt" "$HOME/.local/share/rldyour/go"
+  rldyour::ensure_path
+  [ "$("$HOME/.local/bin/go" version | awk '{ print $3 }')" = "go${GO_VERSION}" ] || {
+    rldyour::log "error" "managed Go launcher did not resolve to ${GO_VERSION}"
+    return 1
+  }
+  ensure_gopls "$destination"
+}
+
+# gopls is built from an exact module version. The checksum database verifies
+# every module in the build, so provenance is enforced without a tracked archive
+# hash. GOBIN keeps the binary inside the managed Go tree.
+ensure_gopls() {
+  local goroot="$1" gobin
+  gobin="$HOME/.local/share/rldyour/go/gopls/${GOPLS_VERSION}"
+  if [ ! -x "$gobin/gopls" ]; then
+    mkdir -p "$gobin"
+    rldyour::log "info" "building gopls ${GOPLS_VERSION} through the module checksum database"
+    env GOROOT="$goroot" GOBIN="$gobin" GOFLAGS=-mod=readonly \
+      GOPROXY=https://proxy.golang.org,direct GOSUMDB=sum.golang.org \
+      "$goroot/bin/go" install "golang.org/x/tools/gopls@${GOPLS_VERSION}" || {
+      rldyour::log "error" "gopls ${GOPLS_VERSION} install failed"
+      return 1
+    }
+  fi
+  rldyour::ubuntu::preflight_managed_link gopls "$HOME/.local/share/rldyour/go"
+  ensure_managed_tool_link gopls "$gobin/gopls" "$HOME/.local/share/rldyour/go"
+  "$HOME/.local/bin/gopls" version >/dev/null 2>&1 || {
+    rldyour::log "error" "managed gopls launcher is not executable"
+    return 1
+  }
+}
+
+ensure_rust() {
+  rldyour::section "Ensure Rust ${RUST_VERSION} (rust-analyzer host)"
+  local arch sha triple filename url archive stage destination parent components
+  case "$(uname -m)" in
+    x86_64|amd64) arch="x86_64"; sha="$RUST_SHA256_X86_64" ;;
+    aarch64|arm64) arch="aarch64"; sha="$RUST_SHA256_AARCH64" ;;
+    *) rldyour::log "error" "Rust ${RUST_VERSION} has no tracked artifact for $(uname -m)"; return 1 ;;
+  esac
+  triple="${arch}-unknown-linux-gnu"
+  filename="rust-${RUST_VERSION}-${triple}.tar.xz"
+  url="https://static.rust-lang.org/dist/${RUST_CHANNEL_DATE}/${filename}"
+  destination="$HOME/.local/share/rldyour/rust/${RUST_VERSION}"
+  parent="$(dirname "$destination")"
+  components="rustc,cargo,rust-std-${triple},clippy-preview,rustfmt-preview,rust-analyzer-preview"
+  if [ "$RLDYOUR_DRY_RUN" -eq 1 ]; then
+    rldyour::log "info" "[DRY-RUN] verify or install managed Rust ${RUST_VERSION} (rustc, cargo, clippy, rustfmt, rust-analyzer) from the tracked SHA-256 artifact; external PATH binaries are preserved but never trusted"
+    return 0
+  fi
+  mkdir -p "$HOME/.local/bin" "$parent"
+  if [ -e "$destination" ] || [ -L "$destination" ]; then
+    if ! rldyour::ubuntu::validate_runtime_receipt \
+      "$destination" rust "$RUST_VERSION" "$sha" \
+      bin/rustc bin/cargo bin/rust-analyzer bin/rustfmt bin/clippy-driver ||
+      [ "$("$destination/bin/rustc" --version 2>/dev/null | awk '{ print $2 }')" != "$RUST_VERSION" ]; then
+      rldyour::log "error" "unmanaged or tampered Rust destination exists; preserved: $destination"
+      return 1
+    fi
+  else
+    archive="$(mktemp)"; stage="$(mktemp -d "$parent/.rust-${RUST_VERSION}.tmp.XXXXXX")"
+    trap 'rm -rf "$archive"; [ -z "${stage:-}" ] || rm -rf "$stage"' RETURN
+    rldyour::download_verified_file "$url" "$sha" "$archive" || return 1
+    # The installer ships inside the SHA-256-verified archive; it is a verified
+    # artifact, never remote code piped to a shell.
+    mkdir -p "$stage/src" "$stage/prefix"
+    tar -xJf "$archive" --strip-components=1 -C "$stage/src"
+    "$stage/src/install.sh" --prefix="$stage/prefix" --disable-ldconfig \
+      --components="$components" >/dev/null || {
+      rldyour::log "error" "Rust ${RUST_VERSION} offline install failed"
+      return 1
+    }
+    rm -rf "$stage/src"
+    [ "$("$stage/prefix/bin/rustc" --version 2>/dev/null | awk '{ print $2 }')" = "$RUST_VERSION" ] || {
+      rldyour::log "error" "staged Rust artifact did not report ${RUST_VERSION}"
+      return 1
+    }
+    rldyour::ubuntu::write_runtime_receipt \
+      "$stage/prefix" rust "$RUST_VERSION" "$sha" \
+      bin/rustc bin/cargo bin/rust-analyzer bin/rustfmt bin/clippy-driver || return 1
+    mv "$stage/prefix" "$destination"
+    rm -rf "$stage"
+    stage=""
+    rm -f "$archive"
+    trap - RETURN
+  fi
+  local tool
+  for tool in rustc cargo rust-analyzer rustfmt clippy-driver cargo-clippy cargo-fmt; do
+    [ -x "$destination/bin/$tool" ] || continue
+    rldyour::ubuntu::preflight_managed_link "$tool" "$HOME/.local/share/rldyour/rust"
+    ensure_managed_tool_link "$tool" "$destination/bin/$tool" "$HOME/.local/share/rldyour/rust"
+  done
+  rldyour::ensure_path
+  [ "$("$HOME/.local/bin/rustc" --version | awk '{ print $2 }')" = "$RUST_VERSION" ] || {
+    rldyour::log "error" "managed Rust launcher did not resolve to ${RUST_VERSION}"
+    return 1
+  }
+}
+
 ensure_bun() {
   local arch sha archive stage destination url parent extract_dir
   case "$(uname -m)" in
@@ -684,6 +858,7 @@ fi
 
 [ "$SKIP_AI" -eq 1 ] || install_ai_runtimes
 [ "$SKIP_LSPS" -eq 1 ] || install_bun_lsps
+[ "$SKIP_LSPS" -eq 1 ] || install_compiled_language_hosts
 install_gui_apps
 run_server_layer
 

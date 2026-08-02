@@ -10,7 +10,7 @@ Maintain one plan-first bootstrap adapter for:
 
 The public entry point is `scripts/bootstrap.sh`. Treat
 `config/rldyour-contract.json`, the platform installers, verification scripts,
-and tests as the executable contract. Current adapter version: `2.0.0`.
+and tests as the executable contract. Current adapter version: `2.1.0`.
 
 ## Composition Invariants
 
@@ -45,6 +45,12 @@ profile; Ubuntu server is always headless.
   is published
 - Ubuntu Node.js/uv/Bun `24.18.0` / `0.11.30` / `1.3.14`, immutable assets
   with tracked architecture hashes
+- Ubuntu Go `1.26.5` and Rust `1.97.1` (one combined archive carrying rustc,
+  cargo, rust-std, clippy, rustfmt, rust-analyzer), tracked architecture hashes.
+  **Desktop only** — `install_compiled_language_hosts` returns early on the
+  server profile, which stays `container-execution-only`. gopls `v0.23.0` is
+  pinned by module version and verified through the Go checksum database, not a
+  tracked archive hash (ADR 0005).
 
 Keep the contract, both installers, tests, README, install guide, AGENTS, and
 this file synchronized when a pin changes.

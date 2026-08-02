@@ -66,6 +66,12 @@ def test_cloak_runtime_identity_preserves_repository_logical_names(
         (ROOT / "templates/browser/cloakbrowser-pyproject.toml").read_bytes()
     )
     lock.write_bytes((ROOT / "templates/browser/cloakbrowser-uv.lock").read_bytes())
+    # content_id() refuses group/world-writable inputs. These fixtures are
+    # created by the test itself, so under a umask of 002 they would arrive
+    # group-writable and fail the integrity check for a reason that has nothing
+    # to do with the behaviour under test.
+    project.chmod(0o644)
+    lock.chmod(0o644)
     assert (
         integrity.content_id(
             f"cloakbrowser|version={integrity.CLOAK_VERSION}|platform={platform_label}",

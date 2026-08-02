@@ -5,13 +5,13 @@ Plan-first bootstrap automation for Apple Silicon macOS desktops, Ubuntu
 
 ## Current Baseline
 
-The adapter contract version is `2.0.0`.
+The adapter contract version is `2.1.0`.
 
 | Field | Value |
 | --- | --- |
-| Adapter version | `2.0.0` |
+| Adapter version | `2.1.0` |
 | Runtime baseline | macOS arm64 and Ubuntu 24.04/26.04 amd64/arm64 |
-| GitHub release tag | `2.0.0` |
+| GitHub release tag | `2.1.0` |
 
 ## What This Repository Provides
 
@@ -24,13 +24,23 @@ The adapter contract version is `2.0.0`.
 
 Desktop profiles install source-analysis tools, LSPs, quality checks, terminal
 tooling, the selected harnesses, and the mandatory browser layer. They do not install Docker
-or configure local project build/runtime execution. Node and Python are tool
-hosts, and the macOS clangd provider arrives in Homebrew's LLVM distribution;
-those supporting binaries do not authorize local project builds.
+or configure local project build/runtime execution. Node, Python, Go, and Rust
+are tool hosts, and the macOS clangd provider arrives in Homebrew's LLVM
+distribution; those supporting binaries do not authorize local project builds
+(see [ADR 0005](docs/adr/0005-go-and-rust-language-server-hosts.md)).
 
-On Ubuntu, Node.js `24.18.0`, uv `0.11.30`, and Bun `1.3.14` are installed from
-versioned upstream assets with tracked per-architecture SHA-256 values. macOS
-bootstraps Homebrew from its notarized `6.0.9` package. At contract `2.0.0` the
+Go and Rust are **desktop-only**. They back `gopls` and `rust-analyzer` over the
+estate's Go and Rust sources. The server profile is `container-execution-only`,
+so it receives no host compiler — project builds and tests run in Docker.
+
+On Ubuntu, Node.js `24.18.0`, uv `0.11.30`, Bun `1.3.14`, Go `1.26.5`, and Rust
+`1.97.1` are installed from
+versioned upstream assets with tracked per-architecture SHA-256 values. One
+combined Rust archive carries rustc, cargo, rust-std, clippy, rustfmt, and
+rust-analyzer. `gopls` `v0.23.0` is the one exception to hash tracking: it ships
+no prebuilt archive, so it is pinned by exact module version and verified
+through the Go module checksum database. macOS
+bootstraps Homebrew from its notarized `6.0.9` package. At contract `2.1.0` the
 active harness set is **codex** and **zcode** only, and neither is installed
 inline: each is owned by its NDDev module, pinned by exact commit in
 `config/rldyour-contract.json`, and self-materialized when its module path
@@ -188,11 +198,10 @@ GUI is an overlay on desktop profiles and can be disabled with `--no-gui`.
   supported Linux desktop builds; their managed CLIs remain available.
 - Ubuntu server is always headless.
 
-ZCode is manual by default on both platforms because upstream does not publish
-a checksum or signature manifest. Ubuntu can install tracked ZCode `3.3.3` only
-when the owner supplies a separately verified SHA-256 through
-`RLDYOUR_ZCODE_SHA256`; otherwise use the documented manual handoff. The
-bootstrap does not weaken this integrity gate for convenience.
+ZCode is not installed by this repository. Since contract `2.0.0` the ZCode app
+and CLI are owned by the `nddev-zcode-app` module and installed through its own
+`--plan`/`--apply` lifecycle; bootstrap only delegates to the pinned module
+commit. There is no apt `.deb` path and no `RLDYOUR_ZCODE_SHA256` gate.
 
 ## Authentication Handoff
 

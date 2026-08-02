@@ -19,6 +19,7 @@ verification, contract metadata, tests, and documentation synchronized.
 - Authentication handoff: `scripts/auth-handoff.sh`
 - Machine-readable contract: `config/rldyour-contract.json`
 - Profile/browser decision: `docs/adr/0004-profile-composition-and-cloakbrowser-boundary.md`
+- Language-server host decision: `docs/adr/0005-go-and-rust-language-server-hosts.md`
 - Operator guide: `README.md`, `docs/install.md`, `SECURITY.md`
 - Product version: `VERSION`, `CHANGELOG.md`
 
@@ -26,7 +27,7 @@ When prose and implementation disagree, verify the scripts and contract, then
 update the affected documentation in the same change. Do not invent a second
 policy source.
 
-## Contract `2.0.0`
+## Contract `2.1.0`
 
 Ubuntu profile selection is always explicit. Never infer server/rootful Docker
 from `uname=Linux`; require `--profile desktop|server`.
@@ -45,6 +46,12 @@ macOS never accepts the server profile. Desktop profiles never install Docker
 or configure local project build/runtime execution. `--no-gui` removes only
 the GUI overlay; it does not change the desktop execution policy. Server is
 Ubuntu-only and always headless.
+
+Desktop profiles additionally install Go and Rust as language-server hosts for
+`gopls` and `rust-analyzer`, on the same footing as Node, Python, and LLVM —
+present to resolve source, not to authorize project builds (ADR 0005). The
+server profile receives no host compiler: `install_compiled_language_hosts`
+returns early there.
 
 ## Managed Versions
 
@@ -68,6 +75,11 @@ operator documentation:
 - Webwright: retired fail-closed; publish only the exact disabled wrapper
 - Ubuntu Node.js/uv/Bun: `24.18.0` / `0.11.30` / `1.3.14`, immutable assets
   with tracked architecture hashes
+- Ubuntu Go `1.26.5` and Rust `1.97.1`, desktop-only language-server hosts,
+  tracked architecture hashes. One combined Rust archive carries rustc, cargo,
+  rust-std, clippy, rustfmt, and rust-analyzer. gopls `v0.23.0` is pinned by
+  module version and verified through the Go checksum database — it publishes
+  no prebuilt archive, so it carries no tracked archive hash (ADR 0005).
 
 Use current, source-backed facts before changing a dependency. Preserve exact
 pins and integrity checks unless the change intentionally updates the contract.
@@ -116,10 +128,10 @@ macOS GUI apply configures cmux non-interactively only for Codex. Do not replace
 that targeted `--yes` install with broad interactive `cmux hooks setup`, which
 can create unrelated agent configs.
 
-ZCode `3.3.3` remains manual by default because upstream publishes no checksum
-or signature manifest. On Ubuntu, installation is allowed only when the owner
-supplies a separately verified `RLDYOUR_ZCODE_SHA256`. Do not add a silent
-download, fallback checksum, or integrity bypass.
+ZCode is owned by the `nddev-zcode-app` module and installed through its own
+`--plan`/`--apply` lifecycle. Bootstrap never installs ZCode via an apt `.deb`
+or a `RLDYOUR_ZCODE_SHA256` gate; both were removed in contract `2.0.0`. Do not
+reintroduce a silent download, fallback checksum, or integrity bypass.
 
 Authentication is a post-install owner handoff. `scripts/auth-handoff.sh` may
 show instructions and perform non-secret status probes, but bootstrap code must
@@ -171,8 +183,9 @@ Full server validation requires a real supported Ubuntu VM with systemd.
 - Keep shell policy in owned `~/.config/rldyour/` drop-ins. Modify owner shell
   files only through the delimited, backed-up source blocks and verify a fresh
   login shell after apply.
-- Ubuntu Node.js, uv, and Bun must retain verified runtime receipts and exact
-  managed links; an external same-version PATH binary is not provenance.
+- Ubuntu Node.js, uv, Bun, Go, and Rust must retain verified runtime receipts
+  and exact managed links; an external same-version PATH binary is not
+  provenance.
 - APT key validation must reject bundles with more than one primary key.
 - Keep desktop source/LSP manifests free of Docker and general project runtime
   dependencies.

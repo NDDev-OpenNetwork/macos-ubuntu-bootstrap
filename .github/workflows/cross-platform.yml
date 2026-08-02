@@ -17,15 +17,27 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # Proves the repository metadata contract every consumer reads before it runs
+  # anything — the four files a caller resolves the adapter by. Platform
+  # *behaviour* is not this lane's job: `ci.yml` runs the real installers in
+  # plan mode, plus shellcheck and the cross-platform crosscheck, on both
+  # supported operating systems.
+  #
+  # windows-latest was dropped: this adapter targets macOS and Ubuntu only, the
+  # installers are Bash, and the check could not fail on Windows for any reason
+  # that would not also fail on the other two. A required status check that
+  # cannot express a real failure reports confidence it never earned — and it
+  # still consumed runner minutes at the Windows multiplier on every push, PR
+  # and weekly schedule.
   smoke:
     name: cross-platform smoke (${{ matrix.os }})
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, windows-latest, macos-latest]
+        os: [ubuntu-latest, macos-latest]
     permissions:
       contents: read
-    uses: NDDev-it-com/ci-workflows/.github/workflows/cross-platform-smoke.yml@2ccb80e96f5771b6a6b4eae63a4f47e232906dc7 # 0.12.0
+    uses: NDDev-it-com/ci-workflows/.github/workflows/cross-platform-smoke.yml@7f69c724923d06b2c2057c5a6ad341c37f1a8995 # 0.13.3
     with:
       os_list: '["${{ matrix.os }}"]'
       command: |

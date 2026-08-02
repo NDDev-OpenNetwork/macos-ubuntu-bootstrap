@@ -4,6 +4,36 @@ All notable changes to this module will be documented in this file.
 
 ## [Unreleased]
 
+### Changed
+
+- **Every reusable-workflow caller repinned from `0.12.0` to `0.13.3`.** All
+  thirteen sat two minor versions behind, so this repository was missing the
+  `zizmor-sarif` `actions: read` fix (0.13.2), the `pr-title`
+  `pull-requests: read` fix, and the fail-closed guard that stops a privileged
+  caller event from supplying `checkout_ref` to `cross-platform-smoke.yml` —
+  which this repository calls.
+
+- **The pytest lane installs through hash-locked uv instead of pip.** It ran
+  `python -m pip install "pytest==9.1.1"`: pip is forbidden estate-wide, and the
+  install was neither hash-verified nor lock-resolved, in the very lane that
+  proves the installer. Dependencies now come from a new `requirements-test.txt`
+  compiled with `uv pip compile --generate-hashes --universal --python-version
+  3.14` and installed with `--require-hashes`. `zsh` stays an apt dependency —
+  the terminal-portability suite genuinely needs the shell it asserts about.
+
+### Removed
+
+- **The `windows-latest` leg of `cross-platform.yml`, and its required status
+  check.** This adapter targets macOS and Ubuntu; the installers are Bash. The
+  lane only asserted that `README.md`, `LICENSE`, `NOTICE` and `VERSION` exist
+  and printed `VERSION` — an OS-independent check that could not fail on Windows
+  for any reason that would not also fail on the other two runners. It was a
+  required check that could not express a real failure, and it billed Windows
+  runner minutes on every push, pull request and weekly schedule. The remaining
+  two legs keep the metadata contract covered; platform behaviour is proven by
+  `ci.yml`, which runs the real installers in plan mode on both supported
+  systems.
+
 ## [2.2.1] - 2026-08-02
 
 Contract `2.1.0` and `2.2.0` were never published as GitHub releases; both

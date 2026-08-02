@@ -18,12 +18,28 @@ jobs:
   bootstrap-pytests:
     permissions:
       contents: read
-    uses: NDDev-it-com/ci-workflows/.github/workflows/python-ci.yml@2ccb80e96f5771b6a6b4eae63a4f47e232906dc7 # 0.12.0
+    uses: NDDev-it-com/ci-workflows/.github/workflows/python-ci.yml@7f69c724923d06b2c2057c5a6ad341c37f1a8995 # 0.13.3
     with:
       python_version: "3.14"
+      # zsh is a genuine test fixture: the terminal-portability suite asserts the
+      # shell rc files this installer writes are parseable by the shell that
+      # actually reads them. Dependencies come from the hash-locked lock through
+      # uv — pip is forbidden estate-wide, and an unpinned, unhashed install in
+      # the lane that proves the installer is the wrong place to make an
+      # exception.
+      #
+      # The interpreter has to be pinned explicitly. The reusable runs
+      # `uv python install 3.14`, which makes 3.14 *available* but does not make
+      # it `python` — so `python -m pip install` previously landed in the user
+      # site-packages of the runner's ambient interpreter ("Defaulting to user
+      # installation because normal site-packages is not writeable") and the
+      # tests ran there. The lane was named `python (3.14)` and did not run on
+      # 3.14. A venv built from the requested version, used explicitly by the
+      # test command, makes the declared version the one that actually runs.
       install_command: >-
         sudo apt-get update &&
         sudo apt-get install -y --no-install-recommends zsh &&
-        python -m pip install "pytest==9.1.1"
-      test_command: python -m pytest -q
+        uv venv --python 3.14 &&
+        uv pip install --require-hashes -r requirements-test.txt
+      test_command: .venv/bin/python -m pytest -q
       timeout_minutes: 15

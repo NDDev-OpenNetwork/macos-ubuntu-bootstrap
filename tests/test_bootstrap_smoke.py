@@ -879,7 +879,10 @@ def test_no_gui_mode_is_distinct_from_server_role() -> None:
 
 
 def test_reusable_ci_is_pinned_to_current_ci_workflows_release() -> None:
-    expected = "2ccb80e96f5771b6a6b4eae63a4f47e232906dc7"
+    # ci-workflows 0.13.3. Advancing this constant is the deliberate act that
+    # repins the whole repository: the assertion below rejects a workflow left
+    # behind, which is how thirteen callers were found still on 0.12.0.
+    expected = "7f69c724923d06b2c2057c5a6ad341c37f1a8995"
     found = 0
     for workflow in (ROOT / ".github" / "workflows").glob("*.yml"):
         body = workflow.read_text(encoding="utf-8")

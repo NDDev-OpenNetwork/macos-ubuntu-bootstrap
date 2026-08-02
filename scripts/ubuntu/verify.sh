@@ -133,6 +133,19 @@ playwright-cli --version | grep -Fq "0.1.17"
 rldyour::verify_terminal_environment
 
 if [ "$PROFILE" = "desktop" ]; then
+  # Go and Rust are desktop-only language-server hosts. The server profile is
+  # `container-execution-only`, so their absence there is the policy working.
+  for cmd in go gopls rustc cargo rust-analyzer; do
+    rldyour::require_cmd "$cmd" required
+  done
+  [ "$(go version 2>/dev/null | awk '{ print $3 }')" = "go1.26.5" ] || {
+    rldyour::log "missing" "Go exact managed Ubuntu version 1.26.5"
+    exit 1
+  }
+  [ "$(rustc --version 2>/dev/null | awk '{ print $2 }')" = "1.97.1" ] || {
+    rldyour::log "missing" "Rust exact managed Ubuntu version 1.97.1"
+    exit 1
+  }
   [ "$DOCKER_MODE" = "none" ] || { rldyour::log "error" "desktop Docker mode must be none"; exit 1; }
   if command -v docker >/dev/null 2>&1; then
     rldyour::log "warn" "unmanaged Docker is present; this desktop bootstrap neither uses nor removes it"

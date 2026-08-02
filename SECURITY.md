@@ -8,7 +8,7 @@ reviewed commit and the matching versioned contract.
 
 | Version | Supported |
 | --- | --- |
-| Current exact tag `2.0.0` | yes |
+| Current exact tag `2.1.0` | yes |
 | Older patch, minor, or major versions | no |
 
 The `0.3.x` release-line label tracks only the latest released patch. The
@@ -157,15 +157,17 @@ policy.
   no-upgrade semantics, existing source tools are preserved, and Docker CE is
   installed only over an empty Docker/containerd state.
 
-The current managed AI baseline is Claude Code `2.1.206`, Codex `0.144.1`,
-OpenCode `1.17.18`, MiMoCode `0.1.5`, and Antigravity (`agy`) exact `1.1.1`.
-The supporting RTK output compressor is exact `0.43.0`.
+Since contract `2.0.0` the active harness set is **codex and zcode only**, and
+neither is installed inline. Each is owned by its authoritative NDDev module
+(`nddev-codex-app`, `nddev-zcode-app`), pinned by exact commit in
+`config/rldyour-contract.json` and driven through that module's own
+`--plan`/`--apply` lifecycle. The inline Claude Code, OpenCode, MiMoCode,
+Antigravity, and raw ZCode installers were removed in `2.0.0`; integrity for
+each harness artifact is the owning module's responsibility. The supporting RTK
+output compressor is exact `0.43.0`.
 
-ZCode is manual by default because upstream publishes no checksum or signature
-manifest. On Ubuntu, the installer accepts only an owner-supplied, separately
-verified `RLDYOUR_ZCODE_SHA256` and fails on mismatch. Do not report the absence
-of an automatic ZCode install as a defect unless an upstream verifiable
-integrity channel has become available.
+Do not report the absence of an inline AI-CLI installer as a defect — it is the
+one-owner-per-harness boundary working as designed.
 
 ## Repository Security Controls
 

@@ -4,6 +4,55 @@ All notable changes to this module will be documented in this file.
 
 ## [Unreleased]
 
+### Added
+
+- **Go and Rust desktop language-server hosts (ADR 0005).** The macOS manifest
+  shipped `gopls` while `go` sat in the forbidden set, and Homebrew declares Go
+  a *build-only* dependency of that formula — so the Go language server arrived
+  without the toolchain it drives and degraded to single-file parsing. Ubuntu
+  desktops had neither a Go nor a Rust server at all, while the estate's two
+  largest compiled codebases are the control plane's own Go core (451 files,
+  verified with `go build ./core/cmd/gds`) and the Rust crates under
+  `rldyour-chatgpt`, `nddev-web`, and the Amsterdam captcha WASM.
+
+  Ubuntu now installs Go `1.26.5` from `go.dev/dl` and Rust `1.97.1` from the
+  dated `static.rust-lang.org` channel snapshot, both with per-architecture
+  SHA-256 values in `config/rldyour-contract.json`, into owned versioned
+  directories with runtime receipts and managed `~/.local/bin` links. One
+  combined Rust archive per architecture carries rustc, cargo, rust-std, clippy,
+  rustfmt, and rust-analyzer, so a single tracked hash covers the host; its
+  bundled `install.sh` runs from inside the verified archive. macOS adds `go`,
+  `rust`, and `rust-analyzer` through Homebrew. `golang-go`, `rustc`, `cargo`,
+  and `rustup` stay forbidden — the managed hosts never come from a distribution
+  package.
+
+  gopls `v0.23.0` is pinned by exact module version and verified through the Go
+  module checksum database, because it publishes no prebuilt archive;
+  `ubuntu_gopls_provenance` records that this is a transparency log rather than
+  a tracked hash, so the difference is declared instead of looking like a gap.
+
+  **Desktop only.** `install_compiled_language_hosts` returns early on any
+  non-desktop profile. The server profile stays `container-execution-only`:
+  project builds and tests run in Docker, and a host compiler there would
+  restore exactly the capability that policy removes.
+  `tests/test_compiled_language_hosts.py` pins the split, the per-architecture
+  hash coverage, installer-to-contract agreement, and the gopls provenance
+  declaration.
+
+### Fixed
+
+- **`test_cloak_runtime_identity_preserves_repository_logical_names` could not
+  pass under a umask of 002.** The test writes its own fixtures into a pytest
+  temporary directory and then feeds them to `content_id()`, which refuses
+  group- or world-writable inputs. Under the default umask of a Ubuntu desktop
+  those copies arrive `664` and the check failed for a reason unrelated to the
+  behaviour under test. The fixtures are now normalized to `644`.
+
+  Note that the repository's *own* `templates/browser/*` files hit the same
+  check, and their mode comes from the umask in force when the repository was
+  cloned — a property Git does not carry. On a machine with `umask 002` the
+  suite still needs those two template files to be non-group-writable.
+
 ## [2.0.0] - 2026-07-23
 
 ### Changed

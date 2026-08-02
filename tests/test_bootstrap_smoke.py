@@ -210,10 +210,14 @@ def test_desktop_manifests_exclude_project_runtime_and_docker() -> None:
     macos = parse_array(file("scripts/macos/install.sh"), "BREW_SOURCE_PACKAGES")
     gui_casks = parse_array(file("scripts/macos/install.sh"), "GUI_CASKS")
     ubuntu = parse_array(file("scripts/ubuntu/install.sh"), "APT_SOURCE_PACKAGES")
+    # ADR 0005 admits Go and Rust as desktop language-server hosts, on the same
+    # footing as Node, Python, and Homebrew's LLVM: they exist so gopls and
+    # rust-analyzer can resolve the estate's Go and Rust sources. Everything
+    # that provisions a container runtime, a general project build system, or a
+    # second toolchain manager stays forbidden.
     forbidden_macos = {
         "docker",
         "docker-desktop",
-        "go",
         "rustup",
         "dart",
         "cmake",
@@ -226,6 +230,8 @@ def test_desktop_manifests_exclude_project_runtime_and_docker() -> None:
         "docker.io",
         "docker-ce",
         "build-essential",
+        # Distribution Go/Rust stay banned: the managed hosts are installed from
+        # tracked SHA-256 artifacts into owned versioned directories, never apt.
         "golang-go",
         "rustc",
         "cargo",
@@ -237,6 +243,8 @@ def test_desktop_manifests_exclude_project_runtime_and_docker() -> None:
     assert macos.isdisjoint(forbidden_macos)
     assert ubuntu.isdisjoint(forbidden_ubuntu)
     assert "llvm" in macos  # Homebrew's supported clangd distribution only.
+    # The language-server hosts admitted by ADR 0005, and their servers.
+    assert {"go", "gopls", "rust", "rust-analyzer"}.issubset(macos)
     assert "docker-language-server" in macos
     assert {"chatgpt", "codex-app"}.issubset(gui_casks)
     assert any(

@@ -25,7 +25,8 @@ rldyour::ensure_path
 rldyour::section "Verify macOS source/LSP workstation"
 
 required_cmds=(
-  git curl node bun uv python3 shellcheck shfmt clangd gopls
+  git curl node bun uv python3 shellcheck shfmt clangd
+  go gopls rustc cargo rust-analyzer
   pyright pyright-langserver basedpyright ruff
   tsc vtsls yaml-language-server bash-language-server docker-langserver
   vscode-html-language-server vscode-css-language-server vscode-json-language-server

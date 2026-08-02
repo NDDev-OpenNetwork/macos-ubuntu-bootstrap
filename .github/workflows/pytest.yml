@@ -18,12 +18,18 @@ jobs:
   bootstrap-pytests:
     permissions:
       contents: read
-    uses: NDDev-it-com/ci-workflows/.github/workflows/python-ci.yml@2ccb80e96f5771b6a6b4eae63a4f47e232906dc7 # 0.12.0
+    uses: NDDev-it-com/ci-workflows/.github/workflows/python-ci.yml@7f69c724923d06b2c2057c5a6ad341c37f1a8995 # 0.13.3
     with:
       python_version: "3.14"
+      # zsh is a genuine test fixture: the terminal-portability suite asserts the
+      # shell rc files this installer writes are parseable by the shell that
+      # actually reads them. Dependencies come from the hash-locked lock through
+      # uv — pip is forbidden estate-wide, and an unpinned, unhashed install in
+      # the lane that proves the installer is the wrong place to make an
+      # exception.
       install_command: >-
         sudo apt-get update &&
         sudo apt-get install -y --no-install-recommends zsh &&
-        python -m pip install "pytest==9.1.1"
+        uv pip install --system --require-hashes -r requirements-test.txt
       test_command: python -m pytest -q
       timeout_minutes: 15

@@ -61,9 +61,6 @@
             "context": "cross-platform smoke (ubuntu-latest) / smoke (ubuntu-latest)"
           },
           {
-            "context": "cross-platform smoke (windows-latest) / smoke (windows-latest)"
-          },
-          {
             "context": "cross-platform smoke (macos-latest) / smoke (macos-latest)"
           },
           {

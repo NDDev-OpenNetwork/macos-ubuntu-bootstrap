@@ -1,7 +1,7 @@
 <!-- Memory Metadata
-Last updated: 2026-07-10
-Last verified: 2026-07-10
-Last commit: 25e5b7bbf07ca90192022ac8fb9f300d443b9410 chore(release): new-mac-or-ubuntu 0.3.7 (other)
+Last updated: 2026-08-02
+Last verified: 2026-08-02
+Last commit: 881c07ad415e6ac11052cfe01ab088de92de810d Merge pull request #32 from NDDev-it-com/feat/go-rust-lsp-hosts
 Scope: language-server setup and diagnostic proof
 Area: LSP
 -->
@@ -12,15 +12,24 @@ Area: LSP
 language-server setup and diagnostic proof
 
 ## Current source of truth
-- `path:README.md`
+- `path:scripts/ubuntu/install.sh`
+- `path:scripts/macos/install.sh`
+- `path:config/rldyour-contract.json`
+- `path:docs/adr/0005-go-and-rust-language-server-hosts.md`
+- `path:tests/test_compiled_language_hosts.py`
 
 ## Last verified
-- date: 2026-07-10
-- commit: `25e5b7bbf07ca90192022ac8fb9f300d443b9410`
-- checked by: Codex final consistency sync
+- date: 2026-08-02
+- commit: `881c07ad415e6ac11052cfe01ab088de92de810d`
+- checked by: verified against current code, contract, and passing gates
 
 ## Facts
-- Desktop profiles install source-editing and language-server tooling without local application build/run stacks; build execution belongs on servers.
+- Desktop profiles install source-editing and language-server tooling; project build execution belongs on servers.
+- Contract `2.1.0` (ADR 0005) admits Go `1.26.5` and Rust `1.97.1` as desktop-only language-server hosts for `gopls` and `rust-analyzer`, on the same footing as Node, Python, and Homebrew's LLVM: present to resolve source, not to authorize project builds.
+- Ubuntu installs both from tracked per-architecture SHA-256 artifacts into owned versioned directories with runtime receipts; `golang-go`, `rustc`, `cargo`, and `rustup` remain forbidden distribution packages. macOS uses the `go`, `rust`, and `rust-analyzer` Homebrew formulae.
+- One combined `rust-<version>-<triple>` archive carries rustc, cargo, rust-std, clippy, rustfmt, and rust-analyzer, so a single tracked hash covers the whole Rust host.
+- `gopls` `v0.23.0` is the one host component without a tracked archive hash: it publishes no prebuilt archive, so it is pinned by exact module version and verified through the Go module checksum database. `runtime_support.ubuntu_gopls_provenance` records that class explicitly.
+- `install_compiled_language_hosts` returns early on any non-desktop profile. The Ubuntu server profile stays `container-execution-only` and receives no host compiler.
 
 ## Evidence
 - `commit:25e5b7bbf07ca90192022ac8fb9f300d443b9410`

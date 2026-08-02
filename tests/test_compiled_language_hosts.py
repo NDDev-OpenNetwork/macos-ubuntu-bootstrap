@@ -80,6 +80,73 @@ def test_installer_constants_match_the_contract() -> None:
     assert constant("RUST_SHA256_AARCH64") == RUNTIME["ubuntu_rust_sha256"]["aarch64"]
 
 
+def _pinned_rows() -> list[list[str]]:
+    source = INSTALL.read_text(encoding="utf-8")
+    block = re.search(r"^PINNED_SOURCE_TOOLS=\((.*?)^\)", source, re.M | re.S)
+    assert block, "PINNED_SOURCE_TOOLS table missing"
+    return [
+        line.strip().strip('"').split(";")
+        for line in block.group(1).splitlines()
+        if line.strip().startswith('"')
+    ]
+
+
+def test_pinned_tool_rows_are_well_formed() -> None:
+    """The table is the only way to add a pinned tool, so a malformed row must
+    fail here rather than half-install on a real device."""
+    rows = _pinned_rows()
+    assert rows, "no pinned source tools declared"
+    seen = set()
+    for row in rows:
+        assert len(row) == 10, f"row must have 10 fields, got {len(row)}: {row[:1]}"
+        name, version, kind, m_x64, m_arm64, links, sha_x64, sha_arm64, u_x64, u_arm64 = row
+        assert name not in seen, f"duplicate tool {name}"
+        seen.add(name)
+        assert kind in {"tar0", "tar1", "zip", "raw"}, f"{name}: unknown kind {kind}"
+        for digest in (sha_x64, sha_arm64):
+            assert re.fullmatch(r"[0-9a-f]{64}", digest), f"{name}: bad sha256"
+        assert sha_x64 != sha_arm64, f"{name}: both architectures share one digest"
+        for url in (u_x64, u_arm64):
+            assert url.startswith("https://"), f"{name}: non-https artifact URL"
+        assert u_x64 != u_arm64, f"{name}: both architectures share one URL"
+        # members and links must stay parallel, or the installer links the wrong file
+        assert len(m_x64.split(",")) == len(links.split(",")), f"{name}: members/links mismatch"
+        assert len(m_arm64.split(",")) == len(links.split(",")), f"{name}: members/links mismatch"
+        # the version must appear in at least one URL, so a bumped pin cannot
+        # keep pointing at the previous artifact
+        assert version in u_x64 or version.replace(".", "") in u_x64, (
+            f"{name}: version {version} does not appear in its x64 URL"
+        )
+
+
+def test_pinned_tools_match_the_contract() -> None:
+    declared = RUNTIME["ubuntu_pinned_source_tools"]
+    rows = {row[0]: row for row in _pinned_rows()}
+    assert set(declared) == set(rows), "contract and installer disagree on the tool set"
+    for name, row in rows.items():
+        assert declared[name]["version"] == row[1], f"{name}: version drift"
+        assert declared[name]["sha256"]["x64"] == row[6], f"{name}: x64 digest drift"
+        assert declared[name]["sha256"]["arm64"] == row[7], f"{name}: arm64 digest drift"
+
+
+def test_pinned_tools_are_verified_on_desktop_only() -> None:
+    """Every pinned tool must be gated, and gated inside the desktop-only block —
+    the server profile is container-execution-only and gets none of them."""
+    verify = (ROOT / "scripts/ubuntu/verify.sh").read_text(encoding="utf-8")
+    desktop_block = verify.split('if [ "$PROFILE" = "desktop" ]; then', 1)
+    assert len(desktop_block) == 2, "desktop-only block not found in verify.sh"
+    for row in _pinned_rows():
+        for link in row[5].split(","):
+            assert link in desktop_block[1], f"{link} is installed but never verified"
+
+
+def test_ast_grep_does_not_publish_the_deprecated_sg_shim() -> None:
+    """ast-grep's archive ships an `sg` shim that upstream deprecated and that
+    would shadow util-linux's setgid `sg` on hosts that have it."""
+    row = next(r for r in _pinned_rows() if r[0] == "ast-grep")
+    assert "sg" not in row[5].split(","), "the deprecated sg shim must not be published"
+
+
 def test_gopls_provenance_is_declared_and_not_a_tracked_hash() -> None:
     """gopls ships no prebuilt archive. Its provenance is the Go module checksum
     database, and that difference must stay explicit rather than look like an

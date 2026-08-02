@@ -10,7 +10,7 @@ Maintain one plan-first bootstrap adapter for:
 
 The public entry point is `scripts/bootstrap.sh`. Treat
 `config/rldyour-contract.json`, the platform installers, verification scripts,
-and tests as the executable contract. Current adapter version: `2.1.0`.
+and tests as the executable contract. Current adapter version: `2.2.0`.
 
 ## Composition Invariants
 
@@ -45,6 +45,10 @@ profile; Ubuntu server is always headless.
   is published
 - Ubuntu Node.js/uv/Bun `24.18.0` / `0.11.30` / `1.3.14`, immutable assets
   with tracked architecture hashes
+- Ubuntu pinned source tools, desktop-only, declared in the
+  `PINNED_SOURCE_TOOLS` table and installed by one generic function: gitleaks,
+  osv-scanner, actionlint, hadolint (CI-parity scanners), markdown-oxide, delta,
+  yq, ast-grep. Add a tool by adding a row — never a second install path.
 - Ubuntu Go `1.26.5` and Rust `1.97.1` (one combined archive carrying rustc,
   cargo, rust-std, clippy, rustfmt, rust-analyzer), tracked architecture hashes.
   **Desktop only** — `install_compiled_language_hosts` returns early on the

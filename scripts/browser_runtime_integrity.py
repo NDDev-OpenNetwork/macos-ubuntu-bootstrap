@@ -66,7 +66,22 @@ def fail(message: str) -> NoReturn:
     raise IntegrityError(message)
 
 
-def regular_owned(path: Path, *, executable: bool = False) -> os.stat_result:
+def regular_owned(
+    path: Path, *, executable: bool = False, enforce_private_mode: bool = True
+) -> os.stat_result:
+    """Assert a path is a regular, non-symlink, owner-held file.
+
+    ``enforce_private_mode`` additionally refuses a group- or world-writable
+    file. That is genuine tamper resistance for a file the installer created
+    and owns, and it must stay on for every installed runtime path.
+
+    It is meaningless for a Git-tracked repository source: Git records only the
+    executable bit, so the group-write bit on a checkout is decided by the
+    umask in force when the repository was cloned. A developer whose umask is
+    002 gets `664` sources and would fail this check on a pristine tree, while
+    anyone who can write those files can change their contents anyway — the
+    mode proves nothing there. Callers reading repository sources pass False.
+    """
     try:
         metadata = path.lstat()
     except FileNotFoundError:
@@ -75,7 +90,7 @@ def regular_owned(path: Path, *, executable: bool = False) -> os.stat_result:
         fail(f"path must be a regular non-symlink file: {path}")
     if metadata.st_uid != os.getuid():
         fail(f"path is not owned by the current UID: {path}")
-    if metadata.st_mode & 0o022:
+    if enforce_private_mode and metadata.st_mode & 0o022:
         fail(f"path is group/world-writable: {path}")
     if executable and not metadata.st_mode & stat.S_IXUSR:
         fail(f"path is not owner-executable: {path}")
@@ -138,13 +153,21 @@ def parse_exact_kv_marker(
     return result
 
 
-def content_id(label: str, inputs: list[Path]) -> str:
+def content_id(
+    label: str, inputs: list[Path], *, repository_sources: bool = False
+) -> str:
+    """Hash a label plus the exact bytes of each input.
+
+    Set ``repository_sources`` when the inputs are Git-tracked files in this
+    checkout rather than files the installer created; see ``regular_owned``.
+    The identity itself is unaffected — only the mode precondition changes.
+    """
     digest = hashlib.sha256()
     digest.update(b"label\0")
     digest.update(label.encode())
     digest.update(b"\0")
     for path in inputs:
-        regular_owned(path)
+        regular_owned(path, enforce_private_mode=not repository_sources)
         digest.update(b"file\0")
         digest.update(path.name.encode())
         digest.update(b"\0")
@@ -161,6 +184,7 @@ def cloak_runtime_identity(platform_label: str) -> str:
             ROOT / "templates/browser/cloakbrowser-pyproject.toml",
             ROOT / "templates/browser/cloakbrowser-uv.lock",
         ],
+        repository_sources=True,
     )
 
 

@@ -1,6 +1,6 @@
 # Installation And Target Matrix
 
-This guide describes adapter contract `2.1.0`. All paths are relative to the
+This guide describes adapter contract `2.2.0`. All paths are relative to the
 root of an existing checkout of this repository at a verified commit; acquiring
 that checkout is the caller's step (see the GDS clean-device runbook, step 0).
 Use `scripts/bootstrap.sh` as the

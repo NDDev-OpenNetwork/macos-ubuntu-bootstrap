@@ -28,12 +28,16 @@ HOMEBREW_INSTALLER_TEAM="927JGANW46"
 # test runner, or local project runtime. Homebrew's LLVM distribution is present
 # only because it is the supported clangd provider; this policy never invokes
 # its compiler/linker for project builds.
+# jdtls and kotlin-language-server are deliberately absent: their Homebrew
+# formulae depend on openjdk and openjdk@21, so installing them pulled the JDK
+# this manifest forbids by name. The estate has no Java sources, and its only
+# Kotlin lives in a Flutter Android app whose toolchain is out of scope here.
 BREW_SOURCE_PACKAGES=(
   git curl ca-certificates node bun uv python
   shellcheck shfmt llvm go gopls rust rust-analyzer docker-language-server
   vscode-langservers-extracted taplo marksman markdown-oxide
   terraform-ls helm-ls cmake-language-server
-  pyright basedpyright ruff ty jdtls kotlin-language-server
+  pyright basedpyright ruff ty
   oxlint biome osv-scanner gitleaks semgrep hadolint actionlint
   yamllint markdownlint-cli2 prettier
   ripgrep fd eza bat git-delta jq yq ast-grep

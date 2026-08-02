@@ -6,6 +6,67 @@ All notable changes to this module will be documented in this file.
 
 ### Added
 
+- **Eight pinned source-analysis tools that macOS had and Ubuntu did not.**
+  Every one is a single upstream release artifact with a tracked
+  per-architecture SHA-256, installed into an owned versioned directory with a
+  runtime receipt — the same contract as Node, uv, Bun, Go, and Rust. All
+  sixteen digests were confirmed by downloading the artifact.
+
+  | Tool | Version | Why Ubuntu needed it |
+  | --- | --- | --- |
+  | `gitleaks` | `8.30.1` | reproduces the estate's gitleaks CI check locally |
+  | `osv-scanner` | `2.4.0` | reproduces the OSV scan |
+  | `actionlint` | `1.7.12` | reproduces the workflow lint |
+  | `hadolint` | `2.15.1` | 49 Dockerfiles in the estate |
+  | `markdown-oxide` | `0.25.12` | Markdown language server; 4218 `.md` files |
+  | `delta` | `0.19.2` | see the fix below |
+  | `yq` | `4.53.3` | structured YAML editing |
+  | `ast-grep` | `0.45.0` | structural search |
+
+  They live in one declarative `PINNED_SOURCE_TOOLS` table driven by a single
+  generic installer rather than eight near-identical functions — duplicating
+  that contract eight times is how a receipt or a preflight check quietly goes
+  missing from one of them. Desktop-only, like the Go and Rust hosts.
+
+  Ubuntu uses `markdown-oxide` where macOS uses `marksman`: marksman's Homebrew
+  formula depends on `dotnet@9`, and a .NET runtime is not something this
+  adapter should pull onto a desktop. The asymmetry is deliberate and recorded.
+
+  ast-grep's archive also ships an `sg` shim. It is **not** published: upstream
+  prints a deprecation banner and exits non-zero, and on a host with util-linux
+  it would shadow the setgid `sg`.
+
+### Removed
+
+- **`jdtls` and `kotlin-language-server` from the macOS manifest.** Their
+  Homebrew formulae depend on `openjdk` and `openjdk@21`, so installing them
+  pulled the JDK that `test_desktop_manifests_exclude_project_runtime_and_docker`
+  forbids by name — the ban was satisfied on paper and defeated through
+  dependency resolution. The estate has no Java sources, and its only Kotlin
+  lives in a Flutter Android app whose toolchain is out of scope here. The test
+  now also rejects the known JVM-backed formulae by name.
+
+### Fixed
+
+- **`content_id()` refused Git-tracked sources for a property Git cannot
+  carry.** It rejects group- or world-writable inputs, which is genuine tamper
+  resistance for a file the installer created and owns. Applied to
+  `templates/browser/*`, it instead depended on the umask in force when the
+  repository was cloned: a developer whose umask is `002` gets `664` sources and
+  failed the gate on a pristine tree, while anyone able to write those files
+  could change their contents anyway.
+
+  `content_id()` and `regular_owned()` now take an explicit flag, and
+  `cloak_runtime_identity()` — the only caller reading repository sources —
+  passes it. Installed runtime paths are unchanged and still fail closed. The
+  full suite now passes under `umask 002` and `umask 022` alike.
+
+- **`cmake-language-server` was installed on Ubuntu but never verified,** so a
+  failed install stayed invisible while macOS gated on it. It is now required by
+  the Ubuntu desktop verifier, along with the eight tools above.
+
+### Added
+
 - **Go and Rust desktop language-server hosts (ADR 0005).** The macOS manifest
   shipped `gopls` while `go` sat in the forbidden set, and Homebrew declares Go
   a *build-only* dependency of that formula — so the Go language server arrived

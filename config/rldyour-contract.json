@@ -2,7 +2,7 @@
   "schema_version": 2,
   "adapter": {
     "id": "macos-ubuntu-bootstrap",
-    "version": "2.2.0"
+    "version": "2.2.1"
   },
   "verified_on": "2026-08-02",
   "targets": {

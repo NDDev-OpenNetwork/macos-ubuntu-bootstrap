@@ -5,13 +5,13 @@ Plan-first bootstrap automation for Apple Silicon macOS desktops, Ubuntu
 
 ## Current Baseline
 
-The adapter contract version is `2.2.0`.
+The adapter contract version is `2.2.1`.
 
 | Field | Value |
 | --- | --- |
-| Adapter version | `2.2.0` |
+| Adapter version | `2.2.1` |
 | Runtime baseline | macOS arm64 and Ubuntu 24.04/26.04 amd64/arm64 |
-| GitHub release tag | `2.2.0` |
+| GitHub release tag | `2.2.1` |
 
 ## What This Repository Provides
 
@@ -40,7 +40,7 @@ combined Rust archive carries rustc, cargo, rust-std, clippy, rustfmt, and
 rust-analyzer. `gopls` `v0.23.0` is the one exception to hash tracking: it ships
 no prebuilt archive, so it is pinned by exact module version and verified
 through the Go module checksum database. macOS
-bootstraps Homebrew from its notarized `6.0.9` package. At contract `2.2.0` the
+bootstraps Homebrew from its notarized `6.0.9` package. At contract `2.2.1` the
 active harness set is **codex** and **zcode** only, and neither is installed
 inline: each is owned by its NDDev module, pinned by exact commit in
 `config/rldyour-contract.json`, and self-materialized when its module path

@@ -4,6 +4,13 @@ All notable changes to this module will be documented in this file.
 
 ## [Unreleased]
 
+## [2.2.1] - 2026-08-02
+
+Contract `2.1.0` and `2.2.0` were never published as GitHub releases; both
+advanced only the contract and the gitlink the GDS control plane consumes.
+This release publishes their combined contents, so the published tag and the
+contract agree again.
+
 ### Added
 
 - **Eight pinned source-analysis tools that macOS had and Ubuntu did not.**

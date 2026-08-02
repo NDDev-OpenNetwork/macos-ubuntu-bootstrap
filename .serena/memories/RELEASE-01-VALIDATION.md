@@ -1,7 +1,7 @@
 <!-- Memory Metadata
 Last updated: 2026-08-02
 Last verified: 2026-08-02
-Last commit: 644384032ffff1f0f9dc11f0600e45f662f2b48c Merge pull request #34 from NDDev-it-com/feat/ubuntu-tool-parity
+Last commit: 81c1184dcb6c34caffeef513bb5b5660b17f6a78 Merge pull request #36 from NDDev-it-com/release/2.2.1
 Scope: README.md, VERSION, CHANGELOG.md, config/rldyour-contract.json, scripts/**, templates/**, tests/**, .github/workflows/**
 Area: RELEASE
 -->
@@ -46,7 +46,9 @@ Release, validation, CI, and public README contract for the macOS/Ubuntu bootstr
 - launchd forward and rollback handoffs use bounded loaded/unloaded state convergence instead of treating an immediate `launchctl` exit status as proof.
 
 ## Current State
-- Current product/config version is `2.2.0` (`VERSION`, `config/rldyour-contract.json` -> `adapter`). The last published GitHub release tag is still `2.0.0`; the gitlink consumed by the GDS control plane is ahead of it by two unreleased contract versions.
+- Current product/config version is `2.2.1` (`VERSION`, `config/rldyour-contract.json` -> `adapter`), and `2.2.1` is the published GitHub release tag — the published release and the contract agree.
+- Contracts `2.1.0` and `2.2.0` were never released; `2.2.1` publishes their combined contents. Do not expect tags for them.
+- Release `2.2.1` published five immutable checksummed assets in one create call: the source archive, `release-manifest.json`, `release-notes.md`, `sbom.spdx.json`, and `SHA256SUMS`.
 - Supported targets are Apple Silicon macOS desktop and Ubuntu 24.04/26.04 desktop/server on amd64 or arm64. Desktop Docker mode is always `none`; server Docker is explicit `none`, `rootful`, or `rootless`.
 - The active harness set is codex and zcode only (`harnesses.active`). Neither is installed inline: each is owned by an NDDev module pinned by exact `harnesses.<id>.module_commit`, and is self-materialized from `module_repo` at that commit when its `module_path_env` is unset. Exact commits and vendor runtime versions are read from the contract and the module's `build/version.json`; they are not duplicated here.
 - The mandatory browser baseline is CloakBrowser `0.4.12`, Chrome DevTools MCP `1.6.0`, and Playwright CLI `0.1.17` on loopback CDP `127.0.0.1:9222`; Webwright has no installed runtime or dependency tree.

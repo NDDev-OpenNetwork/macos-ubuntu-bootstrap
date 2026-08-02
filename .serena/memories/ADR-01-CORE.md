@@ -1,7 +1,7 @@
 <!-- Memory Metadata
-Last updated: 2026-07-10
-Last verified: 2026-07-10
-Last commit: 25e5b7bbf07ca90192022ac8fb9f300d443b9410 chore(release): new-mac-or-ubuntu 0.3.7 (other)
+Last updated: 2026-08-02
+Last verified: 2026-08-02
+Last commit: 881c07ad415e6ac11052cfe01ab088de92de810d Merge pull request #32 from NDDev-it-com/feat/go-rust-lsp-hosts
 Scope: architecture decisions and owner-approved policy changes
 Area: ADR
 -->
@@ -15,12 +15,14 @@ architecture decisions and owner-approved policy changes
 - `path:docs/adr`
 
 ## Last verified
-- date: 2026-07-10
-- commit: `25e5b7bbf07ca90192022ac8fb9f300d443b9410`
-- checked by: Codex final consistency sync
+- date: 2026-08-02
+- commit: `881c07ad415e6ac11052cfe01ab088de92de810d`
+- checked by: verified against current code, contract, and passing gates
 
 ## Facts
 - Bootstrap architecture or policy meaning changes require explicit owner approval; implementation-only maintenance must preserve the current decisions.
+- ADR 0004 (accepted 2026-07-10) fixes profile composition and the CloakBrowser boundary.
+- ADR 0005 (accepted 2026-08-02) amends ADR 0004: Go and Rust join Node, Python, and LLVM as desktop language-server hosts. It is explicit that this trades away the strong form of the desktop boundary — the separation between source analysis and local project build becomes intent and documentation rather than absence of a compiler, the same weaker guarantee that already applied to Node and Python.
 
 ## Evidence
 - `commit:25e5b7bbf07ca90192022ac8fb9f300d443b9410`

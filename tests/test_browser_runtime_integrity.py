@@ -48,12 +48,16 @@ def test_cloak_runtime_identity_preserves_repository_logical_names(
     tmp_path: Path,
 ) -> None:
     platform_label = "Darwin-arm64"
+    # Mirrors cloak_runtime_identity(): these are Git-tracked sources, whose
+    # group-write bit is decided by the umask at clone time, so the private-mode
+    # precondition does not apply to them.
     expected = integrity.content_id(
         f"cloakbrowser|version={integrity.CLOAK_VERSION}|platform={platform_label}",
         [
             ROOT / "templates/browser/cloakbrowser-pyproject.toml",
             ROOT / "templates/browser/cloakbrowser-uv.lock",
         ],
+        repository_sources=True,
     )
     assert integrity.cloak_runtime_identity(platform_label) == expected
 
@@ -66,10 +70,10 @@ def test_cloak_runtime_identity_preserves_repository_logical_names(
         (ROOT / "templates/browser/cloakbrowser-pyproject.toml").read_bytes()
     )
     lock.write_bytes((ROOT / "templates/browser/cloakbrowser-uv.lock").read_bytes())
-    # content_id() refuses group/world-writable inputs. These fixtures are
-    # created by the test itself, so under a umask of 002 they would arrive
-    # group-writable and fail the integrity check for a reason that has nothing
-    # to do with the behaviour under test.
+    # These stand in for *installed* runtime files, so the private-mode
+    # precondition does apply. The test creates them, so under a umask of 002
+    # they would arrive group-writable and fail for a reason unrelated to the
+    # behaviour under test.
     project.chmod(0o644)
     lock.chmod(0o644)
     assert (
@@ -79,6 +83,40 @@ def test_cloak_runtime_identity_preserves_repository_logical_names(
         )
         != expected
     )
+
+
+def test_private_mode_is_enforced_for_installed_files_and_not_for_sources(
+    tmp_path: Path,
+) -> None:
+    """Git records only the executable bit, so a checkout's group-write bit comes
+    from the umask at clone time. Enforcing it on repository sources made the
+    gate fail on a pristine tree under `umask 002` while proving nothing — anyone
+    who can write those files can change their contents. Enforcing it on files
+    the installer created is real tamper resistance and must stay."""
+    payload = tmp_path / "artifact.txt"
+    payload.write_bytes(b"managed runtime bytes\n")
+    payload.chmod(0o664)
+
+    # As an installed runtime file: group-writable is refused.
+    with pytest.raises(integrity.IntegrityError, match="group/world-writable"):
+        integrity.content_id("installed", [payload])
+
+    # As a repository source: the same file is accepted, and yields the same
+    # identity it would at 0644, because the mode is not part of the digest.
+    group_writable_id = integrity.content_id(
+        "source", [payload], repository_sources=True
+    )
+    payload.chmod(0o644)
+    assert integrity.content_id("source", [payload], repository_sources=True) == (
+        group_writable_id
+    )
+    # And the stricter reading still passes once the bit is gone.
+    assert integrity.content_id("installed", [payload])
+
+    # World-writable is refused for installed files regardless.
+    payload.chmod(0o646)
+    with pytest.raises(integrity.IntegrityError, match="group/world-writable"):
+        integrity.content_id("installed", [payload])
 
 
 def test_receipt_round_trip_rejects_payload_tampering(tmp_path: Path) -> None:

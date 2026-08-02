@@ -127,6 +127,47 @@ PYTHON_SOURCE_TOOLS=(
   "semgrep==1.170.0"
 )
 
+# Source-analysis tools that macOS gets from Homebrew and Ubuntu has no
+# acceptable distribution package for. Each is a single upstream release
+# artifact with a tracked per-architecture SHA-256, installed into an owned
+# versioned directory with a runtime receipt — the same contract as Node, uv,
+# Bun, Go, and Rust. Adding a row here is the only way to add such a tool; there
+# is deliberately no second install path.
+#
+# Row format (semicolon-separated, no spaces inside a field):
+#   name;version;kind;members_x64;members_arm64;links;sha_x64;sha_arm64;url_x64;url_arm64
+#
+#   kind     tar0 = tarball, binaries at the root
+#            tar1 = tarball with one wrapper directory to strip
+#            zip  = zip archive, binaries at the root
+#            raw  = the download is the binary itself
+#   members  comma-separated paths inside the unpacked tree, parallel to links
+#   links    comma-separated names published into ~/.local/bin
+#
+# Every digest below was confirmed by downloading the artifact, not copied from
+# a release note.
+PINNED_SOURCE_TOOLS=(
+  # Reproduce the estate's CI checks locally: these four are exactly what the
+  # gitleaks, OSV, actionlint, and hadolint workflows run.
+  "gitleaks;8.30.1;tar0;gitleaks;gitleaks;gitleaks;551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb;e4a487ee7ccd7d3a7f7ec08657610aa3606637dab924210b3aee62570fb4b080;https://github.com/gitleaks/gitleaks/releases/download/v8.30.1/gitleaks_8.30.1_linux_x64.tar.gz;https://github.com/gitleaks/gitleaks/releases/download/v8.30.1/gitleaks_8.30.1_linux_arm64.tar.gz"
+  "osv-scanner;2.4.0;raw;osv-scanner;osv-scanner;osv-scanner;15314940c10d26af9c6649f150b8a47c1262e8fc7e17b1d1029b0e479e8ed8a0;44e580752910f0ff36ec99aff59af20f65df1e859aa31e5605a8f0d055b496e9;https://github.com/google/osv-scanner/releases/download/v2.4.0/osv-scanner_linux_amd64;https://github.com/google/osv-scanner/releases/download/v2.4.0/osv-scanner_linux_arm64"
+  "actionlint;1.7.12;tar0;actionlint;actionlint;actionlint;8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8;325e971b6ba9bfa504672e29be93c24981eeb1c07576d730e9f7c8805afff0c6;https://github.com/rhysd/actionlint/releases/download/v1.7.12/actionlint_1.7.12_linux_amd64.tar.gz;https://github.com/rhysd/actionlint/releases/download/v1.7.12/actionlint_1.7.12_linux_arm64.tar.gz"
+  "hadolint;2.15.1;raw;hadolint;hadolint;hadolint;c7187db94eeeeca956519a6af171adc31453941a1e777961f6e680f697c8c507;f6198ef8090f404dbb771abfee086eb8c48ac177f30da7fd3510aca35b344b5d;https://github.com/hadolint/hadolint/releases/download/v2.15.1/hadolint-linux-x86_64;https://github.com/hadolint/hadolint/releases/download/v2.15.1/hadolint-linux-arm64"
+  # Markdown language server. Ubuntu uses markdown-oxide rather than macOS's
+  # marksman: marksman's Homebrew formula depends on dotnet@9, and a .NET
+  # runtime is not something this adapter should pull onto a desktop.
+  "markdown-oxide;0.25.12;tar1;markdown-oxide;markdown-oxide;markdown-oxide;ad4248cf5d3f0e9d9f120b579501c45dad9c46bfcb4ddec36d2cb85d68a58828;6634b644ff0bcc1b8fb27cc518f82618547ec43fe19d515a890e8e8756950020;https://github.com/Feel-ix-343/markdown-oxide/releases/download/v0.25.12/markdown-oxide-v0.25.12-x86_64-unknown-linux-gnu.tar.gz;https://github.com/Feel-ix-343/markdown-oxide/releases/download/v0.25.12/markdown-oxide-v0.25.12-aarch64-unknown-linux-gnu.tar.gz"
+  # rldyour::ensure_git_delta_config configures delta as the global git pager on
+  # both platforms, but Ubuntu never installed it, so the call silently skipped
+  # on every Linux desktop.
+  "delta;0.19.2;tar1;delta;delta;delta;8e695c5f586a8c53d6c3b01be0b4a422ed218bfed2a56191caebe373a1c18ab2;0bfce159a5cddd5feb3d6db4a616d883ff51253ce08ac7ec11cb1d208cfaab9e;https://github.com/dandavison/delta/releases/download/0.19.2/delta-0.19.2-x86_64-unknown-linux-gnu.tar.gz;https://github.com/dandavison/delta/releases/download/0.19.2/delta-0.19.2-aarch64-unknown-linux-gnu.tar.gz"
+  "yq;4.53.3;tar0;yq_linux_amd64;yq_linux_arm64;yq;b4077cab0f9ee5ce8381e602d090daa69a0afb7e57eb9a5b20e9cb416d7f6794;42600522e7455282e11c71c9fc62dc8e98b05bcdb830210fe16eb673a871e866;https://github.com/mikefarah/yq/releases/download/v4.53.3/yq_linux_amd64.tar.gz;https://github.com/mikefarah/yq/releases/download/v4.53.3/yq_linux_arm64.tar.gz"
+  # The archive also ships an `sg` shim. It is not published: upstream prints a
+  # deprecation banner and exits non-zero, and on a host that has util-linux it
+  # would shadow the setgid `sg`.
+  "ast-grep;0.45.0;zip;ast-grep;ast-grep;ast-grep;78931ae35ebac33d9a72b3aecea3e3d62d6e5b0b718ac8bbedfbe69d68421e41;62b60892dafacfa76d6de87157659f880bbf85ff38bdab52db12f1f14ec60f94;https://github.com/ast-grep/ast-grep/releases/download/0.45.0/app-x86_64-unknown-linux-gnu.zip;https://github.com/ast-grep/ast-grep/releases/download/0.45.0/app-aarch64-unknown-linux-gnu.zip"
+)
+
 usage() {
   cat <<'EOF'
 Usage: scripts/ubuntu/install.sh
@@ -246,6 +287,91 @@ ensure_managed_tool_link() {
     esac
   fi
   ln -sfn "$source" "$destination"
+}
+
+# Install every row of PINNED_SOURCE_TOOLS. One generic installer rather than a
+# function per tool: the contract is identical, and duplicating it eight times
+# is how a receipt or a preflight check quietly goes missing from one of them.
+install_pinned_source_tools() {
+  local row
+  for row in "${PINNED_SOURCE_TOOLS[@]}"; do
+    ensure_pinned_source_tool "$row" || return 1
+  done
+}
+
+ensure_pinned_source_tool() {
+  local row=$1
+  local name version kind members_x64 members_arm64 links sha_x64 sha_arm64 url_x64 url_arm64
+  IFS=';' read -r name version kind members_x64 members_arm64 links \
+    sha_x64 sha_arm64 url_x64 url_arm64 <<<"$row"
+
+  local sha url members
+  case "$(uname -m)" in
+    x86_64|amd64) sha="$sha_x64"; url="$url_x64"; members="$members_x64" ;;
+    aarch64|arm64) sha="$sha_arm64"; url="$url_arm64"; members="$members_arm64" ;;
+    *) rldyour::log "error" "$name $version has no tracked artifact for $(uname -m)"; return 1 ;;
+  esac
+
+  local destination parent
+  destination="$HOME/.local/share/rldyour/$name/$version"
+  parent="$(dirname "$destination")"
+
+  if [ "$RLDYOUR_DRY_RUN" -eq 1 ]; then
+    rldyour::log "info" "[DRY-RUN] verify or install managed $name $version from the tracked SHA-256 artifact; external PATH binaries are preserved but never trusted"
+    return 0
+  fi
+
+  local -a member_list link_list
+  IFS=',' read -r -a member_list <<<"$members"
+  IFS=',' read -r -a link_list <<<"$links"
+  if [ "${#member_list[@]}" -ne "${#link_list[@]}" ]; then
+    rldyour::log "error" "$name: members and links must be parallel lists"
+    return 1
+  fi
+
+  mkdir -p "$HOME/.local/bin" "$parent"
+  if [ -e "$destination" ] || [ -L "$destination" ]; then
+    if ! rldyour::ubuntu::validate_runtime_receipt \
+      "$destination" "$name" "$version" "$sha" "${member_list[@]}"; then
+      rldyour::log "error" "unmanaged or tampered $name destination exists; preserved: $destination"
+      return 1
+    fi
+  else
+    local archive stage
+    archive="$(mktemp)"; stage="$(mktemp -d "$parent/.$name-$version.tmp.XXXXXX")"
+    trap 'rm -rf "$archive"; [ -z "${stage:-}" ] || rm -rf "$stage"' RETURN
+    rldyour::download_verified_file "$url" "$sha" "$archive" || return 1
+    case "$kind" in
+      tar0) tar -xzf "$archive" -C "$stage" ;;
+      tar1) tar -xzf "$archive" --strip-components=1 -C "$stage" ;;
+      zip) unzip -q -o "$archive" -d "$stage" ;;
+      raw) cp "$archive" "$stage/${member_list[0]}" ;;
+      *) rldyour::log "error" "$name: unknown archive kind '$kind'"; return 1 ;;
+    esac
+
+    local member
+    for member in "${member_list[@]}"; do
+      if [ ! -f "$stage/$member" ]; then
+        rldyour::log "error" "$name $version artifact does not contain $member"
+        return 1
+      fi
+      chmod 0755 "$stage/$member"
+    done
+    rldyour::ubuntu::write_runtime_receipt \
+      "$stage" "$name" "$version" "$sha" "${member_list[@]}" || return 1
+    mv "$stage" "$destination"
+    stage=""
+    rm -f "$archive"
+    trap - RETURN
+  fi
+
+  local i
+  for i in "${!link_list[@]}"; do
+    rldyour::ubuntu::preflight_managed_link "${link_list[$i]}" "$HOME/.local/share/rldyour/$name" || return 1
+    ensure_managed_tool_link "${link_list[$i]}" "$destination/${member_list[$i]}" \
+      "$HOME/.local/share/rldyour/$name" || return 1
+  done
+  rldyour::ensure_path
 }
 
 rldyour::ubuntu::write_runtime_receipt() {
@@ -393,6 +519,7 @@ install_compiled_language_hosts() {
   fi
   ensure_go
   ensure_rust
+  install_pinned_source_tools
 }
 
 ensure_go() {

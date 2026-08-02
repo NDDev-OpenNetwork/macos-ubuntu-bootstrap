@@ -242,6 +242,14 @@ def test_desktop_manifests_exclude_project_runtime_and_docker() -> None:
     }
     assert macos.isdisjoint(forbidden_macos)
     assert ubuntu.isdisjoint(forbidden_ubuntu)
+    # A direct-entry ban is not enough on Homebrew: a formula's dependencies are
+    # installed too. jdtls (-> openjdk) and kotlin-language-server (-> openjdk@21)
+    # each pulled the JDK this manifest forbids, so the ban was satisfied on
+    # paper and defeated in practice. Keep the known offenders out by name; a new
+    # JVM-backed formula must be checked against `brew info --json` before it is
+    # added.
+    jvm_backed_formulae = {"jdtls", "kotlin-language-server", "ktlint", "google-java-format"}
+    assert macos.isdisjoint(jvm_backed_formulae)
     assert "llvm" in macos  # Homebrew's supported clangd distribution only.
     # The language-server hosts admitted by ADR 0005, and their servers.
     assert {"go", "gopls", "rust", "rust-analyzer"}.issubset(macos)

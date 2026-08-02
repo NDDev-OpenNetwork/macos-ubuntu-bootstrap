@@ -27,7 +27,7 @@ When prose and implementation disagree, verify the scripts and contract, then
 update the affected documentation in the same change. Do not invent a second
 policy source.
 
-## Contract `2.1.0`
+## Contract `2.2.0`
 
 Ubuntu profile selection is always explicit. Never infer server/rootful Docker
 from `uname=Linux`; require `--profile desktop|server`.
@@ -75,6 +75,13 @@ operator documentation:
 - Webwright: retired fail-closed; publish only the exact disabled wrapper
 - Ubuntu Node.js/uv/Bun: `24.18.0` / `0.11.30` / `1.3.14`, immutable assets
   with tracked architecture hashes
+- Ubuntu pinned source tools (desktop-only, `PINNED_SOURCE_TOOLS` table, one
+  generic installer, tracked per-architecture SHA-256 + runtime receipts):
+  gitleaks `8.30.1`, osv-scanner `2.4.0`, actionlint `1.7.12`, hadolint
+  `2.15.1`, markdown-oxide `0.25.12`, delta `0.19.2`, yq `4.53.3`, ast-grep
+  `0.45.0`. Adding a tool means adding a row; there is no second install path.
+  Ubuntu uses markdown-oxide where macOS uses marksman (marksman's formula
+  depends on `dotnet@9`). ast-grep's deprecated `sg` shim is never published.
 - Ubuntu Go `1.26.5` and Rust `1.97.1`, desktop-only language-server hosts,
   tracked architecture hashes. One combined Rust archive carries rustc, cargo,
   rust-std, clippy, rustfmt, and rust-analyzer. gopls `v0.23.0` is pinned by

@@ -138,6 +138,15 @@ if [ "$PROFILE" = "desktop" ]; then
   for cmd in go gopls rustc cargo rust-analyzer; do
     rldyour::require_cmd "$cmd" required
   done
+  # Pinned source-analysis tools: the four CI-parity scanners, the Markdown
+  # language server, the git pager that ensure_git_delta_config configures, and
+  # the structured YAML/AST utilities.
+  for cmd in gitleaks osv-scanner actionlint hadolint markdown-oxide delta yq ast-grep; do
+    rldyour::require_cmd "$cmd" required
+  done
+  # cmake-language-server ships in PYTHON_SOURCE_TOOLS but was never verified,
+  # so a failed install stayed invisible on Ubuntu while macOS gated on it.
+  rldyour::require_cmd cmake-language-server required
   [ "$(go version 2>/dev/null | awk '{ print $3 }')" = "go1.26.5" ] || {
     rldyour::log "missing" "Go exact managed Ubuntu version 1.26.5"
     exit 1

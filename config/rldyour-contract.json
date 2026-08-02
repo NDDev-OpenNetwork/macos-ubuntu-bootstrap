@@ -2,7 +2,7 @@
   "schema_version": 2,
   "adapter": {
     "id": "macos-ubuntu-bootstrap",
-    "version": "2.1.0"
+    "version": "2.2.0"
   },
   "verified_on": "2026-08-02",
   "targets": {
@@ -115,7 +115,65 @@
       "rust-analyzer-preview"
     ],
     "purpose": "ai-cli-and-language-server-host-only",
-    "managed_receipt": "ubuntu-runtime-v1"
+    "managed_receipt": "ubuntu-runtime-v1",
+    "ubuntu_pinned_source_tools": {
+      "gitleaks": {
+        "version": "8.30.1",
+        "sha256": {
+          "x64": "551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb",
+          "arm64": "e4a487ee7ccd7d3a7f7ec08657610aa3606637dab924210b3aee62570fb4b080"
+        }
+      },
+      "osv-scanner": {
+        "version": "2.4.0",
+        "sha256": {
+          "x64": "15314940c10d26af9c6649f150b8a47c1262e8fc7e17b1d1029b0e479e8ed8a0",
+          "arm64": "44e580752910f0ff36ec99aff59af20f65df1e859aa31e5605a8f0d055b496e9"
+        }
+      },
+      "actionlint": {
+        "version": "1.7.12",
+        "sha256": {
+          "x64": "8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8",
+          "arm64": "325e971b6ba9bfa504672e29be93c24981eeb1c07576d730e9f7c8805afff0c6"
+        }
+      },
+      "hadolint": {
+        "version": "2.15.1",
+        "sha256": {
+          "x64": "c7187db94eeeeca956519a6af171adc31453941a1e777961f6e680f697c8c507",
+          "arm64": "f6198ef8090f404dbb771abfee086eb8c48ac177f30da7fd3510aca35b344b5d"
+        }
+      },
+      "markdown-oxide": {
+        "version": "0.25.12",
+        "sha256": {
+          "x64": "ad4248cf5d3f0e9d9f120b579501c45dad9c46bfcb4ddec36d2cb85d68a58828",
+          "arm64": "6634b644ff0bcc1b8fb27cc518f82618547ec43fe19d515a890e8e8756950020"
+        }
+      },
+      "delta": {
+        "version": "0.19.2",
+        "sha256": {
+          "x64": "8e695c5f586a8c53d6c3b01be0b4a422ed218bfed2a56191caebe373a1c18ab2",
+          "arm64": "0bfce159a5cddd5feb3d6db4a616d883ff51253ce08ac7ec11cb1d208cfaab9e"
+        }
+      },
+      "yq": {
+        "version": "4.53.3",
+        "sha256": {
+          "x64": "b4077cab0f9ee5ce8381e602d090daa69a0afb7e57eb9a5b20e9cb416d7f6794",
+          "arm64": "42600522e7455282e11c71c9fc62dc8e98b05bcdb830210fe16eb673a871e866"
+        }
+      },
+      "ast-grep": {
+        "version": "0.45.0",
+        "sha256": {
+          "x64": "78931ae35ebac33d9a72b3aecea3e3d62d6e5b0b718ac8bbedfbe69d68421e41",
+          "arm64": "62b60892dafacfa76d6de87157659f880bbf85ff38bdab52db12f1f14ec60f94"
+        }
+      }
+    }
   },
   "browser_automation": {
     "required": true,

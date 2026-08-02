@@ -1,7 +1,7 @@
 <!-- Memory Metadata
 Last updated: 2026-08-02
 Last verified: 2026-08-02
-Last commit: 881c07ad415e6ac11052cfe01ab088de92de810d Merge pull request #32 from NDDev-it-com/feat/go-rust-lsp-hosts
+Last commit: 644384032ffff1f0f9dc11f0600e45f662f2b48c Merge pull request #34 from NDDev-it-com/feat/ubuntu-tool-parity
 Scope: language-server setup and diagnostic proof
 Area: LSP
 -->
@@ -20,7 +20,7 @@ language-server setup and diagnostic proof
 
 ## Last verified
 - date: 2026-08-02
-- commit: `881c07ad415e6ac11052cfe01ab088de92de810d`
+- commit: `644384032ffff1f0f9dc11f0600e45f662f2b48c`
 - checked by: verified against current code, contract, and passing gates
 
 ## Facts
@@ -30,6 +30,10 @@ language-server setup and diagnostic proof
 - One combined `rust-<version>-<triple>` archive carries rustc, cargo, rust-std, clippy, rustfmt, and rust-analyzer, so a single tracked hash covers the whole Rust host.
 - `gopls` `v0.23.0` is the one host component without a tracked archive hash: it publishes no prebuilt archive, so it is pinned by exact module version and verified through the Go module checksum database. `runtime_support.ubuntu_gopls_provenance` records that class explicitly.
 - `install_compiled_language_hosts` returns early on any non-desktop profile. The Ubuntu server profile stays `container-execution-only` and receives no host compiler.
+- Contract `2.2.0` adds eight pinned source-analysis tools to Ubuntu desktops via the declarative `PINNED_SOURCE_TOOLS` table and one generic installer: gitleaks `8.30.1`, osv-scanner `2.4.0`, actionlint `1.7.12`, hadolint `2.15.1` (the four that reproduce the estate's CI checks locally), plus markdown-oxide `0.25.12`, delta `0.19.2`, yq `4.53.3`, ast-grep `0.45.0`. Adding a tool means adding a row; there is no second install path.
+- Ubuntu uses markdown-oxide where macOS uses marksman, because marksman's Homebrew formula depends on `dotnet@9`. ast-grep's `sg` shim is never published: upstream deprecated it and it would shadow util-linux's setgid `sg`.
+- `terraform-ls` and `helm-ls` stay macOS-only by decision: the estate contains no Terraform and no Helm charts.
+- `jdtls` and `kotlin-language-server` were removed from macOS: their formulae depend on `openjdk` / `openjdk@21`, so they pulled the JDK the manifest forbids by name.
 
 ## Evidence
 - `commit:25e5b7bbf07ca90192022ac8fb9f300d443b9410`

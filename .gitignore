@@ -11,3 +11,6 @@ dist/
 *.swp
 .idea/
 .vscode/
+
+# uv-created test environment (CI builds it from requirements-test.txt).
+.venv/

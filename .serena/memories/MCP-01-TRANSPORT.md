@@ -1,7 +1,7 @@
 <!-- Memory Metadata
-Last updated: 2026-08-03
-Last verified: 2026-08-03
-Last commit: 4ceac2921743308354b4292034e12e6400ad3e6d Merge pull request #40 from NDDev-it-com/feat/dart-host-and-zcode-delegation
+Last updated: 2026-08-04
+Last verified: 2026-08-04
+Last commit: 47b1b549bb55830f839834ef33bac41a5f278a69 feat(rtk)!: remove rtk from the bootstrap (2.4.0)
 Scope: MCP runtime transport and pin policy
 Area: MCP
 -->

@@ -2,9 +2,9 @@
   "schema_version": 2,
   "adapter": {
     "id": "macos-ubuntu-bootstrap",
-    "version": "2.3.0"
+    "version": "2.4.0"
   },
-  "verified_on": "2026-08-03",
+  "verified_on": "2026-08-04",
   "targets": {
     "macos": {
       "architectures": [
@@ -213,10 +213,6 @@
     "homebrew_pkg_version": "6.0.9",
     "homebrew_pkg_sha256": "525599bd2dcbda29857120234336b0103ad5283a3dc8511f72066eeb917abd3c",
     "homebrew_installer_team": "927JGANW46",
-    "rtk_artifact_version": "0.43.0",
-    "rtk_macos_arm64_sha256": "8a17e49acbd378997eb21d0eb6f7f861111f35b4fc9b1c74edf4c7448e576c65",
-    "rtk_linux_x64_sha256": "ff8a1e7766496e175291a85aeca1dc97c9ff6df33e51e5893d1fbc78fea2a609",
-    "rtk_linux_arm64_sha256": "5519f7ca12e5c143a609f0d28a0a77b97413a8dce31c2681f1a41c24519a8731",
     "browser_provider_lock": "templates/browser/provider/bun.lock",
     "cloakbrowser_lock": "templates/browser/cloakbrowser-uv.lock"
   },

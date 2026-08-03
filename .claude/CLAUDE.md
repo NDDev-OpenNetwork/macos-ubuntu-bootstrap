@@ -10,7 +10,7 @@ Maintain one plan-first bootstrap adapter for:
 
 The public entry point is `scripts/bootstrap.sh`. Treat
 `config/rldyour-contract.json`, the platform installers, verification scripts,
-and tests as the executable contract. Current adapter version: `2.3.0`.
+and tests as the executable contract. Current adapter version: `2.4.0`.
 
 ## Composition Invariants
 
@@ -39,7 +39,6 @@ profile; Ubuntu server is always headless.
     `${RLDYOUR_CODEX_HOME:-$HOME/.codex}/bin` belongs on the managed PATH.
   - `zcode`: delegated out of bootstrap (ADR 0006), owned by `nddev-harnesses`.
     Its target cannot be adopted unattended; never reintroduce an install path.
-- RTK exact `0.43.0`, hash-pinned native artifact
 - CloakBrowser `0.4.12`
 - Chrome DevTools MCP `1.6.0`
 - Playwright CLI `0.1.17`

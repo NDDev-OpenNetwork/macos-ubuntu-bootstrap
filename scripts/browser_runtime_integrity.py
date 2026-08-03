@@ -283,8 +283,16 @@ def policy_hashes() -> dict[str, str]:
         "provider_lock": ROOT / "templates/browser/provider/bun.lock",
         "playwright_config": ROOT / "templates/browser/playwright-cli.json",
     }
+    # Every path here is a Git-tracked source, not a file the installer created.
+    # Git records only the executable bit, so a clone or submodule update under
+    # `umask 002` writes them 664 and a private-mode refusal fails on a pristine
+    # tree while passing under `umask 022` - a property of the checkout, not of the
+    # runtime. The refusal is real tamper resistance for a file the installer owns
+    # and meaningless for a source anyone able to write can simply edit; these are
+    # still hashed, which is what actually pins them. Installed runtime paths keep
+    # failing closed, and must: see cloak_runtime_identity().
     for path in paths.values():
-        regular_owned(path)
+        regular_owned(path, enforce_private_mode=False)
     return {name: sha256_file(path) for name, path in paths.items()}
 
 

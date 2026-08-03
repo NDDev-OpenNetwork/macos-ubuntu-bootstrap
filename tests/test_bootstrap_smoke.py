@@ -217,18 +217,42 @@ def test_harness_delegation_wires_exact_module_commands() -> None:
     assert "rldyour::_ensure_pinned_git_checkout" in common
 
 
+def test_linux_cdp_service_carries_no_sandbox_and_macos_does_not() -> None:
+    """Ubuntu 23.10+ restricts unprivileged user namespaces through AppArmor, so the
+    headless Chromium zygote finds no usable sandbox and aborts with status 6/ABRT.
+    Observed on 26.04: the service restarted seven times and the mandatory health
+    gate failed, which correctly aborted the apply. The flag is what lets the
+    managed service start at all there.
+
+    macOS has no such restriction and keeps its sandbox, so the flag must NOT
+    appear on that platform - and the provenance validators compare the argument
+    tail exactly, so a shared list would break one platform or the other."""
+    common = file("scripts/lib/common.sh")
+    unit = next(
+        line for line in common.splitlines()
+        if line.startswith('ExecStart="${service_binary}"')
+    )
+    assert unit.endswith("--no-sandbox"), unit
+    # Both provenance validators must expect it, and only for linux.
+    assert common.count('if fingerprint == "linux":\n    expected_tail.append("--no-sandbox")') == 2
+    # The macOS plist argument list must stay sandboxed.
+    plist = common[common.index("<string>--fingerprint-platform=${fp}</string>") - 900 :]
+    plist = plist[: plist.index("</array>")] if "</array>" in plist else plist
+    assert "--no-sandbox" not in plist, "macOS launchd arguments must keep the sandbox"
+
+
 def test_harness_layer_runs_after_the_layers_it_used_to_strand() -> None:
     """The harness layer delegates to a module whose fail-closed guards depend on
     local state this repository does not own: a stale builder profile under the
     harness target, or a checkout whose modes came from the caller's umask. Under
     `set -euo pipefail` an abort there stranded every layer behind it - the
-    language servers, compiled hosts, pinned scanners, browser stack, and rtk -
-    which is how a desktop ended up missing 24 of the 46 commands verify.sh
-    requires. The failure must stay fatal; it must not stay first."""
+    language servers, compiled hosts, pinned scanners, and browser stack - which
+    is how a desktop ended up missing 24 of the 46 commands verify.sh required at
+    the time. The failure must stay fatal; it must not stay first."""
     for installer in ("scripts/ubuntu/install.sh", "scripts/macos/install.sh"):
         body = file(installer)
         harness = body.index('[ "$SKIP_AI" -eq 1 ] || install_ai_runtimes')
-        for later in ("rldyour::install_browser_providers", "rldyour::install_rtk"):
+        for later in ("rldyour::install_browser_providers",):
             assert body.index(f"\n{later}") < harness, f"{installer}: {later} must run before the harness"
         # Still fatal: no `|| true`, no warn-and-continue wrapper.
         line = next(l for l in body.splitlines() if "install_ai_runtimes" in l and "SKIP_AI" in l)
@@ -483,101 +507,6 @@ printf '%s' "$CONTENT" | rldyour::_install_managed_browser_file "$2" "$3" 0755
     assert unmanaged.read_text(encoding="utf-8") == original
 
 
-def test_rtk_artifact_install_is_pinned_and_tamper_evident(tmp_path: Path) -> None:
-    payload = tmp_path / "rtk"
-    payload.write_text(
-        "#!/usr/bin/env bash\nprintf 'rtk 0.43.0\\n'\n", encoding="utf-8"
-    )
-    payload.chmod(0o755)
-    archive = tmp_path / "rtk.tar.gz"
-    with tarfile.open(archive, "w:gz") as bundle:
-        bundle.add(payload, arcname="rtk")
-    sha256 = hashlib.sha256(archive.read_bytes()).hexdigest()
-
-    fake_bin = tmp_path / "fake-bin"
-    fake_bin.mkdir()
-    fake_curl = fake_bin / "curl"
-    fake_curl.write_text(
-        """#!/usr/bin/env bash
-set -euo pipefail
-destination=
-while [ "$#" -gt 0 ]; do
-  case "$1" in
-    --output) destination=$2; shift 2 ;;
-    *) shift ;;
-  esac
-done
-cp "$FAKE_ARCHIVE" "$destination"
-""",
-        encoding="utf-8",
-    )
-    fake_curl.chmod(0o755)
-    fake_uname = fake_bin / "uname"
-    fake_uname.write_text(
-        "#!/usr/bin/env bash\n"
-        'case "${1:-}" in -s) echo Linux ;; -m) echo x86_64 ;; *) exec /usr/bin/uname "$@" ;; esac\n',
-        encoding="utf-8",
-    )
-    fake_uname.chmod(0o755)
-
-    home = tmp_path / "home"
-    home.mkdir()
-    interrupted = home / ".local/share/rldyour/rtk/0.43.0"
-    interrupted.mkdir(parents=True)
-    (interrupted / "rtk.sha256").write_text(
-        "# Managed by macos-ubuntu-bootstrap: rtk-v1\n"
-        "version=0.43.0\n"
-        f"sha256={hashlib.sha256(payload.read_bytes()).hexdigest()}\n",
-        encoding="utf-8",
-    )
-    common_path = ROOT / "scripts/lib/common.sh"
-    script = r"""
-source "$1"
-export RLDYOUR_DRY_RUN=0
-rldyour::install_rtk
-"""
-    env = {
-        **os.environ,
-        "HOME": str(home),
-        "PATH": f"{fake_bin}:{os.environ['PATH']}",
-        "FAKE_ARCHIVE": str(archive),
-    }
-    # Replace the production hash only inside the sourced test copy so the
-    # installer path and receipt behavior are exercised without network access.
-    test_common = tmp_path / "common.sh"
-    test_common.write_text(
-        common_path.read_text(encoding="utf-8").replace(
-            "ff8a1e7766496e175291a85aeca1dc97c9ff6df33e51e5893d1fbc78fea2a609",
-            sha256,
-        ),
-        encoding="utf-8",
-    )
-    result = subprocess.run(
-        ["bash", "-c", script, "_", str(test_common)],
-        check=False,
-        capture_output=True,
-        text=True,
-        env=env,
-    )
-    assert result.returncode == 0, result.stderr + result.stdout
-    launcher = home / ".local/bin/rtk"
-    assert (
-        subprocess.check_output([launcher, "--version"], text=True).strip()
-        == "rtk 0.43.0"
-    )
-
-    managed_binary = home / ".local/share/rldyour/rtk/0.43.0/rtk"
-    managed_binary.write_bytes(managed_binary.read_bytes() + b"\n# tampered\n")
-    result = subprocess.run(
-        ["bash", "-c", script, "_", str(test_common)],
-        check=False,
-        capture_output=True,
-        text=True,
-        env=env,
-    )
-    assert result.returncode != 0
-    assert "binary identity changed" in result.stdout
-
 
 def test_browser_commands_are_required_in_verifiers() -> None:
     for platform in ("macos", "ubuntu"):
@@ -704,7 +633,6 @@ def test_existing_homebrew_packages_are_never_implicitly_upgraded() -> None:
 def test_versioned_native_artifacts_publish_on_the_destination_filesystem() -> None:
     common = file("scripts/lib/common.sh")
     ubuntu = file("scripts/ubuntu/install.sh")
-    assert ".rtk.tmp.XXXXXX" in common
     assert ".node-${NODE_VERSION}.tmp.XXXXXX" in ubuntu
     assert ".uv-${UV_VERSION}.tmp.XXXXXX" in ubuntu
     assert ".bun-${BUN_VERSION}.tmp.XXXXXX" in ubuntu

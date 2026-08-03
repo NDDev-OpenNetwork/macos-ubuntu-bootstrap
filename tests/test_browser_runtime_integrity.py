@@ -119,6 +119,37 @@ def test_private_mode_is_enforced_for_installed_files_and_not_for_sources(
         integrity.content_id("installed", [payload])
 
 
+def test_policy_hashes_treats_its_inputs_as_repository_sources() -> None:
+    """policy_hashes() reads eight Git-tracked files - this script, common.sh, the
+    contract, and five templates - and was the call site where the 2.2.0 flag had
+    been dropped. Under `umask 002` a clone writes them 664, so the live
+    verify-browser-runtime run failed with
+
+        NOT_PROVEN: path is group/world-writable: .../browser_runtime_integrity.py
+
+    on a pristine tree, while `umask 022` hosts and CI stayed green. Hashing is
+    what pins these files; the mode says nothing about them, because anyone who can
+    write a source can edit its contents. The installed-path refusal is untouched
+    and must stay - see the test above."""
+    source = MODULE_PATH.read_text(encoding="utf-8")
+    call = source[source.index("def policy_hashes()") : source.index("def validate_contract()")]
+    assert "regular_owned(path, enforce_private_mode=False)" in call
+    assert "regular_owned(path)\n" not in call, "private mode must not be re-enforced here"
+    # It still hashes every input, which is the actual pin.
+    assert "sha256_file(path)" in call
+    # Proven live: the real repository tree passes regardless of its clone umask.
+    assert set(integrity.policy_hashes()) == {
+        "integrity_policy",
+        "installer_policy",
+        "contract",
+        "cloak_project",
+        "cloak_lock",
+        "provider_manifest",
+        "provider_lock",
+        "playwright_config",
+    }
+
+
 def test_receipt_round_trip_rejects_payload_tampering(tmp_path: Path) -> None:
     receipt = tmp_path / "receipt.json"
     state = minimal_state()

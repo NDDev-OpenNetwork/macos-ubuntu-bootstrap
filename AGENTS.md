@@ -27,7 +27,7 @@ When prose and implementation disagree, verify the scripts and contract, then
 update the affected documentation in the same change. Do not invent a second
 policy source.
 
-## Contract `2.3.0`
+## Contract `2.4.0`
 
 Ubuntu profile selection is always explicit. Never infer server/rootful Docker
 from `uname=Linux`; require `--profile desktop|server`.
@@ -73,7 +73,6 @@ operator documentation:
     owned by the `nddev-harnesses` repository. Its target cannot be adopted
     unattended, and blocking a device apply on it stranded every later layer. Do
     not reintroduce a zcode install path, not even a warn-and-continue one.
-- RTK: exact `0.43.0`, hash-pinned native artifact
 - CloakBrowser: `0.4.12`
 - Chrome DevTools MCP: `1.6.0`
 - Playwright CLI: `0.1.17`
@@ -152,7 +151,7 @@ can create unrelated agent configs.
 ZCode is owned by the `nddev-harnesses` repository and installed through its own
 lifecycle. Bootstrap never installs ZCode via an apt `.deb` or a
 `RLDYOUR_ZCODE_SHA256` gate; both were removed in contract `2.0.0`, and the
-remaining module delegation was removed in `2.3.0`. Do not reintroduce a silent
+remaining module delegation was removed in `2.4.0`. Do not reintroduce a silent
 download, fallback checksum, or integrity bypass.
 
 Authentication is a post-install owner handoff. `scripts/auth-handoff.sh` may

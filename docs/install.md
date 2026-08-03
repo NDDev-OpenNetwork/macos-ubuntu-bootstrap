@@ -1,6 +1,6 @@
 # Installation And Target Matrix
 
-This guide describes adapter contract `2.3.0`. All paths are relative to the
+This guide describes adapter contract `2.4.0`. All paths are relative to the
 root of an existing checkout of this repository at a verified commit; acquiring
 that checkout is the caller's step (see the GDS clean-device runbook, step 0).
 Use `scripts/bootstrap.sh` as the
@@ -173,7 +173,7 @@ an unstamped target without an explicit `--adopt-unmanaged` — an adoption deci
 that belongs to the operator, not to an unattended run. Because the harness step
 ran before every other layer under `set -euo pipefail`, that refusal aborted the
 whole apply and silently skipped the language servers, compiled hosts, pinned
-scanners, browser stack, and rtk behind it. zcode is now declared
+scanners, and browser stack behind it. zcode is now declared
 `harnesses.delegated` in the contract and installed by the **nddev-harnesses**
 repository through its own lifecycle. Neither verifier requires `zcode`.
 
@@ -374,8 +374,7 @@ uses a hash-verified, signed, and
 notarized package. The codex harness is installed by its authoritative NDDev
 module (`nddev-codex-app`), which owns its pinned standalone artifacts and
 integrity checks; bootstrap only delegates to that module's install lifecycle and
-never installs a harness through a bun/npm global path. RTK `0.43.0` uses a hash-pinned
-native artifact and tamper-evident launcher. Chrome DevTools MCP and Playwright
+never installs a harness through a bun/npm global path. Chrome DevTools MCP and Playwright
 CLI install from a separate tracked `bun.lock` with `--frozen-lockfile`.
 CloakBrowser dependencies come from a tracked universal lock and install with
 `uv sync --frozen`. Webwright has no installed runtime or dependency tree.

@@ -1097,6 +1097,13 @@ expected_tail = [
     "--no-default-browser-check",
     f"--fingerprint-platform={fingerprint}",
 ]
+# Ubuntu 23.10+ restricts unprivileged user namespaces through AppArmor, so the
+# headless Chromium zygote finds no usable sandbox and aborts on start
+# (status 6/ABRT, observed on 26.04). The flag is what lets the managed service
+# run there at all. macOS keeps its sandbox, and the flag must NOT appear on that
+# platform - hence a per-platform tail rather than one shared list.
+if fingerprint == "linux":
+    expected_tail.append("--no-sandbox")
 if arguments[1:] != expected_tail:
     raise SystemExit("managed service arguments escaped the fixed CDP contract")
 binary = arguments[0]
@@ -1338,6 +1345,13 @@ expected_tail = [
     "--no-default-browser-check",
     f"--fingerprint-platform={fingerprint}",
 ]
+# Ubuntu 23.10+ restricts unprivileged user namespaces through AppArmor, so the
+# headless Chromium zygote finds no usable sandbox and aborts on start
+# (status 6/ABRT, observed on 26.04). The flag is what lets the managed service
+# run there at all. macOS keeps its sandbox, and the flag must NOT appear on that
+# platform - hence a per-platform tail rather than one shared list.
+if fingerprint == "linux":
+    expected_tail.append("--no-sandbox")
 if arguments[1:] != expected_tail:
     raise SystemExit(1)
 binary = arguments[0]
@@ -1877,7 +1891,7 @@ Description=rldyour CloakBrowser headless CDP endpoint
 After=default.target
 
 [Service]
-ExecStart="${service_binary}" --headless=new --remote-debugging-address=127.0.0.1 --remote-debugging-port=${port} "--user-data-dir=${profile}" --no-first-run --no-default-browser-check --fingerprint-platform=${fp}
+ExecStart="${service_binary}" --headless=new --remote-debugging-address=127.0.0.1 --remote-debugging-port=${port} "--user-data-dir=${profile}" --no-first-run --no-default-browser-check --fingerprint-platform=${fp} --no-sandbox
 Restart=always
 RestartSec=3
 UMask=0077
@@ -1990,206 +2004,6 @@ UNIT
   fi
   rldyour::log "error" "CloakBrowser CDP service failed its mandatory health gate"
   return 1
-}
-
-# Install rtk (Rust Token Killer, Apache-2.0), the token-economy shell-output
-# compressor the Claude and Codex adapters drive through their PreToolUse hooks
-# / rules file. Pinned to RTK_VERSION. Also writes the machine-global rtk config
-# with the exclude_commands baseline that protects hook-watched git commands and
-# validator/JSON output (control-plane config/token-economy-policy.json, ADR 0004).
-# The managed binary is installed from a hash-pinned release artifact. Existing
-# package-manager installations outside ~/.local/bin are preserved; the managed
-# launcher wins through rldyour::ensure_path. Skip only as an explicit recovery
-# action with RLDYOUR_SKIP_RTK=1.
-rldyour::install_rtk() {
-  local dry_run="${RLDYOUR_DRY_RUN:-1}"
-  local pin="0.43.0"
-  local cfg_home cfg artifact_url artifact_sha256
-  local namespace version_dir destination receipt launcher archive stage extracted publish_tmp
-  local actual_version binary_sha256 receipt_sha256 existing_version backup
-  namespace="$HOME/.local/share/rldyour/rtk"
-  version_dir="$namespace/$pin"
-  destination="$namespace/$pin/rtk"
-  receipt="$namespace/$pin/rtk.sha256"
-  launcher="$HOME/.local/bin/rtk"
-
-  case "$(uname -s):$(uname -m)" in
-    Darwin:arm64)
-      cfg_home="$HOME/Library/Application Support/rtk"
-      artifact_url="https://github.com/rtk-ai/rtk/releases/download/v${pin}/rtk-aarch64-apple-darwin.tar.gz"
-      artifact_sha256="8a17e49acbd378997eb21d0eb6f7f861111f35b4fc9b1c74edf4c7448e576c65"
-      ;;
-    Linux:x86_64|Linux:amd64)
-      cfg_home="${XDG_CONFIG_HOME:-$HOME/.config}/rtk"
-      artifact_url="https://github.com/rtk-ai/rtk/releases/download/v${pin}/rtk-x86_64-unknown-linux-musl.tar.gz"
-      artifact_sha256="ff8a1e7766496e175291a85aeca1dc97c9ff6df33e51e5893d1fbc78fea2a609"
-      ;;
-    Linux:aarch64|Linux:arm64)
-      cfg_home="${XDG_CONFIG_HOME:-$HOME/.config}/rtk"
-      artifact_url="https://github.com/rtk-ai/rtk/releases/download/v${pin}/rtk-aarch64-unknown-linux-gnu.tar.gz"
-      artifact_sha256="5519f7ca12e5c143a609f0d28a0a77b97413a8dce31c2681f1a41c24519a8731"
-      ;;
-    *)
-      rldyour::log "error" "RTK ${pin} has no tracked artifact for $(uname -s)/$(uname -m)"
-      return 1
-      ;;
-  esac
-  cfg="$cfg_home/config.toml"
-
-  rldyour::section "Install rtk token-economy CLI (pinned ${pin})"
-  if [ "${RLDYOUR_SKIP_RTK:-0}" -ne 0 ]; then
-    rldyour::log "warn" "rtk layer skipped by RLDYOUR_SKIP_RTK"
-    return 0
-  fi
-
-  if [ "$dry_run" -eq 1 ]; then
-    rldyour::log "info" "[DRY-RUN] install RTK ${pin} from its hash-pinned release artifact and publish a tamper-evident managed launcher"
-    rldyour::log "info" "[DRY-RUN] write ${cfg} with [hooks] exclude_commands baseline"
-    return 0
-  fi
-
-  # crates.io 'rtk' is a different tool (Rust Type Kit); never `cargo install rtk`.
-  if [ -L "$namespace" ] || { [ -e "$namespace" ] && [ ! -d "$namespace" ]; } || \
-    [ -L "$version_dir" ] || { [ -e "$version_dir" ] && [ ! -d "$version_dir" ]; }; then
-    rldyour::log "error" "RTK managed namespace is unsafe; preserved: ${namespace}"
-    return 1
-  fi
-  if [ -L "$receipt" ] || { [ -e "$receipt" ] && [ ! -f "$receipt" ]; }; then
-    rldyour::log "error" "RTK receipt path is unsafe; preserved: ${receipt}"
-    return 1
-  fi
-  mkdir -p "$namespace" "$HOME/.local/bin" || return 1
-  chmod 0700 "$namespace" || return 1
-  if [ -e "$destination" ] || [ -L "$destination" ]; then
-    if [ ! -f "$destination" ] || [ ! -x "$destination" ] || \
-      [ ! -f "$receipt" ] || [ -L "$receipt" ] || \
-      ! grep -Fxq "# Managed by macos-ubuntu-bootstrap: rtk-v1" "$receipt"; then
-      rldyour::log "error" "managed RTK destination or receipt is invalid; preserved: ${destination}"
-      return 1
-    fi
-    receipt_sha256="$(sed -n 's/^sha256=//p' "$receipt")"
-    if [ "$(grep -c '^sha256=' "$receipt")" -ne 1 ] || \
-      ! printf '%s' "$receipt_sha256" | grep -Eq '^[0-9a-f]{64}$' || \
-      [ "$(rldyour::sha256_file "$destination")" != "$receipt_sha256" ]; then
-      rldyour::log "error" "managed RTK binary identity changed; refusing to replace it"
-      return 1
-    fi
-  else
-    archive="$(mktemp)"; stage="$(mktemp -d)"; publish_tmp=""
-    trap 'rm -rf "$archive" "$stage"; [ -z "${publish_tmp:-}" ] || rm -f "$publish_tmp"; trap - RETURN' RETURN
-    rldyour::download_verified_file "$artifact_url" "$artifact_sha256" "$archive" || return 1
-    tar -xzf "$archive" -C "$stage" || return 1
-    extracted="$stage/rtk"
-    [ -f "$extracted" ] || {
-      rldyour::log "error" "RTK archive did not contain the expected executable"
-      return 1
-    }
-    chmod 0755 "$extracted" || return 1
-    actual_version="$("$extracted" --version 2>/dev/null | head -n 1)"
-    if ! printf '%s' "$actual_version" | grep -Eq "^rtk[[:space:]]+${pin}([[:space:]]|$)"; then
-      rldyour::log "error" "RTK artifact version mismatch: expected ${pin}, got ${actual_version:-unknown}"
-      return 1
-    fi
-    mkdir -p "$(dirname "$destination")" || return 1
-    chmod 0700 "$(dirname "$destination")" || return 1
-    publish_tmp="$(mktemp "$(dirname "$destination")/.rtk.tmp.XXXXXX")" || return 1
-    install -m 0755 "$extracted" "$publish_tmp" || return 1
-    binary_sha256="$(rldyour::sha256_file "$publish_tmp")" || return 1
-    # Receipt-first publication makes an interrupted install resumable while
-    # preserving the invariant that no managed binary exists without identity.
-    rldyour::_install_managed_browser_file \
-      "$receipt" "# Managed by macos-ubuntu-bootstrap: rtk-v1" 0600 <<RECEIPT || return 1
-# Managed by macos-ubuntu-bootstrap: rtk-v1
-version=${pin}
-sha256=${binary_sha256}
-RECEIPT
-    mv "$publish_tmp" "$destination" || return 1
-    publish_tmp=""
-    rm -rf "$archive" "$stage"
-    trap - RETURN
-  fi
-
-  if [ -e "$launcher" ] && [ ! -L "$launcher" ] && \
-    ! grep -Fxq "# Managed by macos-ubuntu-bootstrap: rtk-v1" "$launcher"; then
-    existing_version="$("$launcher" --version 2>/dev/null | head -n 1 || true)"
-    if ! printf '%s' "$existing_version" | grep -Eq '^rtk[[:space:]]+[0-9]+\.[0-9]+\.[0-9]+'; then
-      rldyour::log "error" "unmanaged ~/.local/bin/rtk is not a recognized RTK binary; preserved"
-      return 1
-    fi
-    backup="$namespace/legacy-$(printf '%s' "$existing_version" | tr -cd '0-9.')-$(date -u +%Y%m%dT%H%M%SZ)"
-    mkdir -p "$backup" || return 1
-    mv "$launcher" "$backup/rtk" || return 1
-    rldyour::log "info" "preserved legacy RTK binary: ${backup}/rtk"
-  elif [ -L "$launcher" ]; then
-    case "$(readlink "$launcher")" in
-      "$namespace"/*) rm -f "$launcher" || return 1 ;;
-      *) rldyour::log "error" "unmanaged rtk symlink exists; preserved: ${launcher}"; return 1 ;;
-    esac
-  fi
-
-  binary_sha256="$(rldyour::sha256_file "$destination")" || return 1
-  rldyour::_install_managed_browser_file \
-    "$launcher" "# Managed by macos-ubuntu-bootstrap: rtk-v1" 0755 <<LAUNCHER || return 1
-#!/usr/bin/env bash
-# Managed by macos-ubuntu-bootstrap: rtk-v1
-set -euo pipefail
-binary="${destination}"
-expected="${binary_sha256}"
-if command -v sha256sum >/dev/null 2>&1; then
-  actual="\$(sha256sum "\$binary" | awk '{ print \$1 }')"
-elif command -v shasum >/dev/null 2>&1; then
-  actual="\$(shasum -a 256 "\$binary" | awk '{ print \$1 }')"
-else
-  echo "rtk: no SHA-256 verifier is available" >&2
-  exit 127
-fi
-[ "\$actual" = "\$expected" ] || { echo "rtk: managed binary identity changed" >&2; exit 126; }
-exec "\$binary" "\$@"
-LAUNCHER
-  actual_version="$("$launcher" --version 2>/dev/null | head -n 1)"
-  printf '%s' "$actual_version" | grep -Eq "^rtk[[:space:]]+${pin}([[:space:]]|$)" || {
-    rldyour::log "error" "managed RTK launcher verification failed"
-    return 1
-  }
-
-  # Idempotent: write the exclude_commands baseline only when absent so an owner's
-  # edits are never clobbered.
-  if [ -L "$cfg" ] || { [ -e "$cfg" ] && [ ! -f "$cfg" ]; }; then
-    rldyour::log "error" "unmanaged RTK config path is not a regular file; preserved: ${cfg}"
-    return 1
-  elif [ ! -f "$cfg" ]; then
-    mkdir -p "$cfg_home"
-    cat > "$cfg" <<'RTKCFG'
-# Managed by macos-ubuntu-bootstrap (token-economy standard; control-plane
-# config/token-economy-policy.json / ADR 0004). Safe to edit.
-[hooks]
-# Never rewrite commands whose output other hooks match on or that scripts parse
-# byte-for-byte: git subcommands watched by the rldyour-flow / rldyour-serena-mcp
-# hooks, gh CI/api, and jq pipelines. Control-plane validators
-# (python3 scripts/validate_*) are unknown command families to rtk and pass
-# through unchanged.
-exclude_commands = [
-  "git commit",
-  "git merge",
-  "git rebase",
-  "git cherry-pick",
-  "git am",
-  "git push",
-  "gh workflow",
-  "gh run",
-  "gh actions",
-  "gh api",
-  "jq",
-]
-
-[tee]
-mode = "failures"
-RTKCFG
-    chmod 0600 "$cfg"
-    rldyour::log "ok" "wrote rtk config with exclude_commands baseline: ${cfg}"
-  else
-    rldyour::log "info" "rtk config already present (kept): ${cfg}"
-  fi
 }
 
 # Build and publish the Node-based browser providers as one immutable runtime.
@@ -3219,11 +3033,11 @@ PY
 rldyour::verify_terminal_environment() {
   local shell_dump expected_bin="$HOME/.local/bin"
   # The active harness set is codex, owned by its GDS module; require it only when
-  # its module path was provided to bootstrap. The browser and rtk commands are
+  # its module path was provided to bootstrap. The browser commands are
   # always published by this bootstrap. zcode is contract-delegated to
   # nddev-harnesses and is never required from a managed shell here.
   local -a required_cmds=(
-    rtk cloak-chromium cloakbrowser-cdp-health chrome-devtools-mcp playwright-cli
+    cloak-chromium cloakbrowser-cdp-health chrome-devtools-mcp playwright-cli
   )
   [ -n "${RLDYOUR_CODEX_MODULE:-}" ] && required_cmds=(codex "${required_cmds[@]}")
   command -v zsh >/dev/null 2>&1 || {
@@ -3264,10 +3078,10 @@ required = {
     "__RLDYOUR_CLOAK_URL__",
     "__RLDYOUR_CLOAK_SKIP__",
 }
-# The browser and rtk commands are always published by this bootstrap; codex
+# The browser commands are always published by this bootstrap; codex
 # appears only when its GDS module path was provided.
 always = (
-    "rtk", "cloak-chromium", "cloakbrowser-cdp-health",
+    "cloak-chromium", "cloakbrowser-cdp-health",
     "chrome-devtools-mcp", "playwright-cli",
 )
 required.update(f"__RLDYOUR_CMD_{name}__" for name in always)

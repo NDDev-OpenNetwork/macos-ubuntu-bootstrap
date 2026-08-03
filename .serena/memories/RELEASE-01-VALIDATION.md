@@ -1,7 +1,7 @@
 <!-- Memory Metadata
-Last updated: 2026-08-03
-Last verified: 2026-08-03
-Last commit: 4ceac2921743308354b4292034e12e6400ad3e6d Merge pull request #40 from NDDev-it-com/feat/dart-host-and-zcode-delegation
+Last updated: 2026-08-04
+Last verified: 2026-08-04
+Last commit: 47b1b549bb55830f839834ef33bac41a5f278a69 feat(rtk)!: remove rtk from the bootstrap (2.4.0)
 Scope: README.md, VERSION, CHANGELOG.md, config/rldyour-contract.json, scripts/**, templates/**, tests/**, .github/workflows/**
 Area: RELEASE
 -->
@@ -46,7 +46,7 @@ Release, validation, CI, and public README contract for the macOS/Ubuntu bootstr
 - launchd forward and rollback handoffs use bounded loaded/unloaded state convergence instead of treating an immediate `launchctl` exit status as proof.
 
 ## Current State
-- Current product/config version is `2.3.0` (`VERSION`, `config/rldyour-contract.json` -> `adapter`). The published GitHub release tag is still `2.2.1`: `2.3.0` advances the contract and the gitlink only, so the published tag trails by design until a release is cut.
+- Current product/config version is `2.4.0` (`VERSION`, `config/rldyour-contract.json` -> `adapter`). The published GitHub release tag is still `2.2.1`: `2.3.0` and `2.4.0` advance the contract and the gitlink only, so the published tag trails by design until a release is cut.
 - Contracts `2.1.0` and `2.2.0` were never released; `2.2.1` publishes their combined contents. Do not expect tags for them.
 - Release `2.2.1` published five immutable checksummed assets in one create call: the source archive, `release-manifest.json`, `release-notes.md`, `sbom.spdx.json`, and `SHA256SUMS`.
 - Supported targets are Apple Silicon macOS desktop and Ubuntu 24.04/26.04 desktop/server on amd64 or arm64. Desktop Docker mode is always `none`; server Docker is explicit `none`, `rootful`, or `rootless`.

@@ -89,6 +89,23 @@ def test_dart_tree_permissions_are_normalized_and_revalidated() -> None:
     assert common.count("rldyour::_managed_tree_permissions() {") == 1
 
 
+def test_rust_tree_is_permission_normalized_before_its_receipt() -> None:
+    """Rust's bundled install.sh creates its prefix under the caller's umask, so
+    `umask 002` published a tree whose root was 0775. Go and Node avoid this only
+    because their trees come from `mktemp -d` at 0700, which is luck rather than a
+    guarantee. The receipt covers five executables, so a writable directory beside
+    them is enough to add a library without invalidating it.
+
+    Node's `npm`/`npx`/`corepack` entries look group-writable to `find -perm /022`
+    but are symlinks, whose mode bits Linux ignores; the shared helper skips
+    symlinks after checking containment, so it is a no-op there by design."""
+    install = INSTALL.read_text(encoding="utf-8")
+    rust = install.split("ensure_rust()", 1)[1].split("\n# Dart SDK host", 1)[0]
+    normalize = rust.index('rldyour::_managed_tree_permissions normalize "$stage/prefix"')
+    receipt = rust.index("rldyour::ubuntu::write_runtime_receipt")
+    assert normalize < receipt, "the tree must be normalized before its receipt is written"
+
+
 def test_dart_telemetry_is_disabled_through_one_shared_fail_closed_helper() -> None:
     """The SDK reports telemetry by default, which contradicts the same boundary
     that makes the browser wrapper reject usage statistics. The opt-out must be

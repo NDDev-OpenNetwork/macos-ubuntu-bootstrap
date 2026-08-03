@@ -664,6 +664,15 @@ ensure_rust() {
       rldyour::log "error" "staged Rust artifact did not report ${RUST_VERSION}"
       return 1
     }
+    # Rust's bundled install.sh creates its prefix under the caller's umask, so
+    # `umask 002` published a group-writable tree root. Go and Node avoid this only
+    # because their trees come from `mktemp -d` at 0700. The receipt covers five
+    # executables, so a writable directory beside them is enough to add a library
+    # without invalidating it.
+    if ! rldyour::_managed_tree_permissions normalize "$stage/prefix"; then
+      rldyour::log "error" "could not normalize permissions on the staged Rust tree"
+      return 1
+    fi
     rldyour::ubuntu::write_runtime_receipt \
       "$stage/prefix" rust "$RUST_VERSION" "$sha" \
       bin/rustc bin/cargo bin/rust-analyzer bin/rustfmt bin/clippy-driver || return 1

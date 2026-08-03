@@ -10,7 +10,7 @@ Maintain one plan-first bootstrap adapter for:
 
 The public entry point is `scripts/bootstrap.sh`. Treat
 `config/rldyour-contract.json`, the platform installers, verification scripts,
-and tests as the executable contract. Current adapter version: `2.2.1`.
+and tests as the executable contract. Current adapter version: `2.3.0`.
 
 ## Composition Invariants
 
@@ -30,13 +30,15 @@ profile; Ubuntu server is always headless.
 
 ## Verified Pins
 
-- Active harness set (one owner per harness, RVR-P1-004): `codex` and `zcode`,
-  each installed by its authoritative NDDev module. Bootstrap installs no AI CLI
-  inline or through a bun/npm global path.
+- Active harness set (one owner per harness, RVR-P1-004): `codex`, installed by
+  its authoritative NDDev module. Bootstrap installs no AI CLI inline or through a
+  bun/npm global path.
   - `codex`: `nddev-codex-app` via `RLDYOUR_CODEX_MODULE` (safe setup by default;
-    full-auto only with `RLDYOUR_CODEX_FULL_AUTO=1`; then `install-builder`).
-  - `zcode`: `nddev-zcode-app` via `RLDYOUR_ZCODE_MODULE` (nddev-builder setup,
-    module `--plan`/`--apply` lifecycle).
+    full-auto only with `RLDYOUR_CODEX_FULL_AUTO=1`; then `install-builder`). The
+    module publishes its CLI only under its own target, so
+    `${RLDYOUR_CODEX_HOME:-$HOME/.codex}/bin` belongs on the managed PATH.
+  - `zcode`: delegated out of bootstrap (ADR 0006), owned by `nddev-harnesses`.
+    Its target cannot be adopted unattended; never reintroduce an install path.
 - RTK exact `0.43.0`, hash-pinned native artifact
 - CloakBrowser `0.4.12`
 - Chrome DevTools MCP `1.6.0`
@@ -55,6 +57,19 @@ profile; Ubuntu server is always headless.
   server profile, which stays `container-execution-only`. gopls `v0.23.0` is
   pinned by module version and verified through the Go checksum database, not a
   tracked archive hash (ADR 0005).
+- Ubuntu Dart SDK `3.12.2`, desktop-only, tracked architecture hashes (ADR 0006).
+  One archive provides `dart language-server` and `dart mcp-server`; the latter is
+  the transport the `dart-flutter` MCP server in `rldyour-mcps` executes, so both
+  verifiers prove the subcommand responds and not merely that `dart` resolves. The
+  Flutter SDK stays out: its `bin/cache` self-populates at runtime and would
+  mutate a receipt-verified tree. macOS uses Homebrew's `dart-sdk`.
+  Two Dart-specific invariants must not regress: the SDK zip stores `0775`
+  directories, so the staged tree goes through
+  `rldyour::_managed_tree_permissions normalize` before the receipt is written
+  (umask cannot fix this — it only clears bits it never adds), and telemetry is
+  disabled through `rldyour::ensure_dart_telemetry_disabled`, which runs the SDK's
+  own `--disable-analytics` switch and then reads `reporting=0` back. Never
+  hand-write the shared Dart/Flutter telemetry config.
 
 Keep the contract, both installers, tests, README, install guide, AGENTS, and
 this file synchronized when a pin changes.
@@ -92,15 +107,17 @@ copy outside the active namespace.
 
 - macOS GUI mode: Ghostty, cmux, ChatGPT, the separate Codex app, Claude Desktop.
 - Ubuntu GUI mode: no bootstrap-installed harness apps; the ZCode desktop app is
-  owned by its `nddev-zcode-app` module.
+  owned by the `nddev-harnesses` repository. `scripts/ubuntu/desktop.sh` owns
+  desktop customization: GNOME dock, Russian layout, BrowserOS install, and the
+  complete snap+apt Firefox removal.
 - Server: no GUI layer.
 
 macOS GUI apply installs cmux hooks non-interactively only for Codex. Keep the
 targeted `--yes` command; do not use broad interactive `cmux hooks setup`.
 
-The ZCode app and CLI are owned by the `nddev-zcode-app` module and installed
-through its own `--plan`/`--apply` lifecycle; bootstrap never installs ZCode via
-an apt `.deb` or a `RLDYOUR_ZCODE_SHA256` gate.
+The ZCode app and CLI are owned by the `nddev-harnesses` repository; bootstrap
+never installs ZCode via an apt `.deb`, a `RLDYOUR_ZCODE_SHA256` gate, or a module
+delegation.
 
 Credentials are outside bootstrap ownership. Use:
 

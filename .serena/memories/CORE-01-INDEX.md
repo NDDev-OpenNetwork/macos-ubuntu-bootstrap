@@ -1,7 +1,7 @@
 <!-- Memory Metadata
-Last updated: 2026-08-03
-Last verified: 2026-08-03
-Last commit: 4ceac2921743308354b4292034e12e6400ad3e6d Merge pull request #40 from NDDev-it-com/feat/dart-host-and-zcode-delegation
+Last updated: 2026-08-04
+Last verified: 2026-08-04
+Last commit: 47b1b549bb55830f839834ef33bac41a5f278a69 feat(rtk)!: remove rtk from the bootstrap (2.4.0)
 Scope: README.md, AGENTS.md, .claude/CLAUDE.md, .serena/project.yml, .serena/memories/**
 Area: CORE
 -->
@@ -32,7 +32,7 @@ Durable Serena memory index for the `rldyour-new-mac-or-ubuntu` bootstrap module
 
 ## Current State
 - This module has three tracked memories: `CORE-01-INDEX.md`, `RELEASE-01-VALIDATION.md`, and `TECHDEBT-01-NOW.md`.
-- The `2.3.0` contract composes Apple Silicon macOS desktop, Ubuntu 24.04/26.04 desktop, and Ubuntu 24.04/26.04 server roles. Desktop roles are source/LSP-only; the Ubuntu server role owns build/runtime and explicit Docker modes.
+- The `2.4.0` contract composes Apple Silicon macOS desktop, Ubuntu 24.04/26.04 desktop, and Ubuntu 24.04/26.04 server roles. Desktop roles are source/LSP-only; the Ubuntu server role owns build/runtime and explicit Docker modes.
 - GUI is an optional desktop overlay. Ubuntu server is always headless.
 - The module owns exact AI CLI installation, terminal integration, language-server/tooling installation, and the mandatory CloakBrowser runtime. Native AI CLI configuration remains in sibling adapter repositories.
 - Serena indexes Bash and Python because the implementation is shell-first with Python validators and fault-injection tests.

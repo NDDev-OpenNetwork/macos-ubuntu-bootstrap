@@ -138,21 +138,25 @@ def test_contract_version_and_profile_matrix() -> None:
     assert contract["safety"]["ubuntu_profile_selection"] == "explicit"
 
 
-def test_active_harness_set_is_only_codex_and_zcode() -> None:
+def test_active_harness_set_is_only_codex() -> None:
     # RVR-P1-004: one owner per harness. Claude Code, OpenCode, MiMoCode, and
-    # Antigravity are fully removed; codex and zcode are delegated to their
-    # authoritative NDDev modules.
+    # Antigravity are fully removed; codex is delegated to its authoritative NDDev
+    # module. ADR 0006 moved zcode out of bootstrap: the ZCode app owns ~/.zcode
+    # and its installer needs an explicit --adopt-unmanaged that no unattended run
+    # may supply, so blocking a device apply on it stranded every later layer.
     contract = json.loads(file("config/rldyour-contract.json"))
     assert "ai_cli" not in contract
     harnesses = contract["harnesses"]
     assert harnesses["policy"] == "one-owner-per-harness"
-    assert harnesses["active"] == ["codex", "zcode"]
+    assert harnesses["active"] == ["codex"]
     assert harnesses["codex"]["module_path_env"] == "RLDYOUR_CODEX_MODULE"
-    assert harnesses["zcode"]["module_path_env"] == "RLDYOUR_ZCODE_MODULE"
     assert harnesses["codex"]["module_repo"].endswith("nddev-codex-app.git")
-    assert harnesses["zcode"]["module_repo"].endswith("nddev-zcode-app.git")
     assert len(harnesses["codex"]["module_commit"]) == 40
-    assert len(harnesses["zcode"]["module_commit"]) == 40
+    # The delegation stays declared, so it reads as a decision, not an omission.
+    delegated = harnesses["delegated"]
+    assert delegated["zcode"]["owner_repo"] == "nddev-harnesses"
+    assert delegated["zcode"]["reason"]
+    assert "zcode" not in harnesses["active"]
 
     installers = (file("scripts/macos/install.sh"), file("scripts/ubuntu/install.sh"))
     removed_constants = (
@@ -191,15 +195,22 @@ def test_harness_delegation_wires_exact_module_commands() -> None:
     assert 'python3 "$module/$entry" install-cli --target "$target"' in common
     assert 'python3 "$module/$entry" apply --setup "$setup" --target "$target"' in common
     assert 'python3 "$module/$entry" install-builder --target "$target"' in common
-    assert 'bash "$module/$entry" bootstrap "$flag"' in common
-    assert 'bash "$module/$entry" install --setup nddev-builder "$flag"' in common
     # Codex module entrypoint and safe-by-default setup.
     assert 'entry="cli-tools/nddev_codex.py"' in common
     assert 'setup="safe"' in common
     assert "RLDYOUR_CODEX_FULL_AUTO" in common
-    # ZCode module entrypoint and plan/apply lifecycle.
-    assert 'entry="cli-tools/scripts/install.sh"' in common
-    assert 'flag="--plan"' in common and 'flag="--apply"' in common
+    # ADR 0006: the zcode delegation is removed outright rather than softened into
+    # a warn-and-continue step, which would be exactly the best-effort fallback
+    # this repository forbids. No zcode installer may come back here.
+    assert "rldyour::install_zcode_harness" not in common
+    assert "RLDYOUR_ZCODE_MODULE" not in common
+    # The ZCode plan/apply lifecycle strings are what must be gone; `nddev-builder`
+    # itself stays, because the codex module installs that marketplace too.
+    assert 'bash "$module/$entry" bootstrap "$flag"' not in common
+    assert 'bash "$module/$entry" install --setup nddev-builder "$flag"' not in common
+    # codex must be reachable: the module publishes its CLI only under its own
+    # target, so the managed PATH has to include that target's bin directory.
+    assert '"${RLDYOUR_CODEX_HOME:-$HOME/.codex}/bin"' in common
     # Unset module path self-materializes the pinned public module (additive).
     assert "self-materializing the pinned codex module" in common
     assert "rldyour::_materialize_harness_module" in common
@@ -219,7 +230,6 @@ def test_desktop_manifests_exclude_project_runtime_and_docker() -> None:
         "docker",
         "docker-desktop",
         "rustup",
-        "dart",
         "cmake",
         "openjdk",
         "mise",
@@ -230,8 +240,9 @@ def test_desktop_manifests_exclude_project_runtime_and_docker() -> None:
         "docker.io",
         "docker-ce",
         "build-essential",
-        # Distribution Go/Rust stay banned: the managed hosts are installed from
-        # tracked SHA-256 artifacts into owned versioned directories, never apt.
+        # Distribution Go/Rust/Dart stay banned: the managed hosts are installed
+        # from tracked SHA-256 artifacts into owned versioned directories, never
+        # apt. ADR 0006 admits the Dart SDK, not the `dart` apt package.
         "golang-go",
         "rustc",
         "cargo",
@@ -251,8 +262,10 @@ def test_desktop_manifests_exclude_project_runtime_and_docker() -> None:
     jvm_backed_formulae = {"jdtls", "kotlin-language-server", "ktlint", "google-java-format"}
     assert macos.isdisjoint(jvm_backed_formulae)
     assert "llvm" in macos  # Homebrew's supported clangd distribution only.
-    # The language-server hosts admitted by ADR 0005, and their servers.
-    assert {"go", "gopls", "rust", "rust-analyzer"}.issubset(macos)
+    # The language-server hosts admitted by ADR 0005 and ADR 0006, and their
+    # servers. `dart-sdk` is Homebrew's SDK formula; it carries both the analysis
+    # server and the `dart mcp-server` transport the marketplace declares.
+    assert {"go", "gopls", "rust", "rust-analyzer", "dart-sdk"}.issubset(macos)
     assert "docker-language-server" in macos
     assert {"chatgpt", "codex-app"}.issubset(gui_casks)
     assert any(
@@ -934,7 +947,8 @@ def test_dependency_check_enforces_one_owner_per_harness_delegation() -> None:
     assert "one-owner-per-harness delegation" in workflow
     assert "rldyour::install_selected_harnesses" in workflow
     assert "RLDYOUR_CODEX_MODULE" in workflow
-    assert "RLDYOUR_ZCODE_MODULE" in workflow
+    # ADR 0006: the workflow now gates on zcode staying OUT of bootstrap.
+    assert "zcode is delegated out of bootstrap" in workflow
     assert "the frozen AI-CLI bundle template must be removed" in workflow
     assert "streamed installer is forbidden" in workflow
 

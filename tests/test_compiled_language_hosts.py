@@ -1,10 +1,14 @@
-"""Go and Rust are desktop-only language-server hosts.
+"""Go, Rust, and Dart are desktop-only language-server hosts.
 
-They back gopls and rust-analyzer over the estate's Go and Rust sources. The
-Ubuntu server profile is `container-execution-only`, so a host compiler there
-would restore exactly the local build capability that policy removes — project
-builds belong in Docker. These tests pin that split, and pin the tracked
-artifact provenance so a version bump cannot silently drop a hash.
+They back gopls, rust-analyzer, and the Dart analysis server over the estate's
+sources. The Ubuntu server profile is `container-execution-only`, so a host
+toolchain there would restore exactly the local build capability that policy
+removes — project builds belong in Docker. These tests pin that split, and pin the
+tracked artifact provenance so a version bump cannot silently drop a hash.
+
+Dart carries a second obligation (ADR 0006): the same archive provides the
+`dart mcp-server` transport that the rldyour-mcps `dart-flutter` server executes,
+so the host is what makes a declared MCP server startable at all.
 """
 
 import json
@@ -38,10 +42,11 @@ def plan(profile: str) -> str:
     return result.stdout + result.stderr
 
 
-def test_desktop_plans_go_and_rust_hosts() -> None:
+def test_desktop_plans_go_rust_and_dart_hosts() -> None:
     output = plan("desktop")
     assert f"Ensure Go {RUNTIME['ubuntu_go']}" in output
     assert f"Ensure Rust {RUNTIME['ubuntu_rust']}" in output
+    assert f"Ensure Dart {RUNTIME['ubuntu_dart']}" in output
     assert RUNTIME["ubuntu_gopls"] in output
     assert "rust-analyzer" in output
 
@@ -51,14 +56,82 @@ def test_server_never_plans_a_host_compiler() -> None:
     assert "compiled-language LSP hosts skipped" in output
     assert f"Ensure Go {RUNTIME['ubuntu_go']}" not in output
     assert f"Ensure Rust {RUNTIME['ubuntu_rust']}" not in output
+    assert f"Ensure Dart {RUNTIME['ubuntu_dart']}" not in output
 
 
 def test_contract_tracks_a_hash_for_every_supported_architecture() -> None:
     assert set(RUNTIME["ubuntu_go_sha256"]) == {"amd64", "arm64"}
     assert set(RUNTIME["ubuntu_rust_sha256"]) == {"x86_64", "aarch64"}
-    for digests in (RUNTIME["ubuntu_go_sha256"], RUNTIME["ubuntu_rust_sha256"]):
+    assert set(RUNTIME["ubuntu_dart_sha256"]) == {"x64", "arm64"}
+    for digests in (
+        RUNTIME["ubuntu_go_sha256"],
+        RUNTIME["ubuntu_rust_sha256"],
+        RUNTIME["ubuntu_dart_sha256"],
+    ):
         for arch, digest in digests.items():
             assert re.fullmatch(r"[0-9a-f]{64}", digest), f"{arch} digest is not a sha256"
+
+
+def test_dart_tree_permissions_are_normalized_and_revalidated() -> None:
+    """The Dart SDK zip records its directories as 0775 and umask only clears bits
+    it never adds, so a naive extraction publishes group-writable directories
+    inside a receipt-verified tree. The receipt hashes only the declared
+    executables, so a writable directory beside them is enough to add or swap a
+    snapshot without invalidating it. Both the fresh and the reused path must go
+    through the shared permission helper."""
+    install = INSTALL.read_text(encoding="utf-8")
+    common = (ROOT / "scripts/lib/common.sh").read_text(encoding="utf-8")
+    dart = install.split("ensure_dart()", 1)[1].split("\nensure_bun()", 1)[0]
+    assert 'rldyour::_managed_tree_permissions normalize "$stage/prefix"' in dart
+    assert 'rldyour::_managed_tree_permissions validate "$destination"' in dart
+    # One generic helper, not a second permission path bolted on for Dart.
+    assert "rldyour::_browser_node_runtime_permissions" not in common
+    assert common.count("rldyour::_managed_tree_permissions() {") == 1
+
+
+def test_dart_telemetry_is_disabled_through_one_shared_fail_closed_helper() -> None:
+    """The SDK reports telemetry by default, which contradicts the same boundary
+    that makes the browser wrapper reject usage statistics. The opt-out must be
+    set through the SDK's own switch (the config is upstream-maintained, never
+    hand-written), proven rather than assumed, and shared by both platforms."""
+    common = (ROOT / "scripts/lib/common.sh").read_text(encoding="utf-8")
+    assert "rldyour::ensure_dart_telemetry_disabled() {" in common
+    assert '"$binary" --disable-analytics' in common
+    # Proven, not assumed: a conflicting enable line fails instead of being
+    # averaged away by upstream duplicate-key resolution.
+    assert "grep -Fxq 'reporting=0'" in common
+    assert "grep -Fxq 'reporting=1'" in common
+    for installer in ("scripts/ubuntu/install.sh", "scripts/macos/install.sh"):
+        body = (ROOT / installer).read_text(encoding="utf-8")
+        assert "rldyour::ensure_dart_telemetry_disabled" in body, installer
+    # The config is never written by this repository, only read back.
+    assert "dart-flutter-telemetry.config" in common
+    assert "reporting=0\\n" not in common
+    verify = (ROOT / "scripts/ubuntu/verify.sh").read_text(encoding="utf-8")
+    assert "dart-flutter-telemetry.config" in verify
+
+
+def test_dart_host_serves_both_the_analysis_server_and_the_mcp_transport() -> None:
+    """ADR 0006. The reason Dart is admitted is that one archive backs source
+    analysis and the `dart-flutter` MCP server. Verification must prove the
+    subcommand exists, not just that a `dart` binary resolves — an SDK that
+    resolves but cannot serve MCP is the exact defect this replaced."""
+    assert RUNTIME["ubuntu_dart_provides"] == [
+        "dart",
+        "dart language-server",
+        "dart mcp-server",
+    ]
+    install = INSTALL.read_text(encoding="utf-8")
+    # Flutter is deliberately absent: its bin/cache self-populates at runtime and
+    # would mutate a receipt-verified tree.
+    assert "flutter_linux" not in install
+    for verifier in ("scripts/ubuntu/verify.sh", "scripts/macos/verify.sh"):
+        body = (ROOT / verifier).read_text(encoding="utf-8")
+        assert "dart mcp-server --version" in body, f"{verifier} does not prove the MCP transport"
+    ubuntu_verify = (ROOT / "scripts/ubuntu/verify.sh").read_text(encoding="utf-8")
+    desktop_block = ubuntu_verify.split('if [ "$PROFILE" = "desktop" ]; then', 1)
+    assert len(desktop_block) == 2
+    assert "dart" in desktop_block[1], "dart must be verified inside the desktop-only block"
 
 
 def test_installer_constants_match_the_contract() -> None:
@@ -78,6 +151,9 @@ def test_installer_constants_match_the_contract() -> None:
     assert constant("GO_SHA256_ARM64") == RUNTIME["ubuntu_go_sha256"]["arm64"]
     assert constant("RUST_SHA256_X86_64") == RUNTIME["ubuntu_rust_sha256"]["x86_64"]
     assert constant("RUST_SHA256_AARCH64") == RUNTIME["ubuntu_rust_sha256"]["aarch64"]
+    assert constant("DART_VERSION") == RUNTIME["ubuntu_dart"]
+    assert constant("DART_SHA256_X64") == RUNTIME["ubuntu_dart_sha256"]["x64"]
+    assert constant("DART_SHA256_ARM64") == RUNTIME["ubuntu_dart_sha256"]["arm64"]
 
 
 def _pinned_rows() -> list[list[str]]:

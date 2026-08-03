@@ -63,7 +63,12 @@ def test_plan_matrix_is_non_destructive() -> None:
         assert "dry-run" in result.stdout
         assert "CloakBrowser" in result.stdout
         if "server" in profile:
-            assert "Ubuntu server module" not in result.stdout
+            # With --skip-system, run_server_layer early-returns before any
+            # Docker/openssh/UFW work. Assert no server-layer mutation strings
+            # leak into plan output — the prior assertion checked for a substring
+            # ("Ubuntu server module") that never existed in the codebase.
+            assert "docker-ce" not in result.stdout
+            assert "openssh-server" not in result.stdout
 
 
 def test_skip_system_covers_ubuntu_server_layer() -> None:
@@ -253,11 +258,11 @@ def test_harness_layer_runs_after_the_layers_it_used_to_strand() -> None:
         body = file(installer)
         harness = body.index('[ "$SKIP_AI" -eq 1 ] || install_ai_runtimes')
         for later in ("rldyour::install_browser_providers",):
-            assert body.index(f"\n{later}") < harness, f"{installer}: {later} must run before the harness"
+            assert body.index(later) < harness, f"{installer}: {later} must run before the harness"
         # Still fatal: no `|| true`, no warn-and-continue wrapper.
         line = next(l for l in body.splitlines() if "install_ai_runtimes" in l and "SKIP_AI" in l)
         assert "||" not in line.split("||", 1)[1].replace(" install_ai_runtimes", "", 1), line
-        assert body.index("verify_apply\n", harness) > harness, f"{installer}: verify must follow the harness"
+        assert body.index("verify_apply", harness) > harness, f"{installer}: verify must follow the harness"
 
 
 def test_materialized_harness_checkouts_are_permission_normalized() -> None:

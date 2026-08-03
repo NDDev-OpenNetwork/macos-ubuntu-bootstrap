@@ -27,7 +27,7 @@ When prose and implementation disagree, verify the scripts and contract, then
 update the affected documentation in the same change. Do not invent a second
 policy source.
 
-## Contract `2.2.1`
+## Contract `2.3.0`
 
 Ubuntu profile selection is always explicit. Never infer server/rootful Docker
 from `uname=Linux`; require `--profile desktop|server`.
@@ -47,27 +47,32 @@ or configure local project build/runtime execution. `--no-gui` removes only
 the GUI overlay; it does not change the desktop execution policy. Server is
 Ubuntu-only and always headless.
 
-Desktop profiles additionally install Go and Rust as language-server hosts for
-`gopls` and `rust-analyzer`, on the same footing as Node, Python, and LLVM —
-present to resolve source, not to authorize project builds (ADR 0005). The
-server profile receives no host compiler: `install_compiled_language_hosts`
-returns early there.
+Desktop profiles additionally install Go, Rust, and the Dart SDK as
+language-server hosts for `gopls`, `rust-analyzer`, and the Dart analysis server,
+on the same footing as Node, Python, and LLVM — present to resolve source, not to
+authorize project builds (ADR 0005, ADR 0006). Dart also provides
+`dart mcp-server`, the transport the `dart-flutter` MCP server in `rldyour-mcps`
+executes; the Flutter SDK is not installed because its `bin/cache` self-populates
+and would mutate a receipt-verified tree. The server profile receives no host
+toolchain: `install_compiled_language_hosts` returns early there.
 
 ## Managed Versions
 
 These values must match both platform installers, the contract, tests, and
 operator documentation:
 
-- Active harness set (one owner per harness, RVR-P1-004): `codex` and `zcode`.
+- Active harness set (one owner per harness, RVR-P1-004): `codex`.
   Bootstrap installs no AI CLI inline and never through a bun/npm global path.
-  Each harness is owned by its authoritative NDDev module, whose materialized
+  The harness is owned by its authoritative NDDev module, whose materialized
   checkout GDS device bootstrap passes in an env var:
   - `codex`: `nddev-codex-app` (`RLDYOUR_CODEX_MODULE`); `install-cli`, then
     `apply --setup safe` (full-auto only via `RLDYOUR_CODEX_FULL_AUTO=1`), then
-    `install-builder`.
-  - `zcode`: `nddev-zcode-app` (`RLDYOUR_ZCODE_MODULE`); `bootstrap` then
-    `install --setup nddev-builder` through the module's `--plan`/`--apply`
-    lifecycle.
+    `install-builder`. The module publishes its CLI only under its own target, so
+    `${RLDYOUR_CODEX_HOME:-$HOME/.codex}/bin` is part of the managed PATH.
+  - `zcode`: **delegated out of bootstrap** (`harnesses.delegated`, ADR 0006) and
+    owned by the `nddev-harnesses` repository. Its target cannot be adopted
+    unattended, and blocking a device apply on it stranded every later layer. Do
+    not reintroduce a zcode install path, not even a warn-and-continue one.
 - RTK: exact `0.43.0`, hash-pinned native artifact
 - CloakBrowser: `0.4.12`
 - Chrome DevTools MCP: `1.6.0`
@@ -82,21 +87,28 @@ operator documentation:
   `0.45.0`. Adding a tool means adding a row; there is no second install path.
   Ubuntu uses markdown-oxide where macOS uses marksman (marksman's formula
   depends on `dotnet@9`). ast-grep's deprecated `sg` shim is never published.
-- Ubuntu Go `1.26.5` and Rust `1.97.1`, desktop-only language-server hosts,
-  tracked architecture hashes. One combined Rust archive carries rustc, cargo,
-  rust-std, clippy, rustfmt, and rust-analyzer. gopls `v0.23.0` is pinned by
-  module version and verified through the Go checksum database — it publishes
-  no prebuilt archive, so it carries no tracked archive hash (ADR 0005).
+- Ubuntu Go `1.26.5`, Rust `1.97.1`, and Dart SDK `3.12.2`, desktop-only
+  language-server hosts, tracked architecture hashes. One combined Rust archive
+  carries rustc, cargo, rust-std, clippy, rustfmt, and rust-analyzer. One Dart SDK
+  archive carries both `dart language-server` and `dart mcp-server`; both
+  verifiers gate on the exact/floor version *and* on the mcp-server subcommand
+  responding, because an SDK that resolves but cannot serve MCP is the defect
+  ADR 0006 exists to prevent. The Dart tree is permission-normalized before
+  publication (its zip stores `0775` directories, which umask cannot fix), and its
+  telemetry is disabled through the SDK's own switch and then proven by reading
+  `reporting=0` back. gopls `v0.23.0` is pinned by module version and verified
+  through the Go checksum database — it publishes no prebuilt archive, so it
+  carries no tracked archive hash (ADR 0005).
 
 Use current, source-backed facts before changing a dependency. Preserve exact
 pins and integrity checks unless the change intentionally updates the contract.
 Never reintroduce mutable, unauthenticated remote installer execution or
 unfrozen dependency resolution. The Node browser providers use
 `templates/browser/provider/bun.lock`; CloakBrowser uses its tracked `uv.lock`.
-The codex and zcode harnesses own their standalone artifacts inside their
-modules; never reintroduce an inline AI-CLI bundle or a bun/npm global install.
+The codex harness owns its standalone artifacts inside its module; never
+reintroduce an inline AI-CLI bundle or a bun/npm global install.
 
-The codex and zcode harnesses stay update-locked: `DISABLE_AUTOUPDATER=1` and
+The codex harness stays update-locked: `DISABLE_AUTOUPDATER=1` and
 `DISABLE_UPDATES=1` keep the codex module's standalone binary from drifting.
 
 ## Non-Negotiable Browser Boundary
@@ -128,17 +140,20 @@ be committed.
 
 - macOS GUI: Ghostty, cmux, ChatGPT, and the separate Codex app.
 - Ubuntu GUI: no bootstrap-installed harness apps; the ZCode desktop app is
-  installed by its `nddev-zcode-app` module.
+  installed by the `nddev-harnesses` repository. Desktop customization
+  (GNOME dock, Russian layout, BrowserOS install, Firefox removal) is owned by
+  `scripts/ubuntu/desktop.sh`.
 - Ubuntu server: no GUI applications.
 
 macOS GUI apply configures cmux non-interactively only for Codex. Do not replace
 that targeted `--yes` install with broad interactive `cmux hooks setup`, which
 can create unrelated agent configs.
 
-ZCode is owned by the `nddev-zcode-app` module and installed through its own
-`--plan`/`--apply` lifecycle. Bootstrap never installs ZCode via an apt `.deb`
-or a `RLDYOUR_ZCODE_SHA256` gate; both were removed in contract `2.0.0`. Do not
-reintroduce a silent download, fallback checksum, or integrity bypass.
+ZCode is owned by the `nddev-harnesses` repository and installed through its own
+lifecycle. Bootstrap never installs ZCode via an apt `.deb` or a
+`RLDYOUR_ZCODE_SHA256` gate; both were removed in contract `2.0.0`, and the
+remaining module delegation was removed in `2.3.0`. Do not reintroduce a silent
+download, fallback checksum, or integrity bypass.
 
 Authentication is a post-install owner handoff. `scripts/auth-handoff.sh` may
 show instructions and perform non-secret status probes, but bootstrap code must

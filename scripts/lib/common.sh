@@ -206,6 +206,10 @@ rldyour::ensure_path() {
     "$HOME/go/bin"
     "$HOME/.rldyour/bin"
     "$HOME/.mimocode/bin"
+    # nddev-codex-app installs its standalone CLI under its own target and
+    # publishes no link into the managed prefix, so the harness target's bin
+    # directory is the only place `codex` can be resolved from.
+    "${RLDYOUR_CODEX_HOME:-$HOME/.codex}/bin"
   )
   local prefix=""
   for p in "${candidates[@]}"; do
@@ -410,13 +414,21 @@ rldyour::_publish_managed_wrapper_set() {
   rldyour::log "ok" "published managed wrapper set: ${names[*]}"
 }
 
-# One owner per harness (RVR-P1-004). The owner's active harness set is codex and
-# zcode. Bootstrap no longer inline-installs any AI CLI and never installs a
-# harness through a bun/npm global path or its own frozen bundle. Each harness is
-# owned by its dedicated authoritative NDDev module. GDS device bootstrap
-# materializes those module checkouts and passes their absolute paths in
-# RLDYOUR_CODEX_MODULE and RLDYOUR_ZCODE_MODULE. A module owns its standalone
-# artifacts; bootstrap only delegates to the module's own install lifecycle.
+# One owner per harness (RVR-P1-004). The owner's active harness set is codex.
+# Bootstrap no longer inline-installs any AI CLI and never installs a harness
+# through a bun/npm global path or its own frozen bundle. Each harness is owned by
+# its dedicated authoritative NDDev module. GDS device bootstrap materializes
+# those module checkouts and passes their absolute paths in RLDYOUR_CODEX_MODULE.
+# A module owns its standalone artifacts; bootstrap only delegates to the module's
+# own install lifecycle.
+#
+# zcode is declared `harnesses.delegated` in the contract and is NOT installed
+# here. The ZCode desktop app creates and owns ~/.zcode on first launch, and its
+# module installer fails closed on an unstamped target, demanding an explicit
+# --adopt-unmanaged that no unattended bootstrap may supply on the owner's
+# behalf. Blocking a whole device apply on that made every downstream layer —
+# language servers, compiled hosts, pinned scanners, the browser stack —
+# unreachable. nddev-harnesses owns zcode through its own lifecycle instead.
 # Read a harness module pin (module_repo / module_commit) from the contract.
 rldyour::_harness_module_pin() {
   local label=$1 key=$2 common_dir root_dir contract
@@ -430,7 +442,7 @@ rldyour::_harness_module_pin() {
 
 # Self-materialize the pinned public harness module (git clone at the exact
 # contract commit) into a managed dir when no explicit module path is provided,
-# so a clean OS -> bootstrap flow installs codex/zcode with zero manual steps.
+# so a clean OS -> bootstrap flow installs codex with zero manual steps.
 # Additive: an explicit RLDYOUR_<H>_MODULE path still wins. Fail-closed.
 rldyour::_materialize_harness_module() {
   local label=$1 dest=$2 entry=$3 repo commit
@@ -505,53 +517,14 @@ rldyour::install_codex_harness() {
   rldyour::run python3 "$module/$entry" install-builder --target "$target" || return 1
 }
 
-# Delegate the ZCode harness to nddev-zcode-app. The module owns the standalone
-# ZCode desktop app + CLI artifacts and exposes its own plan/apply lifecycle, so
-# it is invoked directly with --plan in a dry run (no writes) and --apply
-# otherwise. bootstrap installs the pinned app + CLI; the install command builds
-# the nddev-builder setup.
-rldyour::install_zcode_harness() {
-  local module=${RLDYOUR_ZCODE_MODULE:-}
-  local entry="cli-tools/scripts/install.sh"
-  local status flag
-
-  rldyour::_validate_harness_module "zcode" "$module" "$entry"
-  status=$?
-  if [ "$status" -eq 2 ]; then
-    module="$HOME/.local/share/rldyour/harness-modules/nddev-zcode-app"
-    rldyour::log "info" "RLDYOUR_ZCODE_MODULE unset; self-materializing the pinned zcode module"
-    rldyour::_materialize_harness_module zcode "$module" "$entry" || return 1
-  elif [ "$status" -ne 0 ]; then
-    return 1
-  fi
-
-  if [ "${RLDYOUR_DRY_RUN:-1}" -eq 1 ]; then flag="--plan"; else flag="--apply"; fi
-  rldyour::section "Delegate zcode harness to nddev-zcode-app (nddev-builder setup, ${flag})"
-  if [ ! -f "$module/$entry" ]; then
-    # Auto-materialized module is not present in dry-run; show the plan only.
-    rldyour::log "info" "[DRY-RUN] zcode: bash ${module}/${entry} bootstrap ${flag}; install --setup nddev-builder ${flag}"
-    return 0
-  fi
-  # never install zcode via a bun/npm global; the module owns its artifacts.
-  rldyour::log "info" "zcode delegation: bash ${module}/${entry} bootstrap ${flag}"
-  bash "$module/$entry" bootstrap "$flag" || {
-    rldyour::log "error" "zcode module bootstrap (${flag}) failed"
-    return 1
-  }
-  rldyour::log "info" "zcode delegation: bash ${module}/${entry} install --setup nddev-builder ${flag}"
-  bash "$module/$entry" install --setup nddev-builder "$flag" || {
-    rldyour::log "error" "zcode module nddev-builder setup (${flag}) failed"
-    return 1
-  }
-}
-
-# Install exactly the owner's active harness set (codex, zcode) by delegating to
-# each harness's authoritative NDDev module. Bootstrap must still succeed as a
-# standalone run when a module path is unset.
+# Install exactly the owner's active harness set (codex) by delegating to each
+# harness's authoritative NDDev module. Bootstrap must still succeed as a
+# standalone run when a module path is unset. zcode is contract-delegated to
+# nddev-harnesses and is intentionally absent here.
 rldyour::install_selected_harnesses() {
-  rldyour::section "Install selected harnesses (codex, zcode) via their GDS modules"
+  rldyour::section "Install selected harnesses (codex) via their GDS modules"
   rldyour::install_codex_harness || return 1
-  rldyour::install_zcode_harness || return 1
+  rldyour::log "info" "zcode is delegated to nddev-harnesses (contract harnesses.delegated); bootstrap installs no ZCode app or CLI"
 }
 
 # Recognize only the exact launchd/systemd files emitted by pre-marker releases.
@@ -2289,12 +2262,55 @@ RUNTIME
   trap - RETURN
 }
 
-# Bun packages may arrive with group-writable entrypoints even under a private
-# umask. Normalize a freshly staged tree before publication, and validate every
-# reused tree. Symlinks are allowed only when they resolve back inside the same
-# content-addressed runtime; all material files and directories must be owned by
-# the current UID and must never remain group/world-writable.
-rldyour::_browser_node_runtime_permissions() {
+# Managed runtime trees must never stay group/world-writable, and two unrelated
+# sources violate that on their own:
+#   * Bun packages arrive with group-writable entrypoints even under a private
+#     umask;
+#   * upstream archives can store group-writable modes directly. The Dart SDK zip
+#     records its directories as 0775, and umask only clears bits it never adds,
+#     so `umask 002` publishes 114 group-writable directories inside an otherwise
+#     receipt-verified tree. The receipt hashes only the declared executables, so
+#     anyone in the owner's group could add or replace a snapshot beside them
+#     without invalidating it.
+# Normalize a freshly staged tree before publication, and validate every reused
+# tree. Symlinks are allowed only when they resolve back inside the same runtime
+# root; all material files and directories must be owned by the current UID.
+# The Dart SDK reports telemetry by default. This adapter disables tool telemetry
+# by policy — the browser transport wrapper actively rejects attempts to re-enable
+# usage statistics — so a bootstrap-installed SDK that phones home would
+# contradict its own boundary. The opt-out lives in the shared Dart/Flutter
+# telemetry config, a file the Dart tooling maintains itself, so it is set through
+# the SDK's own supported switch and never hand-written. Platform-independent by
+# design: both installers call this with their own resolved `dart`.
+#
+# Fail closed. An opt-out that cannot be proven is treated as telemetry still
+# being on, because the failure is silent by nature.
+rldyour::ensure_dart_telemetry_disabled() {
+  local binary=$1
+  local config="$HOME/.dart-tool/dart-flutter-telemetry.config"
+  if [ ! -x "$binary" ]; then
+    rldyour::log "error" "Dart telemetry opt-out needs an executable dart: ${binary}"
+    return 1
+  fi
+  "$binary" --disable-analytics >/dev/null 2>&1 || {
+    rldyour::log "error" "'dart --disable-analytics' failed; Dart telemetry state is unknown"
+    return 1
+  }
+  if [ ! -f "$config" ] || [ -L "$config" ]; then
+    rldyour::log "error" "Dart telemetry config is missing or not a regular file: ${config}"
+    return 1
+  fi
+  # A conflicting `reporting=1` must fail rather than be averaged away. Upstream
+  # resolves duplicate keys conservatively, but this gate exists to prove the
+  # opt-out, not to reason about upstream precedence rules.
+  if ! grep -Fxq 'reporting=0' "$config" || grep -Fxq 'reporting=1' "$config"; then
+    rldyour::log "error" "Dart telemetry is not provably disabled in ${config}"
+    return 1
+  fi
+  rldyour::log "ok" "Dart telemetry reporting disabled (${config})"
+}
+
+rldyour::_managed_tree_permissions() {
   local mode=$1 root=$2
   case "$mode" in normalize|validate) ;; *) return 2 ;; esac
   rldyour::_isolated_python python3 -I - "$mode" "$root" <<'PY'
@@ -2371,7 +2387,7 @@ rldyour::_install_browser_node_bundle() {
       rldyour::log "error" "content-addressed browser Node runtime identity is invalid; preserved: ${destination}"
       return 1
     fi
-    if ! rldyour::_browser_node_runtime_permissions validate "$destination"; then
+    if ! rldyour::_managed_tree_permissions validate "$destination"; then
       rebuild_unsafe=1
       rldyour::log "warn" "browser Node runtime permissions are unsafe; rebuilding from the frozen lock"
     fi
@@ -2394,7 +2410,7 @@ RUNTIME
       rldyour::log "error" "isolated browser provider staging installation failed"
       return 1
     fi
-    if ! rldyour::_browser_node_runtime_permissions normalize "$stage"; then
+    if ! rldyour::_managed_tree_permissions normalize "$stage"; then
       rldyour::log "error" "staged browser provider runtime permissions are unsafe"
       return 1
     fi
@@ -2440,7 +2456,7 @@ RUNTIME
     rldyour::log "error" "content-addressed browser Node runtime identity is invalid; preserved: ${destination}"
     return 1
   fi
-  if ! rldyour::_browser_node_runtime_permissions validate "$destination"; then
+  if ! rldyour::_managed_tree_permissions validate "$destination"; then
     rldyour::log "error" "published browser Node runtime permissions are unsafe"
     return 1
   fi
@@ -3202,14 +3218,13 @@ PY
 
 rldyour::verify_terminal_environment() {
   local shell_dump expected_bin="$HOME/.local/bin"
-  # The active harness set is codex and zcode. Both are owned by their GDS
-  # modules, which publish their launchers into the managed prefix; require them
-  # only when their module paths were provided to bootstrap. The browser and rtk
-  # commands are always published by this bootstrap.
+  # The active harness set is codex, owned by its GDS module; require it only when
+  # its module path was provided to bootstrap. The browser and rtk commands are
+  # always published by this bootstrap. zcode is contract-delegated to
+  # nddev-harnesses and is never required from a managed shell here.
   local -a required_cmds=(
     rtk cloak-chromium cloakbrowser-cdp-health chrome-devtools-mcp playwright-cli
   )
-  [ -n "${RLDYOUR_ZCODE_MODULE:-}" ] && required_cmds=(zcode "${required_cmds[@]}")
   [ -n "${RLDYOUR_CODEX_MODULE:-}" ] && required_cmds=(codex "${required_cmds[@]}")
   command -v zsh >/dev/null 2>&1 || {
     rldyour::log "error" "zsh is required for managed terminal verification"
@@ -3249,8 +3264,8 @@ required = {
     "__RLDYOUR_CLOAK_URL__",
     "__RLDYOUR_CLOAK_SKIP__",
 }
-# The browser and rtk commands are always published by this bootstrap; codex and
-# zcode appear only when their GDS module paths were provided.
+# The browser and rtk commands are always published by this bootstrap; codex
+# appears only when its GDS module path was provided.
 always = (
     "rtk", "cloak-chromium", "cloakbrowser-cdp-health",
     "chrome-devtools-mcp", "playwright-cli",

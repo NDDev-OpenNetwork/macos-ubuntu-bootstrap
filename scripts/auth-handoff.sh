@@ -27,7 +27,7 @@ if [ "$mode" = "check" ]; then
   check "GitHub CLI" gh auth status
   check "Codex CLI" codex login status
   # shellcheck disable=SC2016 # backticks are user-facing Markdown, not expansion
-  printf '\nThe codex and zcode harnesses are owned by their GDS modules; launch `codex` and `zcode` to confirm sign-in without exposing account data.\n'
+  printf '\nThe codex harness is owned by its GDS module and zcode by nddev-harnesses; launch `codex` (and `zcode` where nddev-harnesses installed it) to confirm sign-in without exposing account data.\n'
   [ "$failures" -eq 0 ]
   exit
 fi
@@ -51,7 +51,7 @@ Authentication handoff (no credentials are managed by this repository)
    Status: codex login status
    API keys, only when intentionally used: https://platform.openai.com/api-keys
 
-3. ZCode CLI (harness owned by the nddev-zcode-app GDS module)
+3. ZCode CLI (harness owned by the nddev-harnesses repository, not by bootstrap)
    Run: zcode
    Z.ai account OAuth is the default provider; sign in on first launch.
    Install and setup guide: https://zcode.z.ai/en/docs/install

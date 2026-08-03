@@ -1,6 +1,6 @@
 # Installation And Target Matrix
 
-This guide describes adapter contract `2.2.1`. All paths are relative to the
+This guide describes adapter contract `2.3.0`. All paths are relative to the
 root of an existing checkout of this repository at a verified commit; acquiring
 that checkout is the caller's step (see the GDS clean-device runbook, step 0).
 Use `scripts/bootstrap.sh` as the
@@ -94,6 +94,16 @@ Both desktop platforms receive:
 - terminal and source-management utilities;
 - Node/Python tool hosts required by managed CLIs and language tooling (Ubuntu
   pins the official Node.js `24.18.0` LTS tarball and both architecture hashes);
+- the compiled-language and SDK hosts that back their language servers: Go
+  `1.26.5` (gopls `v0.23.0`), Rust `1.97.1` (rust-analyzer), and the Dart SDK
+  `3.12.2` (`dart language-server`). These are desktop-only — the server profile
+  is `container-execution-only` and `install_compiled_language_hosts` returns
+  early there. The Dart SDK also provides `dart mcp-server`, the transport the
+  `dart-flutter` MCP server declared by `rldyour-mcps` executes, which is why both
+  verifiers prove the subcommand responds instead of only checking that `dart`
+  resolves (ADR 0005, ADR 0006). The Flutter SDK is deliberately not installed:
+  its `bin/cache` self-populates at runtime and would mutate a hash-verified
+  runtime tree;
 - source-analysis, LSP, formatter, linter, quality, and security tools;
 - managed AI CLIs;
 - the mandatory fail-closed browser layer;
@@ -131,7 +141,7 @@ bash scripts/bootstrap.sh --platform ubuntu --profile server --docker-mode none
 
 ## Managed Harnesses (one owner per harness)
 
-The owner's active harness set is **codex** and **zcode** only. Bootstrap no
+The owner's active harness set is **codex** only. Bootstrap no
 longer inline-installs any AI CLI and never installs a harness through a bun/npm
 global path. Each harness is owned by its dedicated authoritative NDDev module.
 GDS device bootstrap materializes each module checkout and passes its absolute
@@ -143,19 +153,34 @@ skip the harness: it self-materializes the owner module by cloning
 install lifecycle. Setting the variable overrides this with an existing local
 checkout, whose entrypoint is validated before use.
 
-This means a clean OS -> bootstrap run installs codex and zcode with no manual
-steps and no pre-provisioned checkouts.
+This means a clean OS -> bootstrap run installs codex with no manual steps and no
+pre-provisioned checkouts.
 
 | Harness | Owner module | Module path env (optional override) | Delegated install |
 | --- | --- | --- | --- |
 | Codex | `nddev-codex-app` | `RLDYOUR_CODEX_MODULE` | `install-cli`, `apply --setup safe`, then `install-builder` |
-| ZCode | `nddev-zcode-app` | `RLDYOUR_ZCODE_MODULE` | `bootstrap`, then `install --setup nddev-builder` (`--plan`/`--apply`) |
+
+The codex module installs its CLI under its own target only and publishes no link
+into the managed prefix, so `${RLDYOUR_CODEX_HOME:-$HOME/.codex}/bin` is part of
+the managed PATH. Without it, `codex` could not be found and strict verification
+could never pass.
+
+### ZCode is delegated out of bootstrap
+
+ZCode is **not** installed or delegated to from here (ADR 0006). The desktop app
+creates and owns `~/.zcode` on first launch, and its installer correctly refuses
+an unstamped target without an explicit `--adopt-unmanaged` — an adoption decision
+that belongs to the operator, not to an unattended run. Because the harness step
+ran before every other layer under `set -euo pipefail`, that refusal aborted the
+whole apply and silently skipped the language servers, compiled hosts, pinned
+scanners, browser stack, and rtk behind it. zcode is now declared
+`harnesses.delegated` in the contract and installed by the **nddev-harnesses**
+repository through its own lifecycle. Neither verifier requires `zcode`.
 
 The codex setup defaults to the read-only `safe` profile; the unrestricted
 `full-auto` profile is selected only by the explicit owner flag
 `RLDYOUR_CODEX_FULL_AUTO=1`. `RLDYOUR_DRY_RUN` is respected: a codex dry run only
-logs the exact planned module commands, and the zcode module is driven through
-its own `--plan` lifecycle.
+logs the exact planned module commands.
 
 The codex harness stays update-locked: both `DISABLE_AUTOUPDATER=1` and
 `DISABLE_UPDATES=1` are exported by the managed shell drop-in so the module's
@@ -221,21 +246,24 @@ app versions.
 
 ### Ubuntu Desktop
 
-GUI mode installs only the desktop font support used by the terminal
-environment. No harness desktop app is installed by bootstrap: the codex and
-zcode harnesses are owned by their GDS modules, and the ZCode desktop app is
-installed by `nddev-zcode-app`. ChatGPT, Codex, and cmux have no supported Linux
-desktop build.
+GUI mode installs the desktop font support used by the terminal environment and
+then runs `scripts/ubuntu/desktop.sh`, which owns desktop customization: the
+GNOME dock moved to the bottom and centered, the Russian keyboard layout,
+the BrowserOS install, and the complete removal of the stock snap and apt
+Firefox. No harness desktop app is installed by bootstrap: the codex harness is
+owned by its GDS module, and the ZCode desktop app is installed by
+`nddev-harnesses`. ChatGPT, Codex, and cmux have no supported Linux desktop
+build.
 
 Ubuntu server never installs GUI applications.
 
 ### Harness ownership
 
-The codex and zcode harnesses (CLIs, setups, and — for ZCode — the desktop app)
-are installed and version-owned by their authoritative NDDev modules, not by
-this bootstrap. Bootstrap only delegates to each module's own install
-lifecycle; it publishes no apt `.deb`, bun/npm global, or frozen AI-CLI bundle
-for any harness.
+The codex harness (CLI and setup) is installed and version-owned by its
+authoritative NDDev module, not by this bootstrap. Bootstrap only delegates to
+that module's own install lifecycle; it publishes no apt `.deb`, bun/npm global,
+or frozen AI-CLI bundle for any harness. ZCode (CLI and desktop app) is owned
+end-to-end by `nddev-harnesses` and is not delegated to from here at all.
 
 ## Explicit Ubuntu Server Hardening
 
@@ -310,8 +338,9 @@ bash scripts/auth-handoff.sh show
 bash scripts/auth-handoff.sh check
 ```
 
-`show` documents owner-controlled sign-in for GitHub CLI, the Codex/OpenAI and
-ZCode harnesses, supported desktop applications, browser health, and cmux.
+`show` documents owner-controlled sign-in for GitHub CLI, the Codex/OpenAI
+harness, ZCode where `nddev-harnesses` installed it, supported desktop
+applications, browser health, and cmux.
 `check` performs only non-secret CLI status probes and reports `ok` or
 `pending`; it does not print account secrets.
 
@@ -342,11 +371,10 @@ receipt binding the tracked archive digest to hashes of its managed
 executables; strict verification also requires the owned `~/.local/bin` links.
 External same-version PATH binaries are never accepted as provenance. Homebrew
 uses a hash-verified, signed, and
-notarized package. The codex and zcode harnesses are installed by their
-authoritative NDDev modules (`nddev-codex-app`, `nddev-zcode-app`), which own
-their pinned standalone artifacts and integrity checks; bootstrap only delegates
-to each module's install lifecycle and never installs a harness through a
-bun/npm global path. RTK `0.43.0` uses a hash-pinned
+notarized package. The codex harness is installed by its authoritative NDDev
+module (`nddev-codex-app`), which owns its pinned standalone artifacts and
+integrity checks; bootstrap only delegates to that module's install lifecycle and
+never installs a harness through a bun/npm global path. RTK `0.43.0` uses a hash-pinned
 native artifact and tamper-evident launcher. Chrome DevTools MCP and Playwright
 CLI install from a separate tracked `bun.lock` with `--frozen-lockfile`.
 CloakBrowser dependencies come from a tracked universal lock and install with

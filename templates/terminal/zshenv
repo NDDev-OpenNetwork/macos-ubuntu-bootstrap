@@ -10,6 +10,7 @@ path=(
   "$HOME/.local/bin"                # uv tools, owner launchers (cl/cx/oc)
   "$HOME/.bun/bin"
   "$HOME/.cargo/bin"
+  "$HOME/.codex/bin"                # nddev-codex-app publishes codex only here
   /opt/homebrew/bin
   /opt/homebrew/sbin
   /usr/local/bin

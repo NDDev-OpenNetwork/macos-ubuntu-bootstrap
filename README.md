@@ -5,13 +5,13 @@ Plan-first bootstrap automation for Apple Silicon macOS desktops, Ubuntu
 
 ## Current Baseline
 
-The adapter contract version is `2.2.1`.
+The adapter contract version is `2.3.0`.
 
 | Field | Value |
 | --- | --- |
-| Adapter version | `2.2.1` |
+| Adapter version | `2.3.0` |
 | Runtime baseline | macOS arm64 and Ubuntu 24.04/26.04 amd64/arm64 |
-| GitHub release tag | `2.2.1` |
+| GitHub release tag | `2.3.0` |
 
 ## What This Repository Provides
 
@@ -29,23 +29,29 @@ are tool hosts, and the macOS clangd provider arrives in Homebrew's LLVM
 distribution; those supporting binaries do not authorize local project builds
 (see [ADR 0005](docs/adr/0005-go-and-rust-language-server-hosts.md)).
 
-Go and Rust are **desktop-only**. They back `gopls` and `rust-analyzer` over the
-estate's Go and Rust sources. The server profile is `container-execution-only`,
-so it receives no host compiler — project builds and tests run in Docker.
+Go, Rust, and Dart are **desktop-only**. They back `gopls`, `rust-analyzer`, and
+the Dart analysis server over the estate's sources. The server profile is
+`container-execution-only`, so it receives no host toolchain — project builds and
+tests run in Docker. The Dart SDK carries a second capability the estate depends
+on: `dart mcp-server` is the transport behind the `dart-flutter` MCP server that
+`rldyour-mcps` declares, so this host is what makes that server startable at all
+(see [ADR 0006](docs/adr/0006-dart-host-and-delegated-zcode-harness.md)). The
+Flutter SDK is deliberately not installed — its `bin/cache` self-populates at
+runtime and would mutate a hash-verified tree.
 
-On Ubuntu, Node.js `24.18.0`, uv `0.11.30`, Bun `1.3.14`, Go `1.26.5`, and Rust
-`1.97.1` are installed from
+On Ubuntu, Node.js `24.18.0`, uv `0.11.30`, Bun `1.3.14`, Go `1.26.5`, Rust
+`1.97.1`, and the Dart SDK `3.12.2` are installed from
 versioned upstream assets with tracked per-architecture SHA-256 values. One
 combined Rust archive carries rustc, cargo, rust-std, clippy, rustfmt, and
 rust-analyzer. `gopls` `v0.23.0` is the one exception to hash tracking: it ships
 no prebuilt archive, so it is pinned by exact module version and verified
 through the Go module checksum database. macOS
-bootstraps Homebrew from its notarized `6.0.9` package. At contract `2.2.1` the
-active harness set is **codex** and **zcode** only, and neither is installed
-inline: each is owned by its NDDev module, pinned by exact commit in
-`config/rldyour-contract.json`, and self-materialized when its module path
-variable is unset (see `docs/install.md`). Browser Node providers and
-CloakBrowser use tracked locks with frozen artifact hashes.
+bootstraps Homebrew from its notarized `6.0.9` package. At contract `2.3.0` the
+active harness set is **codex** only, and it is not installed inline: it is owned
+by its NDDev module, pinned by exact commit in `config/rldyour-contract.json`, and
+self-materialized when its module path variable is unset (see `docs/install.md`).
+Browser Node providers and CloakBrowser use tracked locks with frozen artifact
+hashes.
 
 This repository does not install `gds`, and it does not install the seed
 verifier that the GDS clean-device runbook establishes before its first
@@ -198,10 +204,17 @@ GUI is an overlay on desktop profiles and can be disabled with `--no-gui`.
   supported Linux desktop builds; their managed CLIs remain available.
 - Ubuntu server is always headless.
 
-ZCode is not installed by this repository. Since contract `2.0.0` the ZCode app
-and CLI are owned by the `nddev-zcode-app` module and installed through its own
-`--plan`/`--apply` lifecycle; bootstrap only delegates to the pinned module
-commit. There is no apt `.deb` path and no `RLDYOUR_ZCODE_SHA256` gate.
+ZCode is not installed by this repository, and since contract `2.3.0` it is not
+delegated to from here either. The ZCode desktop app creates and owns `~/.zcode`
+on first launch, and its installer correctly refuses to write into an unstamped
+target without an explicit `--adopt-unmanaged` — a decision no unattended
+bootstrap may make for the owner. Because the harness step ran ahead of every
+other layer under `set -euo pipefail`, that refusal aborted whole device applies
+and silently stranded the language servers, compiled hosts, pinned scanners, and
+browser stack behind it. zcode is now declared `harnesses.delegated` in the
+contract and owned by the **nddev-harnesses** repository, which installs it
+through its own lifecycle. There is no apt `.deb` path and no
+`RLDYOUR_ZCODE_SHA256` gate.
 
 ## Authentication Handoff
 

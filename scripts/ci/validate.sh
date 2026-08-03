@@ -55,13 +55,22 @@ if (
     browser.get('disabled_wrapper'),
 ) != ('retired-fail-closed', False, 'webwright'):
     raise SystemExit('Webwright retirement contract is incomplete')
-# One owner per harness (RVR-P1-004): codex and zcode are the active set and are
-# owned by their authoritative NDDev modules, referenced by module-path env vars.
+# One owner per harness (RVR-P1-004): codex is the active set and is owned by its
+# authoritative NDDev module, referenced by a module-path env var. zcode is
+# delegated to nddev-harnesses because its target cannot be adopted unattended;
+# the delegation must stay declared so it reads as a decision, not an omission.
 harnesses = data.get('harnesses', {})
 if harnesses.get('policy') != 'one-owner-per-harness':
     raise SystemExit('harness policy must be one-owner-per-harness')
-if harnesses.get('active') != ['codex', 'zcode']:
-    raise SystemExit('active harness set must be exactly codex and zcode')
+if harnesses.get('active') != ['codex']:
+    raise SystemExit('active harness set must be exactly codex')
+delegated = harnesses.get('delegated', {})
+if 'zcode' not in delegated:
+    raise SystemExit('zcode must stay declared under harnesses.delegated')
+if delegated['zcode'].get('owner_repo') != 'nddev-harnesses':
+    raise SystemExit('delegated zcode must name nddev-harnesses as its owner repo')
+if not delegated['zcode'].get('reason'):
+    raise SystemExit('delegated zcode must carry the reason it is out of bootstrap scope')
 if 'ai_cli' in data:
     raise SystemExit('the inline ai_cli pin block must be removed')
 print(f'contract-ok:{adapter_id}')

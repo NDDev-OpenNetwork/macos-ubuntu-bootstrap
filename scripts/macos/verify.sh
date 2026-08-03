@@ -26,12 +26,12 @@ rldyour::section "Verify macOS source/LSP workstation"
 
 required_cmds=(
   git curl node bun uv python3 shellcheck shfmt clangd
-  go gopls rustc cargo rust-analyzer
+  go gopls rustc cargo rust-analyzer dart
   pyright pyright-langserver basedpyright ruff
   tsc vtsls yaml-language-server bash-language-server docker-langserver
   vscode-html-language-server vscode-css-language-server vscode-json-language-server
   taplo marksman terraform-ls cmake-language-server
-  codex zcode rtk
+  codex rtk
   cloak-chromium cloakbrowser-cdp-health chrome-devtools-mcp playwright-cli
 )
 for cmd in "${required_cmds[@]}"; do
@@ -55,9 +55,19 @@ rldyour::require_cmd_min_version bun 1.3 --version
 rldyour::require_cmd_min_version starship 1.0 --version
 rldyour::require_cmd_min_version atuin 18.0 --version
 rldyour::require_cmd_min_version carapace 1.0 --version
-# The active harness set (codex, zcode) is owned by its GDS modules. Deep harness
-# proof (exact CLI/app versions, setup catalog) is delegated to each module's own
-# status; here we only require the CLIs to resolve on PATH (checked above).
+# Dart backs the analysis server and the `dart-flutter` MCP transport. Homebrew
+# cannot pin an exact patch, so the floor is a major/minor gate plus proof that
+# the mcp-server subcommand exists (a Dart SDK below 3.9 resolves but cannot
+# serve MCP at all, which would leave the declared marketplace server broken).
+rldyour::require_cmd_min_version dart 3.12 --version
+dart mcp-server --version >/dev/null 2>&1 || {
+  rldyour::log "missing" "'dart mcp-server' transport for the dart-flutter MCP server"
+  exit 1
+}
+# The active harness set (codex) is owned by its GDS module. Deep harness proof
+# (exact CLI version, setup catalog) is delegated to the module's own status; here
+# we only require the CLI to resolve on PATH (checked above). zcode is
+# contract-delegated to nddev-harnesses and is deliberately not required.
 rtk --version 2>/dev/null | head -n 1 | grep -Eq '^rtk[[:space:]]+0\.43\.0([[:space:]]|$)' || {
   rldyour::log "missing" "rtk exact managed version 0.43.0"
   exit 1

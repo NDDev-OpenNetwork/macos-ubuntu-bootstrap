@@ -4,6 +4,81 @@ All notable changes to this module will be documented in this file.
 
 ## [Unreleased]
 
+## [2.3.0] - 2026-08-03
+
+Two declared-but-undelivered capabilities are closed in one contract bump: the
+`dart-flutter` MCP server had no Dart on any provisioned device, and the zcode
+harness step aborted device applies before the layer that installs
+`chrome-devtools-mcp`. Both MCP servers named in the `rldyour-mcps` marketplace
+were therefore unstartable on a desktop this adapter had just provisioned.
+
+### Added
+
+- **Dart SDK `3.12.2` as the third desktop language-server host (ADR 0006).**
+  `rldyour-mcps` declares a `dart-flutter` MCP server whose transport is
+  `dart mcp-server`, and `rldyour-claudecode` stated that its Dart SDK pin
+  "matches what the bootstrap installs". No bootstrap path installed Dart on
+  either platform — the string appeared in this repository only in ADR 0005's
+  forbidden list and the test enforcing it — so that MCP server could never start
+  on any provisioned device. Ubuntu now installs the stable-channel
+  `dartsdk-linux-<arch>-release.zip` into an owned versioned directory with a
+  runtime receipt and a managed `~/.local/bin` link, exactly like Go and Rust;
+  macOS uses Homebrew's `dart-sdk`. Both digests were confirmed by downloading the
+  artifacts (`28e47b44…` x64, `f82c83ec…` arm64). Verification gates on the exact
+  (Ubuntu) or floor (macOS) version **and** on `dart mcp-server --version`
+  responding, because an SDK that resolves on `PATH` but cannot serve MCP is the
+  precise defect this replaces. The Flutter SDK is deliberately excluded: its
+  `bin/cache` self-populates at runtime and would mutate a hash-verified tree,
+  which needs its own decision rather than a row in this one.
+  `dart language-server --protocol=lsp` — the exact invocation `rldyour-lsps`
+  declares — was proven against a real `initialize` handshake, with a rejected
+  bogus `--protocol` value as the negative control.
+
+- **Dart telemetry disabled through one shared fail-closed helper.** The SDK
+  reports by default, which contradicts the boundary that makes the browser
+  wrapper reject `--usage-statistics`. `rldyour::ensure_dart_telemetry_disabled`
+  runs the SDK's own `dart --disable-analytics` switch — the shared Dart/Flutter
+  telemetry config is upstream's to maintain and is never hand-written — then reads
+  `reporting=0` back and rejects a conflicting `reporting=1`. Both installers call
+  it; Ubuntu's verifier re-proves it.
+
+### Fixed
+
+- **Group-writable directories in the published Dart tree.** The SDK zip records
+  directories as `0775`, and umask only clears bits it never adds, so extracting
+  under `umask 002` published 113 group-writable directories inside a
+  receipt-verified tree. Because the receipt hashes only the declared executables,
+  a writable directory beside them was enough to add or swap a snapshot without
+  invalidating it. Go and Rust never showed this — their archives store `0755`
+  directories. Rather than add a second permission path, the helper written for
+  group-writable Bun trees is generalized to
+  `rldyour::_managed_tree_permissions` and now normalizes the staged Dart tree
+  before the receipt is written and re-validates a reused one.
+
+- **`${RLDYOUR_CODEX_HOME:-$HOME/.codex}/bin` on the managed PATH.**
+  `nddev-codex-app` installs its standalone CLI under its own target and publishes
+  no link into the managed prefix, while both verifiers required `codex` on
+  `PATH`. `rldyour::ensure_path` and the `zshenv` template omitted that directory,
+  so strict verification could not pass on a correctly installed device — the
+  binary was present and unreachable.
+
+### Removed
+
+- **The zcode harness delegation, entirely (ADR 0006).** The ZCode desktop app
+  creates and owns `~/.zcode` on first launch; its module installer then correctly
+  refuses to write into an unstamped target without an explicit
+  `--adopt-unmanaged`, an adoption decision no unattended run may make for the
+  owner. Because `install_ai_runtimes` sat ahead of every other layer under
+  `set -euo pipefail`, that refusal aborted whole device applies: an observed
+  Ubuntu 26.04 desktop was missing 24 of the 46 commands its own `verify.sh`
+  requires — all the bun language servers, Go, Rust, every pinned scanner, the
+  entire CloakBrowser stack, and with it `chrome-devtools-mcp`, breaking a second
+  declared MCP server for the same reason. `rldyour::install_zcode_harness` and
+  `RLDYOUR_ZCODE_MODULE` are removed rather than softened into warn-and-continue,
+  which would be exactly the best-effort fallback this repository forbids. zcode is
+  declared `harnesses.delegated` in the contract, owned by `nddev-harnesses`, and
+  `dependency-check.yml` now fails if any zcode install path returns.
+
 ### Changed
 
 - **Every reusable-workflow caller repinned from `0.12.0` to `0.13.3`.** All

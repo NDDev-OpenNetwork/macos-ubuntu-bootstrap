@@ -2,9 +2,9 @@
   "schema_version": 2,
   "adapter": {
     "id": "macos-ubuntu-bootstrap",
-    "version": "2.2.1"
+    "version": "2.3.0"
   },
-  "verified_on": "2026-08-02",
+  "verified_on": "2026-08-03",
   "targets": {
     "macos": {
       "architectures": [
@@ -58,8 +58,7 @@
   "harnesses": {
     "policy": "one-owner-per-harness",
     "active": [
-      "codex",
-      "zcode"
+      "codex"
     ],
     "codex": {
       "owner_module": "nddev-codex-app",
@@ -68,12 +67,12 @@
       "module_commit": "a69d77f1c62b5e02cdd9b886c412a53cee92e24a",
       "default_setup": "safe"
     },
-    "zcode": {
-      "owner_module": "nddev-zcode-app",
-      "module_path_env": "RLDYOUR_ZCODE_MODULE",
-      "module_repo": "https://github.com/NDDev-it-com/nddev-zcode-app.git",
-      "module_commit": "b504a8ea9645ca1b87ea12a6b841ba45c55a9e35",
-      "default_setup": "nddev-builder"
+    "delegated": {
+      "zcode": {
+        "owner_repo": "nddev-harnesses",
+        "owner_module": "modules/nddev-zcode-app",
+        "reason": "The ZCode desktop app creates and owns ~/.zcode on first launch. Its installer fails closed on an unstamped target and requires an explicit --adopt-unmanaged, which no unattended bootstrap may pass on the owner's behalf. Bootstrap therefore declares zcode out of scope and never blocks a device apply on it; nddev-harnesses installs it through its own lifecycle."
+      }
     }
   },
   "runtime_support": {
@@ -113,6 +112,16 @@
       "clippy-preview",
       "rustfmt-preview",
       "rust-analyzer-preview"
+    ],
+    "ubuntu_dart": "3.12.2",
+    "ubuntu_dart_sha256": {
+      "x64": "28e47b44cf075f36771046c068bb0d174201cf9c7608744aed1cc23204299c2d",
+      "arm64": "f82c83ece7d168047550dfd4a664e4071ac7c488bddb72dc43102c22d7e0b518"
+    },
+    "ubuntu_dart_provides": [
+      "dart",
+      "dart language-server",
+      "dart mcp-server"
     ],
     "purpose": "ai-cli-and-language-server-host-only",
     "managed_receipt": "ubuntu-runtime-v1",

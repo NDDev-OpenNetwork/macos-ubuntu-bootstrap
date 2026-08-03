@@ -179,6 +179,21 @@ PINNED_SOURCE_TOOLS=(
   "ast-grep;0.45.0;zip;ast-grep;ast-grep;ast-grep;78931ae35ebac33d9a72b3aecea3e3d62d6e5b0b718ac8bbedfbe69d68421e41;62b60892dafacfa76d6de87157659f880bbf85ff38bdab52db12f1f14ec60f94;https://github.com/ast-grep/ast-grep/releases/download/0.45.0/app-x86_64-unknown-linux-gnu.zip;https://github.com/ast-grep/ast-grep/releases/download/0.45.0/app-aarch64-unknown-linux-gnu.zip"
 )
 
+# User-selected CLI tools that are not language hosts, LSPs, or scanners but
+# belong on the desktop estate. Same row contract as PINNED_SOURCE_TOOLS
+# (name;version;kind;members_x64;members_arm64;links;sha_x64;sha_arm64;url_x64;url_arm64).
+# These are raw GitHub release binaries (kind=raw): the downloaded artifact IS
+# the executable, no archive to unpack. Every digest was confirmed by
+# downloading the artifact.
+#
+# herdr ships its own `herdr update` command that fetches https://herdr.dev/latest.json;
+# the bootstrap pins the version here so a fresh device is reproducible without
+# trusting the live manifest at install time.
+USER_TOOLS=(
+  "herdr;0.7.5;raw;herdr;herdr;herdr;3dc83288073e4c2d3c679a30e7be97bcca9141c6fd17dbbb9219142e95c59253;32e763a1499a6b694b1d708e4f062b743be1da9f34fcfa4d212d6db6fe09a8b9;https://github.com/herdrdev/herdr/releases/download/v0.7.5/herdr-linux-x86_64;https://github.com/herdrdev/herdr/releases/download/v0.7.5/herdr-linux-aarch64"
+)
+
+
 usage() {
   cat <<'EOF'
 Usage: scripts/ubuntu/install.sh
@@ -309,6 +324,37 @@ install_pinned_source_tools() {
     ensure_pinned_source_tool "$row" || return 1
   done
 }
+
+# Install user-selected CLI tools (USER_TOOLS). Same row contract and installer
+# as PINNED_SOURCE_TOOLS — the two arrays differ only in taxonomy: pinned source
+# tools are estate CI parity (gitleaks/osv/actionlint/...), user tools are
+# operator-chosen desktop conveniences (herdr). Reusing ensure_pinned_source_tool
+# keeps the receipt, SHA-256 verification, and managed-symlink contract uniform.
+install_user_tools() {
+  local row
+  for row in "${USER_TOOLS[@]}"; do
+    ensure_pinned_source_tool "$row" || return 1
+  done
+}
+
+# Install declarative .desktop entries from templates/desktop/. Each entry is a
+# static file copied verbatim (no templating), mirroring how terminal configs
+# are installed: create when absent, ok when identical, keep+warn when the user
+# has edited it. Idempotent and safe under dry-run.
+install_desktop_entries() {
+  [ "$GUI_ENABLED" -eq 1 ] || {
+    rldyour::log "info" "desktop entries skipped: gui disabled (profile=$PROFILE)"
+    return 0
+  }
+  local entries_dir="$REPO_ROOT/templates/desktop"
+  local target_dir="$HOME/.local/share/applications"
+  local entry
+  for entry in "$entries_dir"/*.desktop; do
+    [ -f "$entry" ] || continue
+    rldyour::install_config_template "$entry" "$target_dir/$(basename "$entry")"
+  done
+}
+
 
 ensure_pinned_source_tool() {
   local row=$1
@@ -1074,52 +1120,70 @@ verify_apply() {
   fi
 }
 
-if [ "${1:-}" = "--help" ]; then
-  usage
-  exit 0
-fi
+main() {
+  if [ "${1:-}" = "--help" ]; then
+    usage
+    exit 0
+  fi
 
-rldyour::assert_root "$REPO_ROOT"
-rldyour::ensure_path
-validate_target
-rldyour::section "macos-ubuntu-bootstrap (Ubuntu) installer"
-rldyour::log "info" "mode: $([ "$RLDYOUR_DRY_RUN" -eq 1 ] && echo dry-run || echo apply); profile: $PROFILE; gui: $GUI_ENABLED; docker: $DOCKER_MODE; policy: $LOCAL_EXECUTION_POLICY"
-
-if [ "$SKIP_SYSTEM" -eq 0 ]; then
-  install_apt_baseline
-  ensure_node
-  ensure_uv
-  ensure_bun
-  ensure_starship
-  ensure_atuin
-  ensure_carapace
+  rldyour::assert_root "$REPO_ROOT"
   rldyour::ensure_path
-  install_python_source_tools
-  rldyour::ensure_git_perf
-  rldyour::ensure_git_delta_config
-  rldyour::install_terminal_configs "$REPO_ROOT/templates/terminal"
-  ensure_login_shell
-else
-  rldyour::log "warn" "system layer skipped by explicit recovery flag"
+  validate_target
+  rldyour::section "macos-ubuntu-bootstrap (Ubuntu) installer"
+  rldyour::log "info" "mode: $([ "$RLDYOUR_DRY_RUN" -eq 1 ] && echo dry-run || echo apply); profile: $PROFILE; gui: $GUI_ENABLED; docker: $DOCKER_MODE; policy: $LOCAL_EXECUTION_POLICY"
+
+  if [ "$SKIP_SYSTEM" -eq 0 ]; then
+    install_apt_baseline
+    ensure_node
+    ensure_uv
+    ensure_bun
+    ensure_starship
+    ensure_atuin
+    ensure_carapace
+    rldyour::ensure_path
+    install_python_source_tools
+    rldyour::ensure_git_perf
+    rldyour::ensure_git_delta_config
+    rldyour::install_terminal_configs "$REPO_ROOT/templates/terminal"
+    ensure_login_shell
+  else
+    rldyour::log "warn" "system layer skipped by explicit recovery flag"
+  fi
+
+  [ "$SKIP_LSPS" -eq 1 ] || install_bun_lsps
+  [ "$SKIP_LSPS" -eq 1 ] || install_compiled_language_hosts
+
+  # User-selected desktop tools (herdr) and .desktop launchers. Desktop profile
+  # only — these are operator conveniences, not build/runtime dependencies, so
+  # they sit alongside the GUI layer rather than inside the system or LSP layer.
+  if [ "$PROFILE" = "desktop" ]; then
+    install_user_tools
+    install_desktop_entries
+  fi
+
+  install_gui_apps
+  run_server_layer
+
+  # Mandatory on desktop, no-GUI desktop, and headless server profiles.
+  rldyour::install_browser_providers
+
+  # The harness layer runs LAST of the installing layers, and deliberately so.
+  # It delegates to a separate module whose own fail-closed guards depend on local
+  # state this repository does not own: a stale builder profile under the harness
+  # target, or a checkout whose modes came from the caller's umask. Under
+  # `set -euo pipefail` an abort here used to strand every layer behind it - the
+  # language servers, the compiled hosts, the pinned scanners, and the browser
+  # stack - which is how a desktop ended up missing 24 of the 46 commands
+  # verify.sh requires. Ordering it last keeps the failure fatal, which it must be,
+  # while making it fatal to itself instead of to the whole device.
+  [ "$SKIP_AI" -eq 1 ] || install_ai_runtimes
+  verify_apply
+  rldyour::log "info" "Run 'bash scripts/auth-handoff.sh' for user-controlled sign-in steps."
+}
+
+# Guard so the main flow only runs when executed directly, not when sourced.
+# This mirrors the pattern in scripts/ubuntu/server.sh and makes install.sh safe
+# to source from tests and other scripts that only need its function definitions.
+if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then
+  main "$@"
 fi
-
-[ "$SKIP_LSPS" -eq 1 ] || install_bun_lsps
-[ "$SKIP_LSPS" -eq 1 ] || install_compiled_language_hosts
-install_gui_apps
-run_server_layer
-
-# Mandatory on desktop, no-GUI desktop, and headless server profiles.
-rldyour::install_browser_providers
-
-# The harness layer runs LAST of the installing layers, and deliberately so.
-# It delegates to a separate module whose own fail-closed guards depend on local
-# state this repository does not own: a stale builder profile under the harness
-# target, or a checkout whose modes came from the caller's umask. Under
-# `set -euo pipefail` an abort here used to strand every layer behind it - the
-# language servers, the compiled hosts, the pinned scanners, and the browser
-# stack - which is how a desktop ended up missing 24 of the 46 commands
-# verify.sh requires. Ordering it last keeps the failure fatal, which it must be,
-# while making it fatal to itself instead of to the whole device.
-[ "$SKIP_AI" -eq 1 ] || install_ai_runtimes
-verify_apply
-rldyour::log "info" "Run 'bash scripts/auth-handoff.sh' for user-controlled sign-in steps."

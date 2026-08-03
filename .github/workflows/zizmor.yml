@@ -17,6 +17,11 @@ jobs:
   zizmor:
     name: Workflow security analysis
     permissions:
+      # zizmor-sarif reads workflow run metadata from the Actions API. A caller
+      # cannot grant a reusable more than it declares itself, so omitting
+      # actions: read fails the run at startup before any job begins — which is
+      # exactly what the 0.12.0 -> 0.13.3 repin surfaced here.
+      actions: read
       contents: read
       security-events: write # SARIF upload to the Security tab
     uses: NDDev-it-com/ci-workflows/.github/workflows/zizmor-sarif.yml@7f69c724923d06b2c2057c5a6ad341c37f1a8995 # 0.13.3

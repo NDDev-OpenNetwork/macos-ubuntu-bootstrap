@@ -3325,6 +3325,11 @@ rldyour::_ensure_pinned_git_checkout() {
     # modified tracked file or an untracked drop-in must not be trusted just
     # because HEAD happens to match the pin.
     if [ "$head" = "$sha" ] && [ -z "$(git -C "$dir" status --porcelain 2>/dev/null)" ]; then
+      # The content is provably the pinned commit, but its modes are not proven
+      # by that: an earlier clone may have landed group-writable. Normalize on the
+      # fast path too, or a device stays broken forever because the fast path is
+      # the only one it ever takes again.
+      rldyour::_harness_checkout_permissions "$dir" || return 1
       return 0
     fi
     git -C "$dir" fetch --quiet --tags origin || {
@@ -3351,6 +3356,28 @@ rldyour::_ensure_pinned_git_checkout() {
   }
   git -C "$dir" clean -ffdx --quiet || {
     rldyour::log "error" "failed to scrub untracked drift in ${dir}"
+    return 1
+  }
+  rldyour::_harness_checkout_permissions "$dir" || return 1
+}
+
+# `git clone` and `git checkout` create files under the caller's umask, and this
+# tree is later compiled into an executable plugin bundle whose consumer refuses a
+# group- or world-writable source. Under `umask 002` the clone lands with 252
+# group-writable paths and nddev-codex-app's `install-builder` fails closed with
+# "nddev-builder source plugin tree must not be writable by group or others" —
+# after this function had already reported success. Because the harness layer runs
+# ahead of every other layer under `set -euo pipefail`, that turned an
+# environment-dependent mode into a total device-apply abort, the same pathology
+# ADR 0006 removed for zcode.
+#
+# Normalize rather than fail: the bytes are provably the pinned commit, so
+# tightening their modes cannot change what gets installed, and refusing would
+# leave every `umask 002` host permanently unable to bootstrap.
+rldyour::_harness_checkout_permissions() {
+  local dir=$1
+  rldyour::_managed_tree_permissions normalize "$dir" || {
+    rldyour::log "error" "could not normalize permissions on the pinned checkout: ${dir}"
     return 1
   }
 }

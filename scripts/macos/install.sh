@@ -279,12 +279,16 @@ else
   rldyour::log "warn" "system layer skipped by explicit recovery flag"
 fi
 
-[ "$SKIP_AI" -eq 1 ] || install_ai_runtimes
 [ "$SKIP_LSPS" -eq 1 ] || install_bun_lsps
 
 # Mandatory on GUI and no-GUI profiles. No skip/fallback path exists.
 rldyour::install_browser_providers
 rldyour::install_rtk
 configure_cmux_hooks
+
+# Harness last, for the reason documented in scripts/ubuntu/install.sh: the layer
+# delegates to a module whose fail-closed guards depend on local state this
+# repository does not own, and an abort there must not strand the layers behind it.
+[ "$SKIP_AI" -eq 1 ] || install_ai_runtimes
 verify_apply
 rldyour::log "info" "Run 'bash scripts/auth-handoff.sh' for user-controlled sign-in steps."

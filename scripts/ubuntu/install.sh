@@ -1094,7 +1094,6 @@ else
   rldyour::log "warn" "system layer skipped by explicit recovery flag"
 fi
 
-[ "$SKIP_AI" -eq 1 ] || install_ai_runtimes
 [ "$SKIP_LSPS" -eq 1 ] || install_bun_lsps
 [ "$SKIP_LSPS" -eq 1 ] || install_compiled_language_hosts
 install_gui_apps
@@ -1103,5 +1102,16 @@ run_server_layer
 # Mandatory on desktop, no-GUI desktop, and headless server profiles.
 rldyour::install_browser_providers
 rldyour::install_rtk
+
+# The harness layer runs LAST of the installing layers, and deliberately so.
+# It delegates to a separate module whose own fail-closed guards depend on local
+# state this repository does not own: a stale builder profile under the harness
+# target, or a checkout whose modes came from the caller's umask. Under
+# `set -euo pipefail` an abort here used to strand every layer behind it - the
+# language servers, the compiled hosts, the pinned scanners, the browser stack,
+# and rtk - which is how a desktop ended up missing 24 of the 46 commands
+# verify.sh requires. Ordering it last keeps the failure fatal, which it must be,
+# while making it fatal to itself instead of to the whole device.
+[ "$SKIP_AI" -eq 1 ] || install_ai_runtimes
 verify_apply
 rldyour::log "info" "Run 'bash scripts/auth-handoff.sh' for user-controlled sign-in steps."

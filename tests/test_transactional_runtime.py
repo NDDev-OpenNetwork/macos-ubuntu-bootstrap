@@ -878,7 +878,7 @@ def test_cloak_systemd_handoff_failure_restores_prior_unit_and_active_state(
         f'ExecStart="{bin_dir / "cloak-chromium"}" --headless=new '
         "--remote-debugging-address=127.0.0.1 --remote-debugging-port=9222 "
         f'"--user-data-dir={profile}" --no-first-run --no-default-browser-check '
-        "--fingerprint-platform=linux\n"
+        "--fingerprint-platform=linux --no-sandbox\n"
     )
     expected_stable_rollback = stable_old_unit.replace(
         "# Managed by macos-ubuntu-bootstrap: browser-stack-v1",
@@ -1173,7 +1173,7 @@ def test_cloak_health_accepts_restored_prior_binary_with_managed_provenance(
         f'ExecStart="{prior_binary}" --headless=new '
         "--remote-debugging-address=127.0.0.1 --remote-debugging-port=9222 "
         f'"--user-data-dir={profile}" --no-first-run --no-default-browser-check '
-        "--fingerprint-platform=linux\n",
+        "--fingerprint-platform=linux --no-sandbox\n",
         encoding="utf-8",
     )
     write_executable(
@@ -1189,7 +1189,7 @@ def test_cloak_health_accepts_restored_prior_binary_with_managed_provenance(
         fake_bin / "ps",
         f"""
         #!/usr/bin/env bash
-        printf '%s\\n' '{prior_binary} --headless=new --remote-debugging-address=127.0.0.1 --remote-debugging-port=9222 --user-data-dir={profile} --no-first-run --no-default-browser-check --fingerprint-platform=linux'
+        printf '%s\\n' '{prior_binary} --headless=new --remote-debugging-address=127.0.0.1 --remote-debugging-port=9222 --user-data-dir={profile} --no-first-run --no-default-browser-check --fingerprint-platform=linux --no-sandbox'
         """,
     )
     write_executable(

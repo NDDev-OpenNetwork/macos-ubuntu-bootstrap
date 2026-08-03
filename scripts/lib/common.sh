@@ -1097,6 +1097,13 @@ expected_tail = [
     "--no-default-browser-check",
     f"--fingerprint-platform={fingerprint}",
 ]
+# Ubuntu 23.10+ restricts unprivileged user namespaces through AppArmor, so the
+# headless Chromium zygote finds no usable sandbox and aborts on start
+# (status 6/ABRT, observed on 26.04). The flag is what lets the managed service
+# run there at all. macOS keeps its sandbox, and the flag must NOT appear on that
+# platform - hence a per-platform tail rather than one shared list.
+if fingerprint == "linux":
+    expected_tail.append("--no-sandbox")
 if arguments[1:] != expected_tail:
     raise SystemExit("managed service arguments escaped the fixed CDP contract")
 binary = arguments[0]
@@ -1338,6 +1345,13 @@ expected_tail = [
     "--no-default-browser-check",
     f"--fingerprint-platform={fingerprint}",
 ]
+# Ubuntu 23.10+ restricts unprivileged user namespaces through AppArmor, so the
+# headless Chromium zygote finds no usable sandbox and aborts on start
+# (status 6/ABRT, observed on 26.04). The flag is what lets the managed service
+# run there at all. macOS keeps its sandbox, and the flag must NOT appear on that
+# platform - hence a per-platform tail rather than one shared list.
+if fingerprint == "linux":
+    expected_tail.append("--no-sandbox")
 if arguments[1:] != expected_tail:
     raise SystemExit(1)
 binary = arguments[0]
@@ -1877,7 +1891,7 @@ Description=rldyour CloakBrowser headless CDP endpoint
 After=default.target
 
 [Service]
-ExecStart="${service_binary}" --headless=new --remote-debugging-address=127.0.0.1 --remote-debugging-port=${port} "--user-data-dir=${profile}" --no-first-run --no-default-browser-check --fingerprint-platform=${fp}
+ExecStart="${service_binary}" --headless=new --remote-debugging-address=127.0.0.1 --remote-debugging-port=${port} "--user-data-dir=${profile}" --no-first-run --no-default-browser-check --fingerprint-platform=${fp} --no-sandbox
 Restart=always
 RestartSec=3
 UMask=0077

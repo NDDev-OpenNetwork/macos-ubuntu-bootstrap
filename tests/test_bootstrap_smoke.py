@@ -217,6 +217,30 @@ def test_harness_delegation_wires_exact_module_commands() -> None:
     assert "rldyour::_ensure_pinned_git_checkout" in common
 
 
+def test_linux_cdp_service_carries_no_sandbox_and_macos_does_not() -> None:
+    """Ubuntu 23.10+ restricts unprivileged user namespaces through AppArmor, so the
+    headless Chromium zygote finds no usable sandbox and aborts with status 6/ABRT.
+    Observed on 26.04: the service restarted seven times and the mandatory health
+    gate failed, which correctly aborted the apply. The flag is what lets the
+    managed service start at all there.
+
+    macOS has no such restriction and keeps its sandbox, so the flag must NOT
+    appear on that platform - and the provenance validators compare the argument
+    tail exactly, so a shared list would break one platform or the other."""
+    common = file("scripts/lib/common.sh")
+    unit = next(
+        line for line in common.splitlines()
+        if line.startswith('ExecStart="${service_binary}"')
+    )
+    assert unit.endswith("--no-sandbox"), unit
+    # Both provenance validators must expect it, and only for linux.
+    assert common.count('if fingerprint == "linux":\n    expected_tail.append("--no-sandbox")') == 2
+    # The macOS plist argument list must stay sandboxed.
+    plist = common[common.index("<string>--fingerprint-platform=${fp}</string>") - 900 :]
+    plist = plist[: plist.index("</array>")] if "</array>" in plist else plist
+    assert "--no-sandbox" not in plist, "macOS launchd arguments must keep the sandbox"
+
+
 def test_harness_layer_runs_after_the_layers_it_used_to_strand() -> None:
     """The harness layer delegates to a module whose fail-closed guards depend on
     local state this repository does not own: a stale builder profile under the

@@ -1,7 +1,7 @@
 <!-- Memory Metadata
-Last updated: 2026-08-02
-Last verified: 2026-08-02
-Last commit: 881c07ad415e6ac11052cfe01ab088de92de810d Merge pull request #32 from NDDev-it-com/feat/go-rust-lsp-hosts
+Last updated: 2026-08-03
+Last verified: 2026-08-03
+Last commit: 4ceac2921743308354b4292034e12e6400ad3e6d Merge pull request #40 from NDDev-it-com/feat/dart-host-and-zcode-delegation
 Scope: architecture decisions and owner-approved policy changes
 Area: ADR
 -->
@@ -22,6 +22,7 @@ architecture decisions and owner-approved policy changes
 ## Facts
 - Bootstrap architecture or policy meaning changes require explicit owner approval; implementation-only maintenance must preserve the current decisions.
 - ADR 0004 (accepted 2026-07-10) fixes profile composition and the CloakBrowser boundary.
+- ADR 0006 (accepted 2026-08-03) amends ADR 0005: the Dart SDK joins Go and Rust as a desktop language-server host, which also makes the `dart-flutter` MCP transport available, and the zcode harness is delegated out of bootstrap to `nddev-harnesses` because its target cannot be adopted unattended. ADR 0005 had listed `dart` among the things that stay forbidden; the `dart` apt package still is.
 - ADR 0005 (accepted 2026-08-02) amends ADR 0004: Go and Rust join Node, Python, and LLVM as desktop language-server hosts. It is explicit that this trades away the strong form of the desktop boundary — the separation between source analysis and local project build becomes intent and documentation rather than absence of a compiler, the same weaker guarantee that already applied to Node and Python.
 
 ## Evidence

@@ -1,7 +1,7 @@
 <!-- Memory Metadata
-Last updated: 2026-08-02
-Last verified: 2026-08-02
-Last commit: 81c1184dcb6c34caffeef513bb5b5660b17f6a78 Merge pull request #36 from NDDev-it-com/release/2.2.1
+Last updated: 2026-08-03
+Last verified: 2026-08-03
+Last commit: 4ceac2921743308354b4292034e12e6400ad3e6d Merge pull request #40 from NDDev-it-com/feat/dart-host-and-zcode-delegation
 Scope: .gitignore, .serena/project.yml, README.md, AGENTS.md, .claude/CLAUDE.md, scripts/**
 Area: TECHDEBT
 -->
@@ -37,10 +37,10 @@ Operational watchpoints and boundaries for the bootstrap module.
 - Durable Serena memory files are tracked; runtime-local Serena state remains ignored.
 - The module owns installation and verification, not adapter-native MCP, command, skill, or task-routing surfaces.
 - Managed shell integration edits only delimited source blocks, backs up pre-existing files, and verifies a fresh login shell. Interactive aliases activate only when their target executable exists.
-- ZCode remains an explicit integrity handoff because upstream publishes no checksum/signature manifest. Ubuntu can install it only with an independently supplied SHA-256.
+- ZCode is out of bootstrap scope as of `2.3.0` (ADR 0006). The app creates and owns `~/.zcode` on first launch and its module installer refuses an unstamped target without an explicit `--adopt-unmanaged`, which no unattended run may supply; because the harness step ran ahead of every later layer under `set -euo pipefail`, that refusal aborted whole device applies. It is declared `harnesses.delegated` with `nddev-harnesses` as owner.
 - A real Apple Silicon macOS desktop strict apply and an immediate non-interactive idempotent reapply were verified on 2026-07-10, including managed launchd/CDP health and cmux hooks. Representative Ubuntu 24.04/26.04 desktop/server runs with systemd, SSH/UFW, and each selected Docker mode remain required; container-only CI cannot prove those host boundaries.
-- No current bootstrap contract/version drift: `VERSION`, contract, scripts, frozen locks, docs, SECURITY, and tests agree on `2.2.1` and its exact runtime pins, and `2.2.1` is the published release tag.
-- Resolved: release `2.2.1` publishes the combined contents of the unreleased `2.1.0` and `2.2.0` contracts, so the published tag no longer trails.
+- No current bootstrap contract/version drift: `VERSION`, contract, scripts, frozen locks, docs, SECURITY, and tests agree on `2.3.0` and its exact runtime pins. `2.2.1` remains the published release tag: `2.3.0` is contract-only so far, the same shape as the unreleased `2.1.0` and `2.2.0` before it.
+- Release `2.2.1` publishes the combined contents of the unreleased `2.1.0` and `2.2.0` contracts. The published tag trails the contract again at `2.3.0`, which is the module's normal shape between releases, not drift.
 - Resolved in `2.2.0`: `content_id()` and `regular_owned()` now take an explicit flag, and `cloak_runtime_identity()` — the only caller reading Git-tracked sources — passes it. The suite passes under `umask 002` and `umask 022` alike. Installed runtime paths still fail closed on a group- or world-writable file, pinned by `test_private_mode_is_enforced_for_installed_files_and_not_for_sources`.
 - Historical Webwright runtimes may remain on previously configured devices for preservation, but no managed command, dependency, or config path can execute them.
 

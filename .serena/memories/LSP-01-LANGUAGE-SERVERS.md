@@ -1,7 +1,7 @@
 <!-- Memory Metadata
-Last updated: 2026-08-02
-Last verified: 2026-08-02
-Last commit: 644384032ffff1f0f9dc11f0600e45f662f2b48c Merge pull request #34 from NDDev-it-com/feat/ubuntu-tool-parity
+Last updated: 2026-08-03
+Last verified: 2026-08-03
+Last commit: 4ceac2921743308354b4292034e12e6400ad3e6d Merge pull request #40 from NDDev-it-com/feat/dart-host-and-zcode-delegation
 Scope: language-server setup and diagnostic proof
 Area: LSP
 -->
@@ -26,6 +26,10 @@ language-server setup and diagnostic proof
 ## Facts
 - Desktop profiles install source-editing and language-server tooling; project build execution belongs on servers.
 - Contract `2.1.0` (ADR 0005) admits Go `1.26.5` and Rust `1.97.1` as desktop-only language-server hosts for `gopls` and `rust-analyzer`, on the same footing as Node, Python, and Homebrew's LLVM: present to resolve source, not to authorize project builds.
+- Contract `2.3.0` (ADR 0006) admits the Dart SDK `3.12.2` on the same footing, and it carries two capabilities: `dart language-server --protocol=lsp` (the invocation `rldyour-lsps` declares, proven against a real `initialize` handshake) and `dart mcp-server`, the transport the `dart-flutter` MCP server in `rldyour-mcps` executes. Before `2.3.0` no bootstrap path installed Dart on either platform while the marketplace claimed otherwise, so that MCP server could never start.
+- The Dart SDK zip records its directories as `0775` and umask only clears bits it never adds, so the staged tree passes `rldyour::_managed_tree_permissions normalize` before its receipt is written and a reused tree is re-validated. That helper is the generalized former browser-Node one; adding a second permission path is forbidden.
+- Dart telemetry is disabled through `rldyour::ensure_dart_telemetry_disabled`, which runs the SDK's own `--disable-analytics` switch and then reads `reporting=0` back from the shared Dart/Flutter telemetry config. Never hand-write that file: upstream maintains it. Ubuntu's verifier re-proves the opt-out; macOS keeps its documented weaker-gate posture.
+- The Flutter SDK is deliberately not installed: its `bin/cache` self-populates at runtime and would mutate a hash-verified tree.
 - Ubuntu installs both from tracked per-architecture SHA-256 artifacts into owned versioned directories with runtime receipts; `golang-go`, `rustc`, `cargo`, and `rustup` remain forbidden distribution packages. macOS uses the `go`, `rust`, and `rust-analyzer` Homebrew formulae.
 - One combined `rust-<version>-<triple>` archive carries rustc, cargo, rust-std, clippy, rustfmt, and rust-analyzer, so a single tracked hash covers the whole Rust host.
 - `gopls` `v0.23.0` is the one host component without a tracked archive hash: it publishes no prebuilt archive, so it is pinned by exact module version and verified through the Go module checksum database. `runtime_support.ubuntu_gopls_provenance` records that class explicitly.

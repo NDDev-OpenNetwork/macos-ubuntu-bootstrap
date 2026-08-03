@@ -1,7 +1,7 @@
 <!-- Memory Metadata
-Last updated: 2026-07-10
-Last verified: 2026-07-10
-Last commit: 9f8f97792500a7af4787448a1478fbe5c9ca12cc chore(release): new-mac-or-ubuntu 0.3.9 (other)
+Last updated: 2026-08-03
+Last verified: 2026-08-03
+Last commit: 4ceac2921743308354b4292034e12e6400ad3e6d Merge pull request #40 from NDDev-it-com/feat/dart-host-and-zcode-delegation
 Scope: CLI runtime and package baselines
 Area: RUNTIME
 -->

@@ -1,7 +1,7 @@
 <!-- Memory Metadata
-Last updated: 2026-08-02
-Last verified: 2026-08-02
-Last commit: 81c1184dcb6c34caffeef513bb5b5660b17f6a78 Merge pull request #36 from NDDev-it-com/release/2.2.1
+Last updated: 2026-08-03
+Last verified: 2026-08-03
+Last commit: 4ceac2921743308354b4292034e12e6400ad3e6d Merge pull request #40 from NDDev-it-com/feat/dart-host-and-zcode-delegation
 Scope: README.md, VERSION, CHANGELOG.md, config/rldyour-contract.json, scripts/**, templates/**, tests/**, .github/workflows/**
 Area: RELEASE
 -->
@@ -46,11 +46,11 @@ Release, validation, CI, and public README contract for the macOS/Ubuntu bootstr
 - launchd forward and rollback handoffs use bounded loaded/unloaded state convergence instead of treating an immediate `launchctl` exit status as proof.
 
 ## Current State
-- Current product/config version is `2.2.1` (`VERSION`, `config/rldyour-contract.json` -> `adapter`), and `2.2.1` is the published GitHub release tag — the published release and the contract agree.
+- Current product/config version is `2.3.0` (`VERSION`, `config/rldyour-contract.json` -> `adapter`). The published GitHub release tag is still `2.2.1`: `2.3.0` advances the contract and the gitlink only, so the published tag trails by design until a release is cut.
 - Contracts `2.1.0` and `2.2.0` were never released; `2.2.1` publishes their combined contents. Do not expect tags for them.
 - Release `2.2.1` published five immutable checksummed assets in one create call: the source archive, `release-manifest.json`, `release-notes.md`, `sbom.spdx.json`, and `SHA256SUMS`.
 - Supported targets are Apple Silicon macOS desktop and Ubuntu 24.04/26.04 desktop/server on amd64 or arm64. Desktop Docker mode is always `none`; server Docker is explicit `none`, `rootful`, or `rootless`.
-- The active harness set is codex and zcode only (`harnesses.active`). Neither is installed inline: each is owned by an NDDev module pinned by exact `harnesses.<id>.module_commit`, and is self-materialized from `module_repo` at that commit when its `module_path_env` is unset. Exact commits and vendor runtime versions are read from the contract and the module's `build/version.json`; they are not duplicated here.
+- The active harness set is codex only (`harnesses.active`). It is not installed inline: it is owned by an NDDev module pinned by exact `harnesses.codex.module_commit`, and is self-materialized from `module_repo` at that commit when `RLDYOUR_CODEX_MODULE` is unset. zcode moved to `harnesses.delegated` in `2.3.0` and is installed by `nddev-harnesses`; `scripts/ci/validate.sh` fails if the active set drifts or if the delegation loses its owner or reason. Exact commits and vendor runtime versions are read from the contract and the module's `build/version.json`; they are not duplicated here.
 - The mandatory browser baseline is CloakBrowser `0.4.12`, Chrome DevTools MCP `1.6.0`, and Playwright CLI `0.1.17` on loopback CDP `127.0.0.1:9222`; Webwright has no installed runtime or dependency tree.
 - AI, browser Node, and CloakBrowser runtimes install from repository-owned frozen locks into content-addressed directories before an atomic wrapper/service/receipt handoff.
 - Browser Node staging removes group/world-write permission bits before publication. An already published runtime with unsafe permissions is preserved outside the active namespace and rebuilt from the frozen lock.

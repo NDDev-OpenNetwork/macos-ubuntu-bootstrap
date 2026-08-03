@@ -94,6 +94,16 @@ Fail closed on missing or unhealthy browser state. Do not add or document:
 - a stock or embedded browser fallback;
 - a non-loopback CDP listener.
 
+The managed headless service passes `--no-sandbox` on **Linux only**, and that is
+a boundary decision rather than a relaxation of one. Ubuntu 23.10+ restrict
+unprivileged user namespaces through AppArmor, so the Chromium zygote has no
+sandbox to enter and the service aborts with `status=6/ABRT`; without the flag the
+mandatory browser layer cannot start on any supported Ubuntu release. macOS keeps
+its sandbox, and both provenance validators compare the argument tail exactly, so
+the flag must never be added there. Do not instead relax
+`kernel.apparmor_restrict_unprivileged_userns`: that re-enables unprivileged user
+namespaces for every process on the host to fix one headless browser.
+
 Managed browser files use ownership markers. Preserve unmanaged files and fail
 instead of replacing them. The sole adoption exception is a complete exact
 match for the former rldyour CloakBrowser home, launcher pair, and service

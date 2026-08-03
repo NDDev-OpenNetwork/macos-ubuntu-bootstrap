@@ -47,7 +47,11 @@ BREW_SOURCE_PACKAGES=(
 )
 
 # Registry-backed language servers, pinned to exact versions for reproducibility
-# (RVR-P2-003). Kept in lockstep with the Ubuntu BUN_LSP_PACKAGES pins.
+# (RVR-P2-003). This is a subset of the Ubuntu BUN_LSP_PACKAGES (6 of 13); the
+# remaining LSPs (vscode-langservers-extracted, @taplo/cli, @biomejs/biome,
+# oxlint, markdownlint-cli2, prettier, @ansible/ansible-language-server) arrive
+# via Homebrew formulae in BREW_SOURCE_PACKAGES below, where exact pins are not
+# possible. The 6 shared entries below are kept version-aligned with Ubuntu.
 BUN_LSP_PACKAGES=(
   "typescript@7.0.2"
   "@vtsls/language-server@0.3.0"

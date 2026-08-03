@@ -157,11 +157,13 @@ policy.
   no-upgrade semantics, existing source tools are preserved, and Docker CE is
   installed only over an empty Docker/containerd state.
 
-Since contract `2.0.0` the active harness set is **codex and zcode only**, and
-neither is installed inline. Each is owned by its authoritative NDDev module
-(`nddev-codex-app`, `nddev-zcode-app`), pinned by exact commit in
-`config/rldyour-contract.json` and driven through that module's own
-`--plan`/`--apply` lifecycle. The inline Claude Code, OpenCode, MiMoCode,
+Since contract `2.3.0` the active harness set is **codex only**, and it is not
+installed inline. It is owned by its authoritative NDDev module
+(`nddev-codex-app`), pinned by exact commit in `config/rldyour-contract.json` and
+driven through that module's own lifecycle. zcode is declared
+`harnesses.delegated` and owned by the `nddev-harnesses` repository: the ZCode app
+creates `~/.zcode` itself and its installer cannot adopt an unstamped target
+unattended, so bootstrap does not delegate to it at all (ADR 0006). The inline Claude Code, OpenCode, MiMoCode,
 Antigravity, and raw ZCode installers were removed in `2.0.0`; integrity for
 each harness artifact is the owning module's responsibility. The RTK output
 compressor was removed from this adapter in `2.4.0` by owner decision: it is not

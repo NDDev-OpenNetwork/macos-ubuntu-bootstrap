@@ -73,7 +73,11 @@ operator documentation:
     owned by the `nddev-harnesses` repository. Its target cannot be adopted
     unattended, and blocking a device apply on it stranded every later layer. Do
     not reintroduce a zcode install path, not even a warn-and-continue one.
-- CloakBrowser: `0.4.12`
+- CloakBrowser: `0.4.12`. The managed headless service passes `--no-sandbox` on
+  Linux only: Ubuntu 23.10+ restrict unprivileged user namespaces through
+  AppArmor, so without it the zygote aborts and the mandatory browser layer cannot
+  start at all. macOS keeps its sandbox and the flag must never appear there. Do
+  not relax `kernel.apparmor_restrict_unprivileged_userns` instead.
 - Chrome DevTools MCP: `1.6.0`
 - Playwright CLI: `0.1.17`
 - Webwright: retired fail-closed; publish only the exact disabled wrapper

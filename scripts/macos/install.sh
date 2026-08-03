@@ -17,9 +17,10 @@ SKIP_CHECKS="${RLDYOUR_SKIP_CHECKS:-0}"
 GUI_ENABLED="${RLDYOUR_GUI_ENABLED:-1}"
 LOCAL_EXECUTION_POLICY="${RLDYOUR_LOCAL_EXECUTION_POLICY:-source-lsp-only}"
 
-# One owner per harness (RVR-P1-004): the active harness set is codex and zcode,
-# each installed by its dedicated authoritative NDDev module via
+# One owner per harness (RVR-P1-004): the active harness set is codex, installed
+# by its dedicated authoritative NDDev module via
 # rldyour::install_selected_harnesses. Bootstrap pins no AI CLI versions here.
+# zcode is contract-delegated to nddev-harnesses.
 HOMEBREW_PKG_VERSION="6.0.9"
 HOMEBREW_PKG_SHA256="525599bd2dcbda29857120234336b0103ad5283a3dc8511f72066eeb917abd3c"
 HOMEBREW_INSTALLER_TEAM="927JGANW46"
@@ -34,7 +35,7 @@ HOMEBREW_INSTALLER_TEAM="927JGANW46"
 # Kotlin lives in a Flutter Android app whose toolchain is out of scope here.
 BREW_SOURCE_PACKAGES=(
   git curl ca-certificates node bun uv python
-  shellcheck shfmt llvm go gopls rust rust-analyzer docker-language-server
+  shellcheck shfmt llvm go gopls rust rust-analyzer dart-sdk docker-language-server
   vscode-langservers-extracted taplo marksman markdown-oxide
   terraform-ls helm-ls cmake-language-server
   pyright basedpyright ruff ty
@@ -118,6 +119,15 @@ install_source_packages() {
   for formula in "${BREW_SOURCE_PACKAGES[@]}"; do
     ensure_formula "$formula"
   done
+  # `dart-sdk` backs the Dart analysis server and the `dart mcp-server` transport
+  # (ADR 0006). Homebrew cannot pin an exact patch, so unlike Ubuntu there is no
+  # receipt here — but the telemetry opt-out is identical on both platforms and
+  # shares one helper.
+  if [ "$RLDYOUR_DRY_RUN" -eq 1 ]; then
+    rldyour::log "info" "[DRY-RUN] disable Dart telemetry reporting through 'dart --disable-analytics'"
+  else
+    rldyour::ensure_dart_telemetry_disabled "$(command -v dart)" || return 1
+  fi
 }
 
 cask_app_path() {
@@ -179,12 +189,12 @@ install_gui_apps() {
     ensure_cask "$cask"
   done
   rldyour::log "info" "ChatGPT and Codex are installed as separate supported OpenAI desktop applications."
-  rldyour::log "warn" "ZCode is not auto-installed because upstream publishes no checksum/signature manifest; see scripts/auth-handoff.sh."
+  rldyour::log "info" "ZCode is owned by the nddev-harnesses repository, not by this bootstrap; see scripts/auth-handoff.sh."
 }
 
 install_ai_runtimes() {
-  # Delegate the active harness set (codex, zcode) to their authoritative NDDev
-  # modules; no AI CLI is installed inline or through a bun/npm global path.
+  # Delegate the active harness set (codex) to its authoritative NDDev module; no
+  # AI CLI is installed inline or through a bun/npm global path.
   rldyour::install_selected_harnesses
 }
 

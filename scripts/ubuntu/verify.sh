@@ -101,7 +101,7 @@ required_cmds=(
   pyright pyright-langserver basedpyright ruff
   tsc vtsls yaml-language-server bash-language-server docker-langserver
   vscode-html-language-server vscode-css-language-server vscode-json-language-server taplo
-  codex zcode rtk
+  codex rtk
   cloak-chromium cloakbrowser-cdp-health chrome-devtools-mcp playwright-cli
 )
 for cmd in "${required_cmds[@]}"; do
@@ -119,9 +119,10 @@ uv --version 2>/dev/null | head -n 1 | grep -Eq '^uv 0\.11\.30([[:space:]]|$)' |
   rldyour::log "missing" "uv exact managed Ubuntu version 0.11.30"
   exit 1
 }
-# The active harness set (codex, zcode) is owned by its GDS modules. Deep harness
-# proof (exact CLI/app versions, setup catalog) is delegated to each module's own
-# status; here we only require the CLIs to resolve on PATH (checked above).
+# The active harness set (codex) is owned by its GDS module. Deep harness proof
+# (exact CLI version, setup catalog) is delegated to the module's own status; here
+# we only require the CLI to resolve on PATH (checked above). zcode is
+# contract-delegated to nddev-harnesses and is deliberately not required.
 rtk --version 2>/dev/null | head -n 1 | grep -Eq '^rtk[[:space:]]+0\.43\.0([[:space:]]|$)' || {
   rldyour::log "missing" "rtk exact managed version 0.43.0"
   exit 1
@@ -135,7 +136,7 @@ rldyour::verify_terminal_environment
 if [ "$PROFILE" = "desktop" ]; then
   # Go and Rust are desktop-only language-server hosts. The server profile is
   # `container-execution-only`, so their absence there is the policy working.
-  for cmd in go gopls rustc cargo rust-analyzer; do
+  for cmd in go gopls rustc cargo rust-analyzer dart; do
     rldyour::require_cmd "$cmd" required
   done
   # Pinned source-analysis tools: the four CI-parity scanners, the Markdown
@@ -155,6 +156,28 @@ if [ "$PROFILE" = "desktop" ]; then
     rldyour::log "missing" "Rust exact managed Ubuntu version 1.97.1"
     exit 1
   }
+  # Dart is the analysis-server host and the `dart-flutter` MCP transport. Both
+  # the exact version and the mcp-server subcommand are proven: an SDK that
+  # resolves but cannot serve MCP would leave the declared marketplace server
+  # broken while verification passed.
+  [ "$(dart --version 2>&1 | awk 'NR == 1 { print $4 }')" = "3.12.2" ] || {
+    rldyour::log "missing" "Dart exact managed Ubuntu version 3.12.2"
+    exit 1
+  }
+  dart mcp-server --version >/dev/null 2>&1 || {
+    rldyour::log "missing" "'dart mcp-server' transport for the dart-flutter MCP server"
+    exit 1
+  }
+  # Telemetry stays off by policy. Prove it from the config the SDK maintains
+  # rather than trusting that the installer ran, and reject a conflicting
+  # `reporting=1` instead of reasoning about upstream duplicate-key precedence.
+  dart_telemetry_config="$HOME/.dart-tool/dart-flutter-telemetry.config"
+  if [ ! -f "$dart_telemetry_config" ] || [ -L "$dart_telemetry_config" ] ||
+    ! grep -Fxq 'reporting=0' "$dart_telemetry_config" ||
+    grep -Fxq 'reporting=1' "$dart_telemetry_config"; then
+    rldyour::log "missing" "Dart telemetry provably disabled in ${dart_telemetry_config}"
+    exit 1
+  fi
   [ "$DOCKER_MODE" = "none" ] || { rldyour::log "error" "desktop Docker mode must be none"; exit 1; }
   if command -v docker >/dev/null 2>&1; then
     rldyour::log "warn" "unmanaged Docker is present; this desktop bootstrap neither uses nor removes it"
@@ -162,9 +185,11 @@ if [ "$PROFILE" = "desktop" ]; then
     rldyour::log "ok" "desktop policy: Docker is absent"
   fi
   if [ "$GUI_ENABLED" -eq 1 ]; then
-    # Harness desktop apps (e.g. ZCode) are owned and verified by their GDS
-    # modules; this bootstrap installs no GUI harness package to check here.
-    rldyour::log "ok" "desktop GUI harness apps are owned by their GDS modules"
+    # Harness desktop apps (e.g. ZCode via nddev-harnesses) are owned and
+    # verified by their own repositories; this bootstrap installs no GUI harness
+    # package to check here. BrowserOS and the Firefox removal are desktop
+    # customization owned by desktop.sh, which reports its own result.
+    rldyour::log "ok" "desktop GUI harness apps are owned by their own repositories"
   fi
 else
   args=(--docker-mode "$DOCKER_MODE")

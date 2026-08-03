@@ -26,9 +26,10 @@ WITH_FAIL2BAN="${RLDYOUR_WITH_FAIL2BAN:-0}"
 # Login shell change is explicit opt-in only; never mutated silently.
 SET_LOGIN_SHELL="${RLDYOUR_SET_LOGIN_SHELL:-0}"
 
-# One owner per harness (RVR-P1-004): the active harness set is codex and zcode,
-# each installed by its dedicated authoritative NDDev module via
+# One owner per harness (RVR-P1-004): the active harness set is codex, installed
+# by its dedicated authoritative NDDev module via
 # rldyour::install_selected_harnesses. Bootstrap pins no AI CLI versions here.
+# zcode is contract-delegated to nddev-harnesses.
 NODE_VERSION="24.18.0"
 NODE_SHA256_X64="55aa7153f9d88f28d765fcdad5ae6945b5c0f98a36881703817e4c450fa76742"
 NODE_SHA256_ARM64="58c9520501f6ae2b52d5b210444e24b9d0c029a58c5011b797bc1fe7105886f6"
@@ -58,6 +59,16 @@ RUST_VERSION="1.97.1"
 RUST_CHANNEL_DATE="2026-07-16"
 RUST_SHA256_X86_64="88f28fa9af20594179f85d6df67078dfd6fa93e2f6da5e1e9b0ac4997988ca4f"
 RUST_SHA256_AARCH64="9a7a2c336b4787f1b72f6bab7c35d5b7af2fd03cbd39b4fc721466a70d402a7d"
+# Dart is the third desktop language-server host (ADR 0006), on the same footing
+# as Go and Rust. One self-contained SDK archive carries `dart language-server`
+# (the analysis server) and `dart mcp-server` (the Dart/Flutter MCP transport the
+# rldyour-mcps marketplace declares), so a single tracked hash covers both. The
+# SDK never mutates its own install tree, which is what keeps it compatible with
+# the runtime-receipt contract; the Flutter SDK is deliberately not installed
+# here because its bin/cache self-populates at runtime and would break that.
+DART_VERSION="3.12.2"
+DART_SHA256_X64="28e47b44cf075f36771046c068bb0d174201cf9c7608744aed1cc23204299c2d"
+DART_SHA256_ARM64="f82c83ece7d168047550dfd4a664e4071ac7c488bddb72dc43102c22d7e0b518"
 # Prompt/history/completion pillars — parity with the macOS brew baseline
 # (starship, atuin, carapace). Installed as pinned standalone artifacts, never
 # via apt (stale) or a piped install script. Linux x64 + arm64 tarball SHA-256
@@ -374,6 +385,15 @@ ensure_pinned_source_tool() {
   rldyour::ensure_path
 }
 
+# `dart --version` prints one line — `Dart SDK version: X.Y.Z (channel) ...` —
+# and older SDKs emitted it on stderr, so both streams are read. Kept as one
+# helper because the version gate runs at three points in ensure_dart.
+rldyour::ubuntu::dart_reported_version() {
+  local binary=$1
+  [ -x "$binary" ] || return 0
+  "$binary" --version 2>&1 | awk 'NR == 1 { print $4 }'
+}
+
 rldyour::ubuntu::write_runtime_receipt() {
   local root=$1 runtime=$2 version=$3 archive_sha256=$4
   local relative key
@@ -519,6 +539,7 @@ install_compiled_language_hosts() {
   fi
   ensure_go
   ensure_rust
+  ensure_dart
   install_pinned_source_tools
 }
 
@@ -663,6 +684,96 @@ ensure_rust() {
     rldyour::log "error" "managed Rust launcher did not resolve to ${RUST_VERSION}"
     return 1
   }
+}
+
+# Dart SDK host (ADR 0006). The stable channel publishes one self-contained zip
+# per architecture whose only top-level entry is `dart-sdk/`, so the wrapper is
+# stripped exactly the way ensure_rust strips its own. `dart` is the single
+# published link: `dart language-server` backs Dart/Flutter source analysis and
+# `dart mcp-server` is the transport the rldyour-mcps `dart-flutter` server
+# executes. Both ship inside this archive — there is no second install path.
+ensure_dart() {
+  rldyour::section "Ensure Dart ${DART_VERSION} (analysis-server and MCP host)"
+  local arch sha filename url archive stage destination parent reported
+  case "$(uname -m)" in
+    x86_64|amd64) arch="x64"; sha="$DART_SHA256_X64" ;;
+    aarch64|arm64) arch="arm64"; sha="$DART_SHA256_ARM64" ;;
+    *) rldyour::log "error" "Dart ${DART_VERSION} has no tracked artifact for $(uname -m)"; return 1 ;;
+  esac
+  filename="dartsdk-linux-${arch}-release.zip"
+  url="https://storage.googleapis.com/dart-archive/channels/stable/release/${DART_VERSION}/sdk/${filename}"
+  destination="$HOME/.local/share/rldyour/dart/${DART_VERSION}"
+  parent="$(dirname "$destination")"
+  if [ "$RLDYOUR_DRY_RUN" -eq 1 ]; then
+    rldyour::log "info" "[DRY-RUN] verify or install managed Dart ${DART_VERSION} from the tracked SHA-256 artifact, publishing dart for the analysis server and the dart-flutter MCP transport; external PATH binaries are preserved but never trusted"
+    return 0
+  fi
+  mkdir -p "$HOME/.local/bin" "$parent"
+  if [ -e "$destination" ] || [ -L "$destination" ]; then
+    if ! rldyour::ubuntu::validate_runtime_receipt \
+      "$destination" dart "$DART_VERSION" "$sha" bin/dart bin/dartaotruntime ||
+      [ "$(rldyour::ubuntu::dart_reported_version "$destination/bin/dart")" != "$DART_VERSION" ]; then
+      rldyour::log "error" "unmanaged or tampered Dart destination exists; preserved: $destination"
+      return 1
+    fi
+    # The receipt covers only the declared executables. A writable directory
+    # beside them is enough to add or swap a snapshot without invalidating it.
+    if ! rldyour::_managed_tree_permissions validate "$destination"; then
+      rldyour::log "error" "managed Dart tree has unsafe ownership or permissions; preserved: $destination"
+      return 1
+    fi
+  else
+    archive="$(mktemp)"; stage="$(mktemp -d "$parent/.dart-${DART_VERSION}.tmp.XXXXXX")"
+    trap 'rm -rf "$archive"; [ -z "${stage:-}" ] || rm -rf "$stage"' RETURN
+    rldyour::download_verified_file "$url" "$sha" "$archive" || return 1
+    # unzip has no --strip-components; the archive's single top-level `dart-sdk`
+    # directory is promoted explicitly instead.
+    mkdir -p "$stage/src"
+    unzip -q "$archive" -d "$stage/src" || {
+      rldyour::log "error" "Dart ${DART_VERSION} archive did not unpack"
+      return 1
+    }
+    if [ ! -d "$stage/src/dart-sdk" ] || [ -L "$stage/src/dart-sdk" ]; then
+      rldyour::log "error" "Dart ${DART_VERSION} archive layout changed; expected a single dart-sdk directory"
+      return 1
+    fi
+    mv "$stage/src/dart-sdk" "$stage/prefix"
+    rm -rf "$stage/src"
+    reported="$(rldyour::ubuntu::dart_reported_version "$stage/prefix/bin/dart")"
+    [ "$reported" = "$DART_VERSION" ] || {
+      rldyour::log "error" "staged Dart artifact reported '${reported:-unknown}', expected ${DART_VERSION}"
+      return 1
+    }
+    # The SDK zip records its directories as 0775, so a permissive umask cannot
+    # save the tree: umask only clears bits it never adds. Normalize before the
+    # receipt is written so the published tree is not group-writable.
+    if ! rldyour::_managed_tree_permissions normalize "$stage/prefix"; then
+      rldyour::log "error" "could not normalize permissions on the staged Dart tree"
+      return 1
+    fi
+    rldyour::ubuntu::write_runtime_receipt \
+      "$stage/prefix" dart "$DART_VERSION" "$sha" bin/dart bin/dartaotruntime || return 1
+    mv "$stage/prefix" "$destination"
+    rm -rf "$stage"
+    stage=""
+    rm -f "$archive"
+    trap - RETURN
+  fi
+  rldyour::ubuntu::preflight_managed_link dart "$HOME/.local/share/rldyour/dart"
+  ensure_managed_tool_link dart "$destination/bin/dart" "$HOME/.local/share/rldyour/dart"
+  rldyour::ensure_path
+  [ "$(rldyour::ubuntu::dart_reported_version "$HOME/.local/bin/dart")" = "$DART_VERSION" ] || {
+    rldyour::log "error" "managed Dart launcher did not resolve to ${DART_VERSION}"
+    return 1
+  }
+  # The MCP transport is the reason this host exists; prove the subcommand is
+  # present rather than assuming the SDK shipped it.
+  "$HOME/.local/bin/dart" mcp-server --version >/dev/null 2>&1 || {
+    rldyour::log "error" "managed Dart ${DART_VERSION} does not expose 'dart mcp-server'"
+    return 1
+  }
+  rldyour::ensure_dart_telemetry_disabled "$HOME/.local/bin/dart" || return 1
+  rldyour::log "ok" "Dart ${DART_VERSION} published with language-server and mcp-server support"
 }
 
 ensure_bun() {
@@ -891,8 +1002,8 @@ install_bun_lsps() {
 }
 
 install_ai_runtimes() {
-  # Delegate the active harness set (codex, zcode) to their authoritative NDDev
-  # modules; no AI CLI is installed inline or through a bun/npm global path.
+  # Delegate the active harness set (codex) to its authoritative NDDev module; no
+  # AI CLI is installed inline or through a bun/npm global path.
   rldyour::install_selected_harnesses
 }
 
@@ -903,9 +1014,9 @@ install_gui_apps() {
   fi
   rldyour::section "Install verified Ubuntu GUI applications"
   apt_install fonts-jetbrains-mono || rldyour::log "warn" "fonts-jetbrains-mono unavailable"
-  # The active harness set (codex, zcode) is owned by its GDS modules; the ZCode
-  # desktop app is installed by nddev-zcode-app, not by this bootstrap.
-  rldyour::log "info" "harness desktop apps are owned by their GDS modules; no GUI harness is installed here."
+  # The active harness set (codex) is owned by its GDS module; the ZCode desktop
+  # app is owned by nddev-harnesses, not by this bootstrap.
+  rldyour::log "info" "harness desktop apps are owned by their own repositories; no GUI harness is installed here."
   # Desktop customization: GNOME dock, Russian layout, BrowserOS, Firefox removal.
   rldyour::section "Configure Ubuntu desktop (dock, keyboard, browser)"
   local desktop_script

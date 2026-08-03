@@ -101,7 +101,7 @@ required_cmds=(
   pyright pyright-langserver basedpyright ruff
   tsc vtsls yaml-language-server bash-language-server docker-langserver
   vscode-html-language-server vscode-css-language-server vscode-json-language-server taplo
-  codex rtk
+  codex
   cloak-chromium cloakbrowser-cdp-health chrome-devtools-mcp playwright-cli
 )
 for cmd in "${required_cmds[@]}"; do
@@ -123,10 +123,6 @@ uv --version 2>/dev/null | head -n 1 | grep -Eq '^uv 0\.11\.30([[:space:]]|$)' |
 # (exact CLI version, setup catalog) is delegated to the module's own status; here
 # we only require the CLI to resolve on PATH (checked above). zcode is
 # contract-delegated to nddev-harnesses and is deliberately not required.
-rtk --version 2>/dev/null | head -n 1 | grep -Eq '^rtk[[:space:]]+0\.43\.0([[:space:]]|$)' || {
-  rldyour::log "missing" "rtk exact managed version 0.43.0"
-  exit 1
-}
 cloakbrowser-cdp-health
 chrome-devtools-mcp --version | grep -Fq "1.6.0"
 playwright-cli --version | grep -Fq "0.1.17"

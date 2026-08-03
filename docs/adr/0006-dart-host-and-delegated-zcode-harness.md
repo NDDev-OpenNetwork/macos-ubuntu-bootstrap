@@ -24,7 +24,7 @@ script checks `python3`, `git`, and `node`.
 **The zcode harness made every layer behind it unreachable.** `install.sh` runs
 `set -euo pipefail`, and `install_ai_runtimes` — which delegated to
 `nddev-zcode-app` — sat ahead of the language servers, the compiled hosts, the
-pinned scanners, the browser stack, and rtk. The ZCode desktop app creates and
+pinned scanners, and the browser stack. The ZCode desktop app creates and
 owns `~/.zcode` on first launch. Its module installer correctly refuses to write
 into an unstamped target and demands an explicit `--adopt-unmanaged`. So on any
 device where the app had ever been launched, a full `--apply` aborted at the

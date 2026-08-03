@@ -4,6 +4,61 @@ All notable changes to this module will be documented in this file.
 
 ## [Unreleased]
 
+## [2.4.0] - 2026-08-04
+
+Everything here was found by running the 2.3.0 apply on a real Ubuntu 26.04
+desktop. Three independent defects each made the mandatory browser layer
+unreachable, so `chrome-devtools-mcp` was never published on a stock supported
+host, and rtk is removed by owner decision.
+
+### Removed
+
+- **rtk is no longer installed by this adapter (owner decision).** `install_rtk`,
+  its four `supply_chain` pins, the exact-version gates in both verifiers, its
+  entry in the managed-shell required commands, and its tests are gone. The apply
+  had been failing on it with `managed RTK destination or receipt is invalid`,
+  and the refusal was correct: the binary on the reporting host hashed
+  `f160611f…` against a contract pin of `ff8a1e77…`, so what was installed was
+  never the pinned artifact. Removing the feature removes the mismatch with it.
+
+### Fixed
+
+- **The headless CDP service could not start on any Ubuntu from 23.10 onward.**
+  Chromium aborted with `No usable sandbox` (`status=6/ABRT`, seven restarts)
+  because 23.10+ restrict unprivileged user namespaces through AppArmor and
+  `kernel.apparmor_restrict_unprivileged_userns=1` is stock on 26.04. The Linux
+  service now passes `--no-sandbox`; both provenance validators expect it for
+  `fingerprint == "linux"` only, because macOS keeps its sandbox and the tail is
+  compared exactly. No machine-wide setting was changed - relaxing the kernel
+  restriction for every process to fix one headless browser is a far larger blast
+  radius for the same outcome. The stealth launcher already passed the flag; only
+  the service was missing it.
+
+- **`policy_hashes()` still enforced private mode on Git-tracked sources.** With
+  the service up, the apply failed at the integrity contract instead:
+  `NOT_PROVEN: path is group/world-writable: scripts/browser_runtime_integrity.py`.
+  Git records only the executable bit, so a clone under `umask 002` writes those
+  eight files 664 and the gate failed on a pristine tree while `umask 022` hosts
+  and CI stayed green. This is the call site the 2.2.0 fix missed. Installed
+  runtime paths still fail closed, the checkout is untouched, and the eight files
+  are still hashed - which is what actually pins them.
+
+- **A materialized harness checkout inherited the caller's umask.** `git clone`
+  under `umask 002` produced 252 group-writable paths, and nddev-codex-app's
+  `install-builder` then correctly refused the tree - after the checkout helper
+  had reported success. Both the clone path and the fast path now normalize
+  through the shared managed-tree helper; the fast path matters most, because it
+  is the only one a host with an already-pinned checkout ever takes again.
+
+### Changed
+
+- **The harness layer runs last in both installers.** It delegates to a module
+  whose fail-closed guards depend on local state this repository does not own, and
+  under `set -euo pipefail` an abort there stranded the language servers, compiled
+  hosts, pinned scanners, and browser stack behind it - a desktop missing 24 of
+  the 46 commands `verify.sh` required. The step stays fatal; it is now fatal to
+  itself rather than to the whole device.
+
 ## [2.3.0] - 2026-08-03
 
 Two declared-but-undelivered capabilities are closed in one contract bump: the

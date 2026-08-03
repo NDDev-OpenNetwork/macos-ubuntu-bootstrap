@@ -377,46 +377,6 @@ def test_wrapper_set_publish_rolls_back_after_mid_set_rename_failure(
     assert not stage.exists()
 
 
-@pytest.mark.parametrize("unsafe_state", ("namespace-symlink", "dangling-destination"))
-def test_native_artifact_installers_reject_unsafe_managed_paths_before_download(
-    tmp_path: Path, unsafe_state: str
-) -> None:
-    fixture = runtime_fixture(tmp_path)
-    home = tmp_path / "home"
-    fake_bin = tmp_path / "fake-bin"
-    fake_bin.mkdir()
-    download_log = tmp_path / "download.log"
-    write_executable(
-        fake_bin / "curl",
-        """
-        #!/usr/bin/env bash
-        printf '%s\\n' called >"$DOWNLOAD_LOG"
-        exit 77
-        """,
-    )
-    namespace = home / ".local/share/rldyour/rtk"
-    version = "0.43.0"
-    binary_name = "rtk"
-    if unsafe_state == "namespace-symlink":
-        namespace.parent.mkdir(parents=True)
-        external = tmp_path / "external-owner-data"
-        external.mkdir()
-        namespace.symlink_to(external, target_is_directory=True)
-    else:
-        version_dir = namespace / version
-        version_dir.mkdir(parents=True)
-        (version_dir / binary_name).symlink_to(tmp_path / "missing-unmanaged-target")
-    result = run_bash(
-        fixture,
-        home,
-        fake_bin,
-        "rldyour::install_rtk",
-        extra_env={"DOWNLOAD_LOG": str(download_log)},
-    )
-    assert result.returncode != 0
-    assert not download_log.exists()
-
-
 def test_harness_delegation_skips_cleanly_when_module_paths_are_unset(
     tmp_path: Path,
 ) -> None:

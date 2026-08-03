@@ -283,7 +283,6 @@ fi
 
 # Mandatory on GUI and no-GUI profiles. No skip/fallback path exists.
 rldyour::install_browser_providers
-rldyour::install_rtk
 configure_cmux_hooks
 
 # Harness last, for the reason documented in scripts/ubuntu/install.sh: the layer

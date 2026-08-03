@@ -8,7 +8,7 @@ reviewed commit and the matching versioned contract.
 
 | Version | Supported |
 | --- | --- |
-| Current exact tag `2.3.0` | yes |
+| Current exact tag `2.4.0` | yes |
 | Older patch, minor, or major versions | no |
 
 The `0.3.x` release-line label tracks only the latest released patch. The
@@ -163,8 +163,9 @@ neither is installed inline. Each is owned by its authoritative NDDev module
 `config/rldyour-contract.json` and driven through that module's own
 `--plan`/`--apply` lifecycle. The inline Claude Code, OpenCode, MiMoCode,
 Antigravity, and raw ZCode installers were removed in `2.0.0`; integrity for
-each harness artifact is the owning module's responsibility. The supporting RTK
-output compressor is exact `0.43.0`.
+each harness artifact is the owning module's responsibility. The RTK output
+compressor was removed from this adapter in `2.4.0` by owner decision: it is not
+required, and bootstrap must not install it.
 
 Do not report the absence of an inline AI-CLI installer as a defect — it is the
 one-owner-per-harness boundary working as designed.

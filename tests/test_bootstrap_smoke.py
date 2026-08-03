@@ -217,6 +217,42 @@ def test_harness_delegation_wires_exact_module_commands() -> None:
     assert "rldyour::_ensure_pinned_git_checkout" in common
 
 
+def test_harness_layer_runs_after_the_layers_it_used_to_strand() -> None:
+    """The harness layer delegates to a module whose fail-closed guards depend on
+    local state this repository does not own: a stale builder profile under the
+    harness target, or a checkout whose modes came from the caller's umask. Under
+    `set -euo pipefail` an abort there stranded every layer behind it - the
+    language servers, compiled hosts, pinned scanners, browser stack, and rtk -
+    which is how a desktop ended up missing 24 of the 46 commands verify.sh
+    requires. The failure must stay fatal; it must not stay first."""
+    for installer in ("scripts/ubuntu/install.sh", "scripts/macos/install.sh"):
+        body = file(installer)
+        harness = body.index('[ "$SKIP_AI" -eq 1 ] || install_ai_runtimes')
+        for later in ("rldyour::install_browser_providers", "rldyour::install_rtk"):
+            assert body.index(f"\n{later}") < harness, f"{installer}: {later} must run before the harness"
+        # Still fatal: no `|| true`, no warn-and-continue wrapper.
+        line = next(l for l in body.splitlines() if "install_ai_runtimes" in l and "SKIP_AI" in l)
+        assert "||" not in line.split("||", 1)[1].replace(" install_ai_runtimes", "", 1), line
+        assert body.index("verify_apply\n", harness) > harness, f"{installer}: verify must follow the harness"
+
+
+def test_materialized_harness_checkouts_are_permission_normalized() -> None:
+    """`git clone` applies the caller's umask, and nddev-codex-app refuses a
+    group- or world-writable builder source tree. Under `umask 002` the clone
+    landed with 252 group-writable paths and install-builder failed closed after
+    the checkout helper had already reported success. Both the fresh and the
+    fast path must normalize, or a host that already has a clean pinned checkout
+    stays broken forever - the fast path is the only one it takes again."""
+    common = file("scripts/lib/common.sh")
+    helper = "rldyour::_harness_checkout_permissions"
+    assert f"{helper}() {{" in common
+    checkout = common.index("rldyour::_ensure_pinned_git_checkout() {")
+    body = common[checkout : common.index(f"\n{helper}() {{")]
+    assert body.count(helper) == 2, "both the fast path and the clone path must normalize"
+    # Reuses the shared helper rather than a third permission implementation.
+    assert "rldyour::_managed_tree_permissions normalize" in common[common.index(f"{helper}() {{") :]
+
+
 def test_desktop_manifests_exclude_project_runtime_and_docker() -> None:
     macos = parse_array(file("scripts/macos/install.sh"), "BREW_SOURCE_PACKAGES")
     gui_casks = parse_array(file("scripts/macos/install.sh"), "GUI_CASKS")

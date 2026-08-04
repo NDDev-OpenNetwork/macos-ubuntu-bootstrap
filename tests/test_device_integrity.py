@@ -161,7 +161,10 @@ def test_verify_contract_versions_passes_when_state_matches() -> None:
     state = {
         "runtime_hosts": {
             name: {
-                "normalized": runtime_support[field],
+                # Use _normalize_version to mirror what collect_state would
+                # produce — gopls reports "0.23.0" but the contract stores
+                # "v0.23.0", and _verify_contract_versions strips the v.
+                "normalized": di._normalize_version(runtime_support[field], name),
                 "raw": runtime_support[field],
                 "path": f"/bin/{name}",
             }
@@ -288,6 +291,81 @@ def test_build_writes_canonical_receipt(tmp_path: Path) -> None:
     assert output.exists()
     loaded = di.load_receipt(output)
     assert loaded["schema"] == di.SCHEMA
+
+
+def test_verify_cli_returns_zero_on_valid_receipt(tmp_path: Path) -> None:
+    """verify subcommand via CLI must exit 0 and print PROVEN for a fresh receipt."""
+    receipt = tmp_path / "verify.json"
+    assert _run_cli("build", "--output", str(receipt)) == 0
+    assert _run_cli("verify", "--receipt", str(receipt)) == 0
+
+
+def test_verify_cli_json_output(tmp_path: Path) -> None:
+    """verify --json must emit a canonical JSON status envelope."""
+    import io
+    import sys
+
+    receipt = tmp_path / "verify-json.json"
+    assert _run_cli("build", "--output", str(receipt)) == 0
+
+    old_stdout = sys.stdout
+    sys.stdout = io.StringIO()
+    try:
+        rc = _run_cli("verify", "--receipt", str(receipt), "--json")
+    finally:
+        output = sys.stdout.getvalue()
+        sys.stdout = old_stdout
+
+    assert rc == 0
+    result = json.loads(output)
+    assert result["status"] == "PROVEN"
+    assert "payload_sha256" in result
+
+
+def test_metadata_only_cli(tmp_path: Path) -> None:
+    """metadata-only subcommand must validate receipt self-integrity."""
+    receipt = tmp_path / "meta.json"
+    assert _run_cli("build", "--output", str(receipt)) == 0
+    assert _run_cli("metadata-only", "--receipt", str(receipt)) == 0
+
+
+def test_is_our_receipt_accepts_valid_receipt(tmp_path: Path) -> None:
+    """_is_our_receipt must recognize our schema/owner."""
+    receipt = tmp_path / "ours.json"
+    assert _run_cli("build", "--output", str(receipt)) == 0
+    assert di._is_our_receipt(receipt) is True
+
+
+def test_is_our_receipt_rejects_foreign_json(tmp_path: Path) -> None:
+    """_is_our_receipt must reject a JSON file with wrong schema/owner."""
+    foreign = tmp_path / "foreign.json"
+    foreign.write_text(json.dumps({"schema": "something-else", "owner": "no-one"}))
+    assert di._is_our_receipt(foreign) is False
+
+
+def test_is_our_receipt_rejects_invalid_json(tmp_path: Path) -> None:
+    """_is_our_receipt must return False for unparseable JSON."""
+    garbage = tmp_path / "garbage.json"
+    garbage.write_text("not json at all")
+    assert di._is_our_receipt(garbage) is False
+
+
+def test_build_overwrites_existing_our_receipt_with_backup(tmp_path: Path) -> None:
+    """build must back up an existing our-receipt before rewriting."""
+    receipt = tmp_path / "rebuild.json"
+    assert _run_cli("build", "--output", str(receipt)) == 0
+    # A second build should create a .bak and succeed.
+    assert _run_cli("build", "--output", str(receipt)) == 0
+    assert (tmp_path / "rebuild.json.bak").exists()
+
+
+def test_build_refuses_unmanaged_receipt(tmp_path: Path) -> None:
+    """build must refuse to overwrite a file that is not one of our receipts."""
+    foreign = tmp_path / "foreign.json"
+    foreign.write_text(json.dumps({"unrelated": "data"}))
+    rc = _run_cli("build", "--output", str(foreign))
+    assert rc != 0
+
 
 
 def _run_cli(*args: str) -> int:

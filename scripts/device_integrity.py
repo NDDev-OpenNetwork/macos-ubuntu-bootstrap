@@ -53,6 +53,7 @@ RUNTIME_HOSTS: dict[str, tuple[str, str]] = {
     "uv": ("--version", "ubuntu_uv"),
     "bun": ("--version", "ubuntu_bun"),
     "go": ("version", "ubuntu_go"),
+    "gopls": ("version", "ubuntu_gopls"),
     "rustc": ("--version", "ubuntu_rust"),
     "dart": ("--version", "ubuntu_dart"),
 }
@@ -87,6 +88,37 @@ def canonical_bytes(value: dict[str, Any]) -> bytes:
 
 def fail(message: str) -> NoReturn:
     raise IntegrityError(message)
+
+
+def _current_os() -> str:
+    """Return the normalized OS label matching the contract's ``os`` arrays."""
+    system = os.uname().sysname
+    if system == "Darwin":
+        return "macos"
+    if system == "Linux":
+        return "linux"
+    return system.lower()
+
+
+def _applies_to_current_os(spec: dict[str, Any]) -> bool:
+    """Check whether a contract entry's ``os`` array includes this platform.
+
+    Entries without an ``os`` field apply to all platforms (backward
+    compatibility). Entries with ``os: ["linux"]`` are skipped on macOS, so a
+    Linux-only tool like herdr does not cause a NOT_PROVEN on macOS where it is
+    never installed.
+    """
+    declared_oses = spec.get("os")
+    if not declared_oses:
+        return True
+    # Normalize: "ubuntu" in the contract means Linux (the bootstrap's only
+    # Linux target); "linux" is the uname label.
+    current = _current_os()
+    normalized = {current, "linux" if current == "linux" else current}
+    for entry_os in declared_oses:
+        if entry_os in normalized or (entry_os == "ubuntu" and current == "linux"):
+            return True
+    return False
 
 
 # ----------------------------- safety primitives -----------------------------
@@ -208,7 +240,11 @@ def _run_version(binary: Path, flag: str) -> str:
     if result.returncode != 0:
         detail = (result.stderr or result.stdout).strip()
         return f"error:{detail or 'no detail'}"
-    return result.stdout.strip()
+    # Some runtimes print their version to stderr (notably `dart --version`
+    # on all platforms, and `go version` on some setups). Merge both streams
+    # so the version token is captured regardless of which stream the tool
+    # chose — mirroring the `2>&1` pattern the bash installer uses.
+    return (result.stdout + result.stderr).strip()
 
 
 def _normalize_version(raw: str, name: str) -> str:
@@ -256,6 +292,8 @@ def _user_tool_state(bin_dir: Path) -> dict[str, dict[str, str]]:
     declared = contract.get("user_tools", {})
     state: dict[str, dict[str, str]] = {}
     for name, spec in declared.items():
+        if not _applies_to_current_os(spec):
+            continue
         binary = shutil.which(name) or str(bin_dir / name)
         raw = _run_version(Path(binary), "--version")
         normalized = _normalize_version(raw, name)
@@ -277,7 +315,9 @@ def _desktop_entry_state(applications_dir: Path) -> dict[str, dict[str, str]]:
     contract = load_contract()
     declared = contract.get("desktop_entries", {})
     state: dict[str, dict[str, str]] = {}
-    for name, _spec in declared.items():
+    for name, spec in declared.items():
+        if not _applies_to_current_os(spec):
+            continue
         target = applications_dir / f"{name}.desktop"
         entry: dict[str, str] = {"path": str(target), "present": str(target.exists())}
         if target.exists() and target.is_file():
@@ -292,7 +332,11 @@ def collect_state(*, home: Path) -> dict[str, Any]:
     share_rldyour = home / ".local/share/rldyour"
     applications_dir = home / ".local/share/applications"
 
-    safe_directory(bin_dir, enforce_private_mode=False)
+    # On a fresh machine before bootstrap, ~/.local/bin may not exist yet.
+    # safe_directory would treat that as a missing required path and fail;
+    # tolerate absence so build can snapshot an all-absent device.
+    if bin_dir.exists():
+        safe_directory(bin_dir, enforce_private_mode=False)
     if share_rldyour.exists():
         safe_directory(share_rldyour, enforce_private_mode=False)
     if applications_dir.exists():
@@ -385,9 +429,13 @@ def _verify_contract_versions(state: dict[str, Any]) -> None:
         if declared is None:
             continue
         installed = state.get("runtime_hosts", {}).get(name, {}).get("normalized")
+        # Strip a leading 'v' from the declared value: the contract stores
+        # "v0.23.0" for gopls (matching the Go module tag), but the installed
+        # binary reports "0.23.0" (semver without the Go-module prefix).
+        declared_norm = declared.lstrip("v") if declared else declared
         if installed is None or installed == "absent":
             drifts.append(f"{name}: absent (contract declares {declared})")
-        elif installed != declared:
+        elif installed != declared_norm:
             drifts.append(f"{name}: installed {installed} != contract {declared}")
 
     declared_tools = runtime_support.get(PINNED_SOURCE_TOOLS_CONTRACT, {})
@@ -403,6 +451,8 @@ def _verify_contract_versions(state: dict[str, Any]) -> None:
     declared_user_tools = contract.get("user_tools", {})
     installed_user_tools = state.get("user_tools", {})
     for name, spec in declared_user_tools.items():
+        if not _applies_to_current_os(spec):
+            continue
         declared = spec.get("version")
         installed = installed_user_tools.get(name, {}).get("installed_version")
         if installed is None or installed == "absent":

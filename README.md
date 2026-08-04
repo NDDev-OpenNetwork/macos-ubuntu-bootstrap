@@ -5,13 +5,13 @@ Plan-first bootstrap automation for Apple Silicon macOS desktops, Ubuntu
 
 ## Current Baseline
 
-The adapter contract version is `2.4.0`.
+The adapter contract version is `2.5.0`.
 
 | Field | Value |
 | --- | --- |
-| Adapter version | `2.4.0` |
+| Adapter version | `2.5.0` |
 | Runtime baseline | macOS arm64 and Ubuntu 24.04/26.04 amd64/arm64 |
-| GitHub release tag | `2.4.0` |
+| GitHub release tag | `2.5.0` |
 
 ## What This Repository Provides
 
@@ -46,7 +46,7 @@ combined Rust archive carries rustc, cargo, rust-std, clippy, rustfmt, and
 rust-analyzer. `gopls` `v0.23.0` is the one exception to hash tracking: it ships
 no prebuilt archive, so it is pinned by exact module version and verified
 through the Go module checksum database. macOS
-bootstraps Homebrew from its notarized `6.0.9` package. At contract `2.4.0` the
+bootstraps Homebrew from its notarized `6.0.9` package. At contract `2.5.0` the
 active harness set is **codex** only, and it is not installed inline: it is owned
 by its NDDev module, pinned by exact commit in `config/rldyour-contract.json`, and
 self-materialized when its module path variable is unset (see `docs/install.md`).
@@ -203,7 +203,7 @@ GUI is an overlay on desktop profiles and can be disabled with `--no-gui`.
   supported Linux desktop builds; their managed CLIs remain available.
 - Ubuntu server is always headless.
 
-ZCode is not installed by this repository, and since contract `2.4.0` it is not
+ZCode is not installed by this repository, and since contract `2.5.0` it is not
 delegated to from here either. The ZCode desktop app creates and owns `~/.zcode`
 on first launch, and its installer correctly refuses to write into an unstamped
 target without an explicit `--adopt-unmanaged` — a decision no unattended

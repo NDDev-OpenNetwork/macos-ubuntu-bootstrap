@@ -4,6 +4,48 @@ All notable changes to this module will be documented in this file.
 
 ## [Unreleased]
 
+## [2.5.0] - 2026-08-04
+
+### Added
+
+- **herdr** (terminal workspace manager for AI coding agents) is now installed
+  on the Ubuntu desktop profile as a managed, SHA-256-verified binary with a
+  `.desktop` launcher. Declared in the contract under `user_tools` with per-arch
+  digests; installed via the same `ensure_pinned_source_tool` path as pinned
+  source tools, with a runtime receipt.
+- **`device_integrity.py`** — a whole-device receipt script (modeled on
+  `browser_runtime_integrity.py`) that snapshots runtime hosts, pinned tools,
+  user tools, desktop entries, and policy hashes into a canonical-JSON receipt,
+  then verifies the device matches both its receipt and the contract. Subcommands:
+  `build`, `verify [--json]`, `metadata-only`.
+- **Profile dispatch isolation tests** (32 tests across three layers): plan-mode
+  dispatch, bootstrap.sh exit-2 validation, and `validate_target` unit tests via
+  sourceable install.sh.
+- **Contract-code parity tests**: apt baseline, cloak runtime, macOS GUI casks,
+  Node/uv/Bun constants, and USER_TOOLS now cross-checked against the contract.
+- **macOS `main()` + BASH_SOURCE guard** on install.sh, mirroring ubuntu/server.
+
+### Changed
+
+- **`ubuntu_apt_packages` contract section restructured**: replaced the
+  `essential`/`cli_tools` split (which the code never honored — `clangd` was in
+  the code but not in any tier) with `baseline` (31 pkgs) and `cloak_runtime`
+  (38 pkgs). `profiles.server` is now `[baseline, cloak_runtime]` — the prior
+  `[essential]` was unverifiable and would have failed verify.sh.
+- **`gui.macos` synced**: added `ghostty`, renamed `claude-desktop` → `claude`.
+- **macOS BUN_LSP_PACKAGES comment corrected**: "kept in lockstep" → accurate
+  description (6 of 13; remaining arrive via Homebrew formulae).
+- **`device_integrity.py` macOS correctness**: OS-filter on `user_tools` (herdr
+  is Linux-only), `dart --version` stderr merge, `gopls` added to RUNTIME_HOSTS,
+  tolerant of missing `~/.local/bin` on fresh machines.
+
+### Fixed
+
+- **`verify.sh` now checks `herdr`** in the desktop block — a failed install no
+  longer stays invisible.
+- **Dead assertion in `test_plan_matrix_is_non_destructive`** removed; replaced
+  by meaningful server-vs-desktop dispatch tests (without `--skip-system`).
+
 ## [2.4.0] - 2026-08-04
 
 Everything here was found by running the 2.3.0 apply on a real Ubuntu 26.04

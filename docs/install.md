@@ -1,6 +1,6 @@
 # Installation And Target Matrix
 
-This guide describes adapter contract `2.4.0`. All paths are relative to the
+This guide describes adapter contract `2.5.0`. All paths are relative to the
 root of an existing checkout of this repository at a verified commit; acquiring
 that checkout is the caller's step (see the GDS clean-device runbook, step 0).
 Use `scripts/bootstrap.sh` as the
@@ -107,7 +107,10 @@ Both desktop platforms receive:
 - source-analysis, LSP, formatter, linter, quality, and security tools;
 - managed AI CLIs;
 - the mandatory fail-closed browser layer;
-- an optional platform-specific GUI overlay.
+- an optional platform-specific GUI overlay;
+- on Ubuntu desktop, user-selected CLI tools (herdr `0.7.5`, a terminal
+  workspace manager for AI coding agents) installed as managed, SHA-256-verified
+  binaries with `.desktop` launchers. Declared in the contract under `user_tools`.
 
 Desktop manifests intentionally exclude Docker, project build orchestration,
 language SDKs used as project runtimes, and local project test/runtime
@@ -418,6 +421,20 @@ Browser runtime checks:
 cloakbrowser-cdp-health
 chrome-devtools-mcp --version
 playwright-cli --version
+```
+
+Device integrity receipt — binds the device to the contract it was bootstrapped
+against. Build snapshots the current device state (runtime hosts, pinned tools,
+user tools, desktop entries, policy hashes) into a canonical-JSON receipt at
+`~/.local/share/rldyour/device-receipt.json` (mode `0600`). Verify re-collects
+state and compares structurally (detects binary changes, missing files) AND
+compares every declared version against `rldyour-contract.json` (closes the gap
+where `verify.sh` compares against hardcoded bash literals):
+
+```bash
+python3 scripts/device_integrity.py build
+python3 scripts/device_integrity.py verify [--json]
+python3 scripts/device_integrity.py metadata-only --receipt <path>
 ```
 
 Full server evidence requires an Ubuntu 24.04/26.04 VM with systemd. A container

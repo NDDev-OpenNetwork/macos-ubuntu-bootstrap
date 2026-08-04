@@ -2,7 +2,7 @@
   "schema_version": 2,
   "adapter": {
     "id": "macos-ubuntu-bootstrap",
-    "version": "2.5.0"
+    "version": "2.5.1"
   },
   "verified_on": "2026-08-04",
   "targets": {
@@ -242,6 +242,25 @@
       "profiles": [
         "desktop"
       ]
+    },
+    "telegram": {
+      "version": "7.0.7",
+      "summary": "Telegram Desktop messenger (official Linux portable build from td.telegram.org).",
+      "install_method": "tarball",
+      "url": "https://td.telegram.org/tlinux/tsetup.7.0.7.tar.xz",
+      "archive_sha256": "45e4bdbe9bdbc800916b81147210f912f5c72f069fdec6f9b201fe305d0d2d9c",
+      "archive_kind": "tar0",
+      "archive_members": [
+        "Telegram/Telegram"
+      ],
+      "bin_target": "${HOME}/.local/bin/telegram-desktop",
+      "managed_receipt": "ubuntu-runtime-v1",
+      "os": [
+        "linux"
+      ],
+      "profiles": [
+        "desktop"
+      ]
     }
   },
   "desktop_entries": {
@@ -251,6 +270,19 @@
       "icon": "utilities-terminal",
       "categories": "Development",
       "wm_class": "Ptyxis",
+      "profiles": [
+        "desktop"
+      ],
+      "os": [
+        "ubuntu"
+      ]
+    },
+    "telegram": {
+      "source": "templates/desktop/telegram.desktop",
+      "target": "${HOME}/.local/share/applications/telegram.desktop",
+      "icon": "telegram",
+      "categories": "Network;InstantMessaging;",
+      "wm_class": "TelegramDesktop",
       "profiles": [
         "desktop"
       ],
@@ -335,7 +367,13 @@
       "fonts-tlwg-loma-otf"
     ],
     "desktop_apps": [
-      "browseros",
+      {
+        "name": "browseros",
+        "version": "0.47.18",
+        "deb_version": "148.0.7966.97",
+        "url": "https://github.com/browseros-ai/BrowserOS/releases/download/v0.47.18/BrowserOS_v0.47.18_amd64.deb",
+        "sha256": "bfdda9be19ab0ec69602156a5c8aba3bd163351ca89539ecfda2761596b4dc7b"
+      },
       "deskflow",
       "happ"
     ],

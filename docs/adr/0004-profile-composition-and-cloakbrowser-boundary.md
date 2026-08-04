@@ -3,6 +3,7 @@
 - Status: accepted
 - Date: 2026-07-10
 - Amended: 2026-07-10 (Webwright retirement and exact runtime receipts)
+- Amended: 2026-08-04 (ADR 0008 introduces the desktop-builds profile, relaxing the "desktop never installs Docker" invariant for local development)
 
 ## Context
 

@@ -8,7 +8,7 @@ reviewed commit and the matching versioned contract.
 
 | Version | Supported |
 | --- | --- |
-| Current exact tag `2.5.1` | yes |
+| Current exact tag `2.6.0` | yes |
 | Older patch, minor, or major versions | no |
 
 The `0.3.x` release-line label tracks only the latest released patch. The
@@ -166,7 +166,7 @@ creates `~/.zcode` itself and its installer cannot adopt an unstamped target
 unattended, so bootstrap does not delegate to it at all (ADR 0006). The inline Claude Code, OpenCode, MiMoCode,
 Antigravity, and raw ZCode installers were removed in `2.0.0`; integrity for
 each harness artifact is the owning module's responsibility. The RTK output
-compressor was removed from this adapter in `2.5.1` by owner decision: it is not
+compressor was removed from this adapter in `2.6.0` by owner decision: it is not
 required, and bootstrap must not install it.
 
 Do not report the absence of an inline AI-CLI installer as a defect — it is the

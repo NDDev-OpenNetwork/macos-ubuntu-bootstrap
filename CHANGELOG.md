@@ -4,6 +4,39 @@ All notable changes to this module will be documented in this file.
 
 ## [Unreleased]
 
+## [2.6.0] - 2026-08-04
+
+### Added — desktop-builds profile
+
+- **New profile `desktop-builds`** with execution policy `local-dev-with-builds`.
+  An Ubuntu desktop that receives everything the plain `desktop` profile has,
+  PLUS Docker Engine rootful for local builds/tests — without the server baseline
+  (openssh-server, unattended-upgrades, chrony). Implemented via a new
+  `--skip-baseline` flag in `server.sh`. ADR 0008 documents the decision and
+  amends ADR 0004's "desktop never installs Docker" invariant.
+
+- **`build-essential`** added to the apt baseline — needed for local C/Rust/Go
+  compilation on desktop/desktop-builds profiles.
+
+- **`server.sh --skip-baseline` flag** — allows callers to install only Docker
+  (or only hardening) without the server baseline. Used by desktop-builds to
+  get Docker without openssh/chrony/unattended-upgrades.
+
+### Changed
+
+- **`safety.docker_group_membership`** changed from `"never-automatic"` to
+  `"explicit"` — the bootstrap still does not grant the docker group, but the
+  contract acknowledges the developer will do so manually on desktop-builds.
+- **`verify.sh` desktop block** guard changed from `PROFILE = desktop` to
+  `PROFILE != server` — desktop-builds now gets the same LSP/tool verification
+  as desktop, plus Docker presence is verified.
+- **`install_compiled_language_hosts`** guard changed from `PROFILE != desktop`
+  to `PROFILE = server` — desktop-builds receives Go/Rust/Dart.
+- **`install_gui_apps`** and **user tools** guards changed to `PROFILE = server`
+  negation — desktop-builds gets GUI apps and user tools.
+
+## [2.5.1] - 2026-08-04
+
 ## [2.5.1] - 2026-08-04
 
 ### Added

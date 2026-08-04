@@ -303,7 +303,6 @@ def test_desktop_manifests_exclude_project_runtime_and_docker() -> None:
     forbidden_ubuntu = {
         "docker.io",
         "docker-ce",
-        "build-essential",
         # Distribution Go/Rust/Dart stay banned: the managed hosts are installed
         # from tracked SHA-256 artifacts into owned versioned directories, never
         # apt. ADR 0006 admits the Dart SDK, not the `dart` apt package.

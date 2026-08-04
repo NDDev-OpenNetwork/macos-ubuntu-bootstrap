@@ -146,9 +146,9 @@ def test_dart_host_serves_both_the_analysis_server_and_the_mcp_transport() -> No
         body = (ROOT / verifier).read_text(encoding="utf-8")
         assert "dart mcp-server --version" in body, f"{verifier} does not prove the MCP transport"
     ubuntu_verify = (ROOT / "scripts/ubuntu/verify.sh").read_text(encoding="utf-8")
-    desktop_block = ubuntu_verify.split('if [ "$PROFILE" = "desktop" ]; then', 1)
+    desktop_block = ubuntu_verify.split('if [ "$PROFILE" != "server" ]; then', 1)
     assert len(desktop_block) == 2
-    assert "dart" in desktop_block[1], "dart must be verified inside the desktop-only block"
+    assert "dart" in desktop_block[1], "dart must be verified inside the non-server block"
 
 
 def test_installer_constants_match_the_contract() -> None:
@@ -223,21 +223,21 @@ def test_pinned_tools_match_the_contract() -> None:
 
 
 def test_pinned_tools_are_verified_on_desktop_only() -> None:
-    """Every pinned tool must be gated, and gated inside the desktop-only block —
+    """Every pinned tool must be gated inside the non-server block —
     the server profile is container-execution-only and gets none of them."""
     verify = (ROOT / "scripts/ubuntu/verify.sh").read_text(encoding="utf-8")
-    desktop_block = verify.split('if [ "$PROFILE" = "desktop" ]; then', 1)
-    assert len(desktop_block) == 2, "desktop-only block not found in verify.sh"
+    desktop_block = verify.split('if [ "$PROFILE" != "server" ]; then', 1)
+    assert len(desktop_block) == 2, "non-server block not found in verify.sh"
     for row in _pinned_rows():
         for link in row[5].split(","):
             assert link in desktop_block[1], f"{link} is installed but never verified"
 
 
 def test_user_tools_are_verified_on_desktop_only() -> None:
-    """Every USER_TOOLS entry must be verified inside the desktop-only block."""
+    """Every USER_TOOLS entry must be verified inside the non-server block."""
     verify = (ROOT / "scripts/ubuntu/verify.sh").read_text(encoding="utf-8")
-    desktop_block = verify.split('if [ "$PROFILE" = "desktop" ]; then', 1)
-    assert len(desktop_block) == 2, "desktop-only block not found in verify.sh"
+    desktop_block = verify.split('if [ "$PROFILE" != "server" ]; then', 1)
+    assert len(desktop_block) == 2, "non-server block not found in verify.sh"
     install = INSTALL.read_text(encoding="utf-8")
     match = re.search(r'USER_TOOLS=\(\s*(.*?)\)', install, re.DOTALL)
     assert match is not None, "USER_TOOLS array not found"

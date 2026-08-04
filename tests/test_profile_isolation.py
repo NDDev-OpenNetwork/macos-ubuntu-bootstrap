@@ -165,6 +165,25 @@ def test_server_plans_compiled_hosts_skip_message() -> None:
     assert "compiled-language LSP hosts skipped" in output
 
 
+def test_desktop_builds_plans_docker_without_server_baseline() -> None:
+    """desktop-builds must plan Docker but skip the server baseline (openssh/chrony)."""
+    output = run_plan("--platform", "ubuntu", "--profile", "desktop-builds")
+    assert "Docker Engine (rootful)" in output
+    assert "server baseline" in output  # the skip message
+    # openssh-server is only installed by the server baseline (install_baseline
+    # in server.sh), never by the apt baseline. Its absence proves --skip-baseline worked.
+    assert "openssh-server" not in output
+
+
+def test_desktop_builds_gets_compiled_hosts_and_user_tools() -> None:
+    """desktop-builds receives Go/Rust/Dart, herdr, and telegram — same as desktop."""
+    output = run_plan("--platform", "ubuntu", "--profile", "desktop-builds")
+    assert "Ensure Go" in output
+    assert "Ensure Rust" in output
+    assert "managed herdr" in output
+    assert "managed telegram" in output
+
+
 def test_browser_is_mandatory_on_all_profiles() -> None:
     """CloakBrowser must appear in plan output for every profile/mode."""
     combos = [
@@ -187,11 +206,12 @@ INVALID_COMBOS: list[tuple[tuple[str, ...], str]] = [
     (("--platform", "foo"), "Unsupported platform: foo"),
     (("--platform", "ubuntu", "--profile", "foo"), "Unsupported profile: foo"),
     (("--platform", "ubuntu", "--profile", "desktop", "--docker-mode", "foo"), "Unsupported Docker mode: foo"),
-    (("--platform", "macos", "--profile", "desktop", "--docker-mode", "rootful"), "cannot install Docker"),
-    (("--platform", "ubuntu", "--profile", "desktop", "--docker-mode", "rootless"), "cannot install Docker"),
+    (("--platform", "macos", "--profile", "desktop", "--docker-mode", "rootful"), "source/LSP-only"),
+    (("--platform", "ubuntu", "--profile", "desktop", "--docker-mode", "rootless"), "source/LSP-only"),
     (("--platform", "ubuntu", "--profile", "desktop", "--harden-ssh"), "Server hardening flags require"),
     (("--platform", "ubuntu", "--profile", "desktop", "--enable-ufw"), "Server hardening flags require"),
     (("--platform", "ubuntu", "--profile", "desktop", "--with-fail2ban"), "Server hardening flags require"),
+    (("--platform", "macos", "--profile", "desktop-builds"), "macOS only supports"),
 ]
 
 
@@ -213,6 +233,8 @@ def test_invalid_combination_exits_nonzero_with_message(args: tuple[str, ...], e
 VALID_TUPLES: list[tuple[str, str, str, str]] = [
     ("desktop", "source-lsp-only", "none", "0"),
     ("desktop", "source-lsp-only", "none", "1"),
+    ("desktop-builds", "local-dev-with-builds", "rootful", "0"),
+    ("desktop-builds", "local-dev-with-builds", "rootful", "1"),
     ("server", "container-execution-only", "none", "0"),
     ("server", "container-execution-only", "rootful", "0"),
     ("server", "container-execution-only", "rootless", "0"),
@@ -221,15 +243,20 @@ VALID_TUPLES: list[tuple[str, str, str, str]] = [
 
 # Invalid composition tuples that validate_target must reject (return 2).
 INVALID_TUPLES: list[tuple[str, str, str, str]] = [
-    # Desktop cannot have Docker
+    # Desktop cannot have Docker (use desktop-builds for that)
     ("desktop", "source-lsp-only", "rootful", "0"),
     ("desktop", "source-lsp-only", "rootless", "1"),
+    # desktop-builds must have rootful Docker, not none/rootless
+    ("desktop-builds", "local-dev-with-builds", "none", "0"),
+    ("desktop-builds", "local-dev-with-builds", "rootless", "1"),
     # Server cannot have GUI
     ("server", "container-execution-only", "none", "1"),
     ("server", "container-execution-only", "rootful", "1"),
     # Execution policy must match profile
     ("desktop", "container-execution-only", "none", "0"),
+    ("desktop", "local-dev-with-builds", "none", "0"),
     ("server", "source-lsp-only", "none", "0"),
+    ("desktop-builds", "source-lsp-only", "rootful", "0"),
     # Bogus values
     ("laptop", "source-lsp-only", "none", "0"),
     ("desktop", "source-lsp-only", "podman", "0"),
@@ -298,32 +325,30 @@ def test_macos_install_sh_has_bash_source_guard() -> None:
     )
 
 
-def test_run_server_layer_guards_on_profile() -> None:
-    """run_server_layer must early-return when PROFILE != server."""
+def test_run_server_layer_guards_on_docker_mode() -> None:
+    """run_server_layer must early-return when DOCKER_MODE is none."""
     source = INSTALL.read_text(encoding="utf-8")
-    # Extract the run_server_layer function body.
     start = source.index("run_server_layer()")
-    # The guard should be one of the first statements in the function.
     body = source[start : start + 500]
-    assert '[ "$PROFILE" = "server" ] || return 0' in body, (
-        "run_server_layer missing PROFILE=server guard"
+    assert '"$DOCKER_MODE" = "none"' in body, (
+        "run_server_layer missing DOCKER_MODE=none guard"
     )
 
 
-def test_install_gui_apps_guards_on_profile_and_gui() -> None:
-    """install_gui_apps must early-return when PROFILE != desktop OR GUI_ENABLED != 1."""
+def test_install_gui_apps_guards_on_server_profile() -> None:
+    """install_gui_apps must early-return when PROFILE is server OR GUI is off."""
     source = INSTALL.read_text(encoding="utf-8")
     start = source.index("install_gui_apps()")
     body = source[start : start + 300]
-    assert '"$PROFILE" != "desktop"' in body, "install_gui_apps missing PROFILE guard"
+    assert '"$PROFILE" = "server"' in body, "install_gui_apps missing PROFILE=server guard"
     assert '"$GUI_ENABLED" -ne 1' in body, "install_gui_apps missing GUI_ENABLED guard"
 
 
-def test_install_compiled_language_hosts_guards_on_profile() -> None:
-    """install_compiled_language_hosts must early-return when PROFILE != desktop."""
+def test_install_compiled_language_hosts_guards_on_server_profile() -> None:
+    """install_compiled_language_hosts must early-return when PROFILE is server."""
     source = INSTALL.read_text(encoding="utf-8")
     start = source.index("install_compiled_language_hosts()")
     body = source[start : start + 300]
-    assert '"$PROFILE" != "desktop"' in body, (
-        "install_compiled_language_hosts missing PROFILE guard"
+    assert '"$PROFILE" = "server"' in body, (
+        "install_compiled_language_hosts missing PROFILE=server guard"
     )

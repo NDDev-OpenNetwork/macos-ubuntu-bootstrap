@@ -2,7 +2,7 @@
   "schema_version": 2,
   "adapter": {
     "id": "macos-ubuntu-bootstrap",
-    "version": "2.5.1"
+    "version": "2.6.0"
   },
   "verified_on": "2026-08-04",
   "targets": {
@@ -39,6 +39,17 @@
             "none"
           ],
           "execution_policy": "source-lsp-only"
+        },
+        "desktop-builds": {
+          "gui_modes": [
+            "enabled",
+            "disabled"
+          ],
+          "docker_modes": [
+            "rootful"
+          ],
+          "default_docker_mode": "rootful",
+          "execution_policy": "local-dev-with-builds"
         },
         "server": {
           "gui_modes": [
@@ -310,8 +321,9 @@
     }
   },
   "ubuntu_apt_packages": {
-    "_doc": "apt packages installed by scripts/ubuntu/install.sh::install_apt_baseline. The baseline (terminal, LSP, and CLI tools) and the cloak_runtime (Chromium support libraries for the mandatory CloakBrowser) are installed on BOTH profiles — the terminal/LSP/browser layers are mandatory on desktop and server per ADR 0004. desktop_apps (BrowserOS, deskflow, happ) are installed only in the desktop+gui profile via scripts/ubuntu/desktop.sh. The zcode desktop app is delegated to nddev-harnesses and not installed here. build-essential is NOT installed by this baseline (desktop uses prebuilt pinned binaries; server builds inside Docker).",
+    "_doc": "apt packages installed by scripts/ubuntu/install.sh::install_apt_baseline. The baseline (terminal, LSP, CLI tools, and build-essential for local C/Rust/Go compilation) and the cloak_runtime (Chromium support libraries for the mandatory CloakBrowser) are installed on ALL profiles — the terminal/LSP/browser layers are mandatory per ADR 0004. desktop_apps (BrowserOS, deskflow, happ) are installed only in the desktop/desktop-builds+gui profile via scripts/ubuntu/desktop.sh. The zcode desktop app is delegated to nddev-harnesses and not installed here.",
     "baseline": [
+      "build-essential",
       "ca-certificates",
       "curl",
       "gpg",
@@ -416,7 +428,7 @@
     "desktop_local_runtime": false,
     "server_firewall_mutation": "explicit-only",
     "server_ssh_hardening": "explicit-only",
-    "docker_group_membership": "never-automatic",
+    "docker_group_membership": "explicit",
     "package_upgrade": "never-automatic",
     "ubuntu_full_apply_user": "non-root-sudo-account",
     "ssh_match_validation": "full-live-connection-context",

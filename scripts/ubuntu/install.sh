@@ -191,6 +191,11 @@ PINNED_SOURCE_TOOLS=(
 # trusting the live manifest at install time.
 USER_TOOLS=(
   "herdr;0.7.5;raw;herdr;herdr;herdr;3dc83288073e4c2d3c679a30e7be97bcca9141c6fd17dbbb9219142e95c59253;32e763a1499a6b694b1d708e4f062b743be1da9f34fcfa4d212d6db6fe09a8b9;https://github.com/herdrdev/herdr/releases/download/v0.7.5/herdr-linux-x86_64;https://github.com/herdrdev/herdr/releases/download/v0.7.5/herdr-linux-aarch64"
+  # Telegram Desktop official portable build. The tsetup tarball contains
+  # Telegram/Telegram (the binary) and Telegram/Updater (a self-updater that
+  # breaks reproducibility — only the binary is published, not the updater).
+  # x86_64-only: Telegram does not publish an arm64 Linux portable build.
+  "telegram;7.0.7;tarx;Telegram/Telegram;Telegram/Telegram;telegram-desktop;45e4bdbe9bdbc800916b81147210f912f5c72f069fdec6f9b201fe305d0d2d9c;45e4bdbe9bdbc800916b81147210f912f5c72f069fdec6f9b201fe305d0d2d9c;https://td.telegram.org/tlinux/tsetup.7.0.7.tar.xz;https://td.telegram.org/tlinux/tsetup.7.0.7.tar.xz"
 )
 
 
@@ -401,6 +406,7 @@ ensure_pinned_source_tool() {
     case "$kind" in
       tar0) tar -xzf "$archive" -C "$stage" ;;
       tar1) tar -xzf "$archive" --strip-components=1 -C "$stage" ;;
+      tarx) tar -xJf "$archive" -C "$stage" ;;
       zip) unzip -q -o "$archive" -d "$stage" ;;
       raw) cp "$archive" "$stage/${member_list[0]}" ;;
       *) rldyour::log "error" "$name: unknown archive kind '$kind'"; return 1 ;;

@@ -25,7 +25,8 @@ MODULE_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 # shellcheck source=../lib/common.sh
 . "$SCRIPT_DIR/../lib/common.sh"
 
-BROWSEROS_DEB_URL="https://cdn.browseros.com/download/BrowserOS.deb"
+BROWSEROS_DEB_URL="https://github.com/browseros-ai/BrowserOS/releases/download/v0.47.18/BrowserOS_v0.47.18_amd64.deb"
+BROWSEROS_DEB_SHA256="bfdda9be19ab0ec69602156a5c8aba3bd163351ca89539ecfda2761596b4dc7b"
 BROWSEROS_DEB_TMP="/tmp/BrowserOS.deb"
 
 # ----------------------------- helpers -----------------------------
@@ -110,9 +111,10 @@ nddev::_install_browseros() {
   fi
 
   nddev::_sudo_refresh
-  info "Downloading BrowserOS .deb"
-  wget -nv -O "$BROWSEROS_DEB_TMP" "$BROWSEROS_DEB_URL"
-  ok "downloaded ($(du -h "$BROWSEROS_DEB_TMP" | cut -f1))"
+  info "Downloading BrowserOS .deb (versioned, SHA-256 verified)"
+  rldyour::download_verified_file "$BROWSEROS_DEB_URL" "$BROWSEROS_DEB_SHA256" "$BROWSEROS_DEB_TMP" \
+    || { warn "BrowserOS .deb download or SHA-256 verification failed"; return 1; }
+  ok "downloaded and verified ($(du -h "$BROWSEROS_DEB_TMP" | cut -f1))"
 
   sudo dpkg -i "$BROWSEROS_DEB_TMP" 2>/dev/null \
     || sudo apt-get install -f -y 2>/dev/null

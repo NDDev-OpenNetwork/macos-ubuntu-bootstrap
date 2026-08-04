@@ -141,10 +141,11 @@ if [ "$PROFILE" = "desktop" ]; then
   for cmd in gitleaks osv-scanner actionlint hadolint markdown-oxide delta yq ast-grep; do
     rldyour::require_cmd "$cmd" required
   done
-  # User-selected desktop tools (herdr). Installed by install_user_tools using
-  # the same managed-symlink + receipt contract as pinned source tools; a failed
-  # install must not stay invisible.
+  # User-selected desktop tools (herdr, telegram). Installed by install_user_tools
+  # using the same managed-symlink + receipt contract as pinned source tools; a
+  # failed install must not stay invisible.
   rldyour::require_cmd herdr required
+  rldyour::require_cmd telegram-desktop required
   # cmake-language-server ships in PYTHON_SOURCE_TOOLS but was never verified,
   # so a failed install stayed invisible on Ubuntu while macOS gated on it.
   rldyour::require_cmd cmake-language-server required

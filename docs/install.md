@@ -450,3 +450,61 @@ python3 scripts/device_integrity.py metadata-only --receipt <path>
 Full server evidence requires an Ubuntu 24.04/26.04 VM with systemd. A container
 cannot prove SSH reachability, UFW behavior, time synchronization, Docker daemon
 mode, or externally observable port exposure.
+
+## Quick Reference
+
+### Full device bootstrap (via GDS orchestrator)
+
+```bash
+cd ~/Developer/control-plane/github-device-sync
+
+# Plan (read-only)
+scripts/bootstrap-device.sh --device estate/devices/<device>.yaml --plan
+
+# Apply (needs sudo for OS layer)
+scripts/bootstrap-device.sh --device estate/devices/<device>.yaml \
+  --apply --approval-ref approval:owner:<ref>
+
+# Verify
+python3 modules/macos-ubuntu-bootstrap/scripts/device_integrity.py verify
+```
+
+### OS installer directly
+
+```bash
+cd ~/Developer/control-plane/github-device-sync/modules/macos-ubuntu-bootstrap
+
+bash scripts/bootstrap.sh --platform ubuntu --profile desktop-builds --gui --plan
+bash scripts/bootstrap.sh --platform ubuntu --profile desktop-builds --gui --apply
+bash scripts/ubuntu/verify.sh
+```
+
+### Profile → flags matrix
+
+| What you want | Command flags |
+|---|---|
+| Local coding only (like macOS) | `--profile desktop` |
+| Local coding + Docker builds | `--profile desktop-builds` |
+| Headless server with Docker | `--profile server` |
+| macOS desktop | `--platform macos` (auto-resolves to desktop) |
+| Server with rootless Docker | `--profile server --docker-mode rootless` |
+| Server without Docker | `--profile server --docker-mode none` |
+| Desktop without GUI | `--profile desktop --no-gui` |
+
+### CI validation (before push)
+
+```bash
+bash scripts/ci/validate.sh          # shellcheck + contract parity + plan matrix
+uv venv .venv && uv pip install -r requirements-test.txt
+.venv/bin/python -m pytest tests/ -q  # 176 tests
+```
+
+### Manual steps after bootstrap
+
+```bash
+sudo usermod -aG docker $USER         # docker group (desktop-builds/server)
+# re-login for group to take effect
+
+# SSH keys, Claude CLI, git identity — see "What is NOT installed" section
+```
+

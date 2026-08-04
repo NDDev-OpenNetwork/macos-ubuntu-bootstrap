@@ -20,7 +20,7 @@ INSTALL_OPEN_DESIGN=0
 
 usage() {
   cat <<'EOF'
-Usage: scripts/bootstrap.sh [--platform macos|ubuntu] [--profile server|desktop]
+Usage: scripts/bootstrap.sh [--platform macos|ubuntu] [--profile desktop|desktop-builds|server]
                            [--gui|--no-gui] [--docker-mode none|rootful|rootless]
                            [--apply|--plan] [--skip-system] [--skip-ai]
                            [--skip-lsps] [--skip-checks] [--strict]
@@ -33,14 +33,17 @@ Default:
   - mode: plan (dry-run)
   - platform: auto-detect (darwin -> macos, linux -> ubuntu)
   - profile: macOS resolves to desktop; Ubuntu requires an explicit profile
-  - GUI: enabled for desktop, disabled for server; override desktop with --no-gui
-  - Docker: rootful on Ubuntu server, none on desktops; rootless is explicit
+  - GUI: enabled for desktop/desktop-builds, disabled for server
+  - Docker: rootful on Ubuntu server/desktop-builds, none on desktop; rootless is explicit
 
 Profiles:
-  - desktop: source editing, LSP/quality tools, AI CLIs, mandatory headless
-             CloakBrowser, and optional GUI apps. No Docker or project runtime.
-  - server:  Ubuntu-only headless build/runtime host with Docker, AI CLIs,
-             LSPs, mandatory CloakBrowser, and safe server verification.
+  - desktop:        source editing, LSP/quality tools, AI CLIs, mandatory headless
+                    CloakBrowser, and optional GUI apps. No Docker or project runtime.
+  - desktop-builds: Ubuntu-only — everything desktop has, PLUS Docker rootful for
+                    local builds/tests. Receives the server Docker layer without the
+                    server baseline (no openssh-server, unattended-upgrades, or chrony).
+  - server:         Ubuntu-only headless build/runtime host with Docker, AI CLIs,
+                    LSPs, mandatory CloakBrowser, and safe server verification.
 
 Safety:
   --harden-ssh and --enable-ufw are never implied. They require an explicit
@@ -168,24 +171,30 @@ if [ "$PROFILE" = "auto" ]; then
   if [ "$PLATFORM" = "macos" ]; then
     PROFILE="desktop"
   else
-    echo "Ubuntu requires --profile desktop or --profile server; the bootstrap never infers Docker/server state" >&2
+    echo "Ubuntu requires --profile desktop|desktop-builds|server; the bootstrap never infers Docker/server state" >&2
     exit 2
   fi
 fi
 
-if [ "$PROFILE" != "server" ] && [ "$PROFILE" != "desktop" ]; then
-  echo "Unsupported profile: $PROFILE (expected server|desktop)" >&2
+if [ "$PROFILE" != "server" ] && [ "$PROFILE" != "desktop" ] && [ "$PROFILE" != "desktop-builds" ]; then
+  echo "Unsupported profile: $PROFILE (expected desktop|desktop-builds|server)" >&2
   exit 2
 fi
 
-# macOS is always a desktop workstation; a server profile there is meaningless.
+# macOS is always a desktop workstation; server/desktop-builds are meaningless there.
 if [ "$PLATFORM" = "macos" ] && [ "$PROFILE" != "desktop" ]; then
   echo "macOS only supports the desktop profile (got: $PROFILE)" >&2
   exit 2
 fi
+# desktop-builds is Ubuntu-only (it installs Docker Engine, which this bootstrap
+# never provisions on macOS).
+if [ "$PLATFORM" = "macos" ] && [ "$PROFILE" = "desktop-builds" ]; then
+  echo "The desktop-builds profile is Ubuntu-only; use --profile desktop on macOS" >&2
+  exit 2
+fi
 
 if [ "$GUI_MODE" = "auto" ]; then
-  if [ "$PROFILE" = "desktop" ]; then GUI_MODE="enabled"; else GUI_MODE="disabled"; fi
+  if [ "$PROFILE" = "server" ]; then GUI_MODE="disabled"; else GUI_MODE="enabled"; fi
 fi
 if [ "$GUI_MODE" != "enabled" ] && [ "$GUI_MODE" != "disabled" ]; then
   echo "Unsupported GUI mode: $GUI_MODE" >&2
@@ -197,7 +206,7 @@ if [ "$PROFILE" = "server" ] && [ "$GUI_MODE" != "disabled" ]; then
 fi
 
 if [ "$DOCKER_MODE" = "auto" ]; then
-  if [ "$PLATFORM" = "ubuntu" ] && [ "$PROFILE" = "server" ]; then
+  if [ "$PLATFORM" = "ubuntu" ] && { [ "$PROFILE" = "server" ] || [ "$PROFILE" = "desktop-builds" ]; }; then
     DOCKER_MODE="rootful"
   else
     DOCKER_MODE="none"
@@ -208,8 +217,10 @@ case "$DOCKER_MODE" in none|rootful|rootless) ;; *)
   exit 2
   ;;
 esac
+# The plain desktop profile is source/LSP-only and cannot install Docker.
+# desktop-builds and server are the only profiles that may carry a Docker mode.
 if [ "$PROFILE" = "desktop" ] && [ "$DOCKER_MODE" != "none" ]; then
-  echo "Desktop profiles are source/LSP-only and cannot install Docker" >&2
+  echo "The desktop profile is source/LSP-only; use --profile desktop-builds for local Docker" >&2
   exit 2
 fi
 if [ "$PLATFORM" = "macos" ] && [ "$DOCKER_MODE" != "none" ]; then
@@ -247,6 +258,8 @@ export RLDYOUR_WITH_FAIL2BAN=$WITH_FAIL2BAN
 export RLDYOUR_INSTALL_OPEN_DESIGN=$INSTALL_OPEN_DESIGN
 if [ "$PROFILE" = "desktop" ]; then
   export RLDYOUR_LOCAL_EXECUTION_POLICY="source-lsp-only"
+elif [ "$PROFILE" = "desktop-builds" ]; then
+  export RLDYOUR_LOCAL_EXECUTION_POLICY="local-dev-with-builds"
 else
   export RLDYOUR_LOCAL_EXECUTION_POLICY="container-execution-only"
 fi

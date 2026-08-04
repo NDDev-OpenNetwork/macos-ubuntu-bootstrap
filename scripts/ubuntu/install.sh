@@ -87,7 +87,7 @@ CARAPACE_SHA256_X64="35ab52bfe7bdd8296d90c3687660bde80497599badde840ab615d2f421f
 CARAPACE_SHA256_ARM64="b2456cb09d77004db87de2567d6d7588a61ceb4724522c463e2b1c1f87b4d4b9"
 
 APT_SOURCE_PACKAGES=(
-  ca-certificates curl gpg gnupg git jq python3 python3-venv
+  build-essential ca-certificates curl gpg gnupg git jq python3 python3-venv
   shellcheck shfmt clangd zsh unzip xz-utils wget zip lsb-release yamllint
   fd-find bat fzf zoxide tmux btop duf hexyl gh ripgrep httpie miller
 )
@@ -242,6 +242,7 @@ is_supported_ubuntu() {
 validate_target() {
   case "$PROFILE:$LOCAL_EXECUTION_POLICY:$DOCKER_MODE:$GUI_ENABLED" in
     desktop:source-lsp-only:none:0|desktop:source-lsp-only:none:1) ;;
+    desktop-builds:local-dev-with-builds:rootful:0|desktop-builds:local-dev-with-builds:rootful:1) ;;
     server:container-execution-only:none:0|server:container-execution-only:rootful:0|server:container-execution-only:rootless:0) ;;
     *)
       rldyour::log "error" "invalid Ubuntu composition: profile=$PROFILE policy=$LOCAL_EXECUTION_POLICY docker=$DOCKER_MODE gui=$GUI_ENABLED"
@@ -588,7 +589,7 @@ ensure_uv() {
 # profile is `container-execution-only`, so a compiler on the host would be
 # exactly the local build capability that policy removes.
 install_compiled_language_hosts() {
-  if [ "$PROFILE" != "desktop" ]; then
+  if [ "$PROFILE" = "server" ]; then
     rldyour::log "info" "compiled-language LSP hosts skipped: profile=$PROFILE builds run in Docker"
     return 0
   fi
@@ -1072,7 +1073,7 @@ install_ai_runtimes() {
 }
 
 install_gui_apps() {
-  if [ "$PROFILE" != "desktop" ] || [ "$GUI_ENABLED" -ne 1 ]; then
+  if [ "$PROFILE" = "server" ] || [ "$GUI_ENABLED" -ne 1 ]; then
     rldyour::log "info" "GUI application layer disabled"
     return 0
   fi
@@ -1092,7 +1093,11 @@ install_gui_apps() {
 
 run_server_layer() {
   local resolved_user=""
-  [ "$PROFILE" = "server" ] || return 0
+  # No Docker work for the plain desktop profile. Server and desktop-builds
+  # both reach this function; desktop-builds installs Docker-only via --skip-baseline.
+  if [ "$DOCKER_MODE" = "none" ]; then
+    return 0
+  fi
   if [ "$SKIP_SYSTEM" -eq 1 ]; then
     return 0
   fi
@@ -1105,6 +1110,10 @@ run_server_layer() {
     return 2
   fi
   local -a args=(--docker-mode "$DOCKER_MODE" --skip-verify)
+  # desktop-builds installs Docker only — no openssh/chrony/unattended-upgrades.
+  if [ "$PROFILE" = "desktop-builds" ]; then
+    args+=(--skip-baseline)
+  fi
   if [ "$RLDYOUR_DRY_RUN" -eq 1 ]; then args+=(--plan); else args+=(--apply); fi
   [ "$ENABLE_UFW" -eq 1 ] && args+=(--enable-ufw)
   if [ "$HARDEN_SSH" -eq 1 ]; then
@@ -1174,10 +1183,9 @@ main() {
   [ "$SKIP_LSPS" -eq 1 ] || install_bun_lsps
   [ "$SKIP_LSPS" -eq 1 ] || install_compiled_language_hosts
 
-  # User-selected desktop tools (herdr) and .desktop launchers. Desktop profile
-  # only — these are operator conveniences, not build/runtime dependencies, so
-  # they sit alongside the GUI layer rather than inside the system or LSP layer.
-  if [ "$PROFILE" = "desktop" ]; then
+  # User-selected desktop tools (herdr, telegram) and .desktop launchers. Desktop
+  # and desktop-builds profiles only — these are operator conveniences.
+  if [ "$PROFILE" != "server" ]; then
     install_user_tools
     install_desktop_entries
   fi

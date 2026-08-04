@@ -40,6 +40,9 @@ Opt-in hardening:
 
 Other:
   --skip-verify                  Do not run verify-server.sh after apply.
+  --skip-baseline                Skip openssh-server/unattended-upgrades/chrony.
+                                  Used by the desktop-builds profile to install
+                                  only Docker without the full server baseline.
   --help                         Show this help.
 
 Environment equivalents:
@@ -1614,6 +1617,7 @@ rldyour::ubuntu_server::main() (
   ssh_match_host=${RLDYOUR_SERVER_SSH_MATCH_HOST:-}
   ssh_local_address=${RLDYOUR_SERVER_SSH_LOCAL_ADDRESS:-}
   skip_verify=${RLDYOUR_SERVER_SKIP_VERIFY:-0}
+  skip_baseline=0
 
   while [ "$#" -gt 0 ]; do
     case "$1" in
@@ -1671,6 +1675,10 @@ rldyour::ubuntu_server::main() (
         ;;
       --skip-verify)
         skip_verify=1
+        shift
+        ;;
+      --skip-baseline)
+        skip_baseline=1
         shift
         ;;
       --help)
@@ -1733,8 +1741,12 @@ rldyour::ubuntu_server::main() (
     rldyour::log "info" "SSH port: $resolved_port${ssh_allow_cidr:+; allow CIDR: $ssh_allow_cidr}"
   fi
 
-  rldyour::ubuntu_server::install_baseline
-  rldyour::ubuntu_server::ensure_time_sync
+  if [ "$skip_baseline" -eq 0 ]; then
+    rldyour::ubuntu_server::install_baseline
+    rldyour::ubuntu_server::ensure_time_sync
+  else
+    rldyour::log "info" "server baseline (openssh, unattended-upgrades, chrony) skipped by --skip-baseline"
+  fi
   case "$docker_mode" in
     none) rldyour::log "info" "Docker mode none: no Docker state is managed" ;;
     rootful) rldyour::ubuntu_server::install_docker_rootful ;;

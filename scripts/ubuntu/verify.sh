@@ -129,9 +129,9 @@ playwright-cli --version | grep -Fq "0.1.17"
 "$SCRIPT_DIR/../verify-browser-runtime.sh" --json
 rldyour::verify_terminal_environment
 
-if [ "$PROFILE" = "desktop" ]; then
-  # Go and Rust are desktop-only language-server hosts. The server profile is
-  # `container-execution-only`, so their absence there is the policy working.
+if [ "$PROFILE" != "server" ]; then
+  # Go and Rust are desktop/desktop-builds language-server hosts. The server
+  # profile is `container-execution-only`, so their absence there is the policy.
   for cmd in go gopls rustc cargo rust-analyzer dart; do
     rldyour::require_cmd "$cmd" required
   done
@@ -179,11 +179,17 @@ if [ "$PROFILE" = "desktop" ]; then
     rldyour::log "missing" "Dart telemetry provably disabled in ${dart_telemetry_config}"
     exit 1
   fi
-  [ "$DOCKER_MODE" = "none" ] || { rldyour::log "error" "desktop Docker mode must be none"; exit 1; }
-  if command -v docker >/dev/null 2>&1; then
-    rldyour::log "warn" "unmanaged Docker is present; this desktop bootstrap neither uses nor removes it"
-  else
-    rldyour::log "ok" "desktop policy: Docker is absent"
+  if [ "$PROFILE" = "desktop" ]; then
+    [ "$DOCKER_MODE" = "none" ] || { rldyour::log "error" "desktop Docker mode must be none"; exit 1; }
+    if command -v docker >/dev/null 2>&1; then
+      rldyour::log "warn" "unmanaged Docker is present; this desktop bootstrap neither uses nor removes it"
+    else
+      rldyour::log "ok" "desktop policy: Docker is absent"
+    fi
+  elif [ "$PROFILE" = "desktop-builds" ]; then
+    [ "$DOCKER_MODE" = "rootful" ] || { rldyour::log "error" "desktop-builds Docker mode must be rootful"; exit 1; }
+    command -v docker >/dev/null 2>&1 || { rldyour::log "missing" "docker is required for the desktop-builds profile"; exit 1; }
+    rldyour::log "ok" "desktop-builds policy: Docker is present"
   fi
   if [ "$GUI_ENABLED" -eq 1 ]; then
     # Harness desktop apps (e.g. ZCode via nddev-harnesses) are owned and

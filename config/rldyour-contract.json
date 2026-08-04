@@ -210,6 +210,24 @@
     ],
     "ubuntu": []
   },
+  "open_design": {
+    "_doc": "Open Design (https://github.com/nexu-io/open-design) is the open-source Claude Design alternative. It publishes NO native Linux builds (macOS .dmg / Windows .exe only), so on Linux it runs via the published Docker image ghcr.io/nexu-io/od. This is the first docker-compose workload in the module. It is gated behind an explicit operator opt-in and deliberately does NOT relax the desktop source-lsp policy (Docker must already be present on desktop) nor the never-automatic docker-group policy.",
+    "enabled_by_default": false,
+    "install_flag": "--install-open-design",
+    "env_var": "RLDYOUR_INSTALL_OPEN_DESIGN",
+    "repo": "https://github.com/NDDev-it-com/open-design.git",
+    "workspace_target": "${HOME}/Developer/forks/open-design",
+    "image": "ghcr.io/nexu-io/od:latest",
+    "port": 7456,
+    "requires_docker": true,
+    "desktop_docker_policy": "preinstalled-only (bootstrap never installs Docker on desktop; source-lsp policy preserved)",
+    "server_docker_policy": "installed-by-server-layer (rootful/rootless)",
+    "managed_receipt": "open-design-v1",
+    "profiles": [
+      "desktop",
+      "server"
+    ]
+  },
   "supply_chain": {
     "homebrew_pkg_version": "6.0.9",
     "homebrew_pkg_sha256": "525599bd2dcbda29857120234336b0103ad5283a3dc8511f72066eeb917abd3c",

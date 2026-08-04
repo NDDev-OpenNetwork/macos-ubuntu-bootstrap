@@ -233,6 +233,23 @@ def test_pinned_tools_are_verified_on_desktop_only() -> None:
             assert link in desktop_block[1], f"{link} is installed but never verified"
 
 
+def test_user_tools_are_verified_on_desktop_only() -> None:
+    """Every USER_TOOLS entry must be verified inside the desktop-only block."""
+    verify = (ROOT / "scripts/ubuntu/verify.sh").read_text(encoding="utf-8")
+    desktop_block = verify.split('if [ "$PROFILE" = "desktop" ]; then', 1)
+    assert len(desktop_block) == 2, "desktop-only block not found in verify.sh"
+    install = INSTALL.read_text(encoding="utf-8")
+    match = re.search(r'USER_TOOLS=\(\s*(.*?)\)', install, re.DOTALL)
+    assert match is not None, "USER_TOOLS array not found"
+    for raw in re.findall(r'"([^"]+)"', match.group(1)):
+        fields = raw.split(";")
+        name, link = fields[0], fields[5]
+        assert link in desktop_block[1], (
+            f"{name} ({link}) is installed via USER_TOOLS but never verified"
+        )
+
+
+
 def test_ast_grep_does_not_publish_the_deprecated_sg_shim() -> None:
     """ast-grep's archive ships an `sg` shim that upstream deprecated and that
     would shadow util-linux's setgid `sg` on hosts that have it."""

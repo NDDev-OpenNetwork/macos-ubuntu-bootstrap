@@ -69,7 +69,7 @@ while [ "$#" -gt 0 ]; do
       shift 2
       ;;
     --profile)
-      PROFILE="${2:?--profile requires one of server|desktop}"
+      PROFILE="${2:?--profile requires one of desktop|desktop-builds|server}"
       shift 2
       ;;
     --gui)

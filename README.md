@@ -19,17 +19,21 @@ The adapter contract version is `2.6.0`.
   only.
 - **Ubuntu 24.04/26.04 desktop (`amd64`/`arm64`):** GUI or no GUI, Docker
   `none`, source/LSP only.
+- **Ubuntu 24.04/26.04 desktop-builds (`amd64`/`arm64`):** GUI or no GUI, Docker
+  `rootful`, local development with builds. Everything desktop has, plus Docker
+  Engine for local builds/tests — without the server baseline (ADR 0008).
 - **Ubuntu 24.04/26.04 server (`amd64`/`arm64`):** headless, server
   build/runtime, Docker `none`, `rootful`, or `rootless`; default `rootful`.
 
-Desktop profiles install source-analysis tools, LSPs, quality checks, terminal
-tooling, the selected harnesses, and the mandatory browser layer. They do not install Docker
-or configure local project build/runtime execution. Node, Python, Go, and Rust
-are tool hosts, and the macOS clangd provider arrives in Homebrew's LLVM
-distribution; those supporting binaries do not authorize local project builds
-(see [ADR 0005](docs/adr/0005-go-and-rust-language-server-hosts.md)).
+Desktop and desktop-builds profiles install source-analysis tools, LSPs, quality
+checks, terminal tooling, the selected harnesses, and the mandatory browser
+layer. The plain desktop profile does not install Docker; desktop-builds is the
+explicit exception that adds Docker rootful for local development (ADR 0008).
+Node, Python, Go, and Rust are tool hosts, and the macOS clangd provider arrives
+in Homebrew's LLVM distribution; those supporting binaries do not authorize
+local project builds (see [ADR 0005](docs/adr/0005-go-and-rust-language-server-hosts.md)).
 
-Go, Rust, and Dart are **desktop-only**. They back `gopls`, `rust-analyzer`, and
+Go, Rust, and Dart are **desktop and desktop-builds only**. They back `gopls`, `rust-analyzer`, and
 the Dart analysis server over the estate's sources. The server profile is
 `container-execution-only`, so it receives no host toolchain — project builds and
 tests run in Docker. The Dart SDK carries a second capability the estate depends
@@ -157,7 +161,7 @@ bash scripts/bootstrap.sh --platform ubuntu --profile server --docker-mode none
 bash scripts/bootstrap.sh --platform ubuntu --profile server --docker-mode rootless
 ```
 
-Ubuntu always requires an explicit `--profile desktop|server`; Linux alone is
+Ubuntu always requires an explicit `--profile desktop|desktop-builds|server`; Linux alone is
 not enough information to infer a safe Docker/runtime role. Supported layer
 controls are `--skip-system`, `--skip-ai`, `--skip-lsps`, and `--skip-checks`.
 Browser automation cannot be skipped.

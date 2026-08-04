@@ -13,14 +13,19 @@ verification settings are composed consistently.
   `--no-gui`; Docker `none`; policy `source-lsp-only`.
 - **Ubuntu 24.04/26.04 desktop (`amd64`/`arm64`):** GUI enabled by default or
   disabled with `--no-gui`; Docker `none`; policy `source-lsp-only`.
+- **Ubuntu 24.04/26.04 desktop-builds (`amd64`/`arm64`):** GUI enabled by
+  default or disabled with `--no-gui`; Docker `rootful`; policy
+  `local-dev-with-builds`. Everything desktop has, plus Docker Engine for local
+  builds/tests — without the server baseline (no openssh-server,
+  unattended-upgrades, or chrony). See ADR 0008.
 - **Ubuntu 24.04/26.04 server (`amd64`/`arm64`):** headless; Docker `none`,
   `rootful`, or `rootless`; default `rootful`; policy `container-execution-only`
   (project builds/tests run inside Docker; no host build toolchain is installed).
 
 macOS supports only the desktop profile. Ubuntu requires an explicit
-`--profile desktop|server`; the bootstrap never infers a runtime or Docker role
-from Linux alone. Desktop and server are roles; `--no-gui` removes only the GUI
-overlay and does not turn a desktop into a server.
+`--profile desktop|desktop-builds|server`; the bootstrap never infers a runtime
+or Docker role from Linux alone. Desktop, desktop-builds, and server are roles;
+`--no-gui` removes only the GUI overlay and does not change the execution policy.
 
 Apply mode validates the real target. Ubuntu apply is supported only on exact
 Ubuntu releases `24.04` and `26.04`.
@@ -39,6 +44,10 @@ bash scripts/bootstrap.sh --platform macos --no-gui
 bash scripts/bootstrap.sh --platform ubuntu --profile desktop
 bash scripts/bootstrap.sh --platform ubuntu --profile desktop --no-gui
 
+# Ubuntu desktop-builds (desktop + Docker for local builds/tests)
+bash scripts/bootstrap.sh --platform ubuntu --profile desktop-builds
+bash scripts/bootstrap.sh --platform ubuntu --profile desktop-builds --no-gui
+
 # Ubuntu server; rootful Docker is the bootstrap default
 bash scripts/bootstrap.sh --platform ubuntu --profile server
 ```
@@ -48,6 +57,7 @@ Apply examples:
 ```bash
 bash scripts/bootstrap.sh --platform macos --apply
 bash scripts/bootstrap.sh --platform ubuntu --profile desktop --apply
+bash scripts/bootstrap.sh --platform ubuntu --profile desktop-builds --apply
 bash scripts/bootstrap.sh --platform ubuntu --profile server --apply
 ```
 
@@ -64,7 +74,7 @@ AI environment under `/root` without a usable user manager.
 
 ```text
 --platform macos|ubuntu
---profile desktop|server
+--profile desktop|desktop-builds|server
 --gui | --no-gui
 --docker-mode none|rootful|rootless
 --plan | --apply

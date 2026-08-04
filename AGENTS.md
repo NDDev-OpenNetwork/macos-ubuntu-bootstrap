@@ -30,7 +30,7 @@ policy source.
 ## Contract `2.6.0`
 
 Ubuntu profile selection is always explicit. Never infer server/rootful Docker
-from `uname=Linux`; require `--profile desktop|server`.
+from `uname=Linux`; require `--profile desktop|desktop-builds|server`.
 
 Supported compositions:
 
@@ -38,16 +38,20 @@ Supported compositions:
   `source-lsp-only`.
 - Ubuntu 24.04/26.04 `amd64` or `arm64` desktop: GUI enabled or disabled,
   Docker `none`, `source-lsp-only`.
+- Ubuntu 24.04/26.04 `amd64` or `arm64` desktop-builds: GUI enabled or disabled,
+  Docker `rootful`, `local-dev-with-builds` (everything desktop has PLUS Docker
+  for local builds/tests, without the server baseline).
 - Ubuntu 24.04/26.04 `amd64` or `arm64` server: headless, Docker
   `none|rootful|rootless`, default `rootful`, `container-execution-only` (project
   builds/tests run inside Docker; the host installs no build toolchain or SDKs).
 
-macOS never accepts the server profile. Desktop profiles never install Docker
-or configure local project build/runtime execution. `--no-gui` removes only
-the GUI overlay; it does not change the desktop execution policy. Server is
+macOS never accepts the server or desktop-builds profile. The plain desktop
+profile never installs Docker or configures local project build/runtime
+execution; desktop-builds is the explicit exception (ADR 0008). `--no-gui`
+removes only the GUI overlay; it does not change the execution policy. Server is
 Ubuntu-only and always headless.
 
-Desktop profiles additionally install Go, Rust, and the Dart SDK as
+Desktop and desktop-builds profiles additionally install Go, Rust, and the Dart SDK as
 language-server hosts for `gopls`, `rust-analyzer`, and the Dart analysis server,
 on the same footing as Node, Python, and LLVM — present to resolve source, not to
 authorize project builds (ADR 0005, ADR 0006). Dart also provides

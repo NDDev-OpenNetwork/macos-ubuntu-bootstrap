@@ -120,6 +120,8 @@ bash "$REPO_ROOT/scripts/bootstrap.sh" --platform ubuntu --profile desktop --gui
 bash "$REPO_ROOT/scripts/bootstrap.sh" --platform ubuntu --profile desktop --no-gui "${COMMON_PLAN[@]}"
 bash "$REPO_ROOT/scripts/bootstrap.sh" --platform ubuntu --profile server --docker-mode rootful "${COMMON_PLAN[@]}"
 bash "$REPO_ROOT/scripts/bootstrap.sh" --platform ubuntu --profile server --docker-mode rootless "${COMMON_PLAN[@]}"
+bash "$REPO_ROOT/scripts/bootstrap.sh" --platform ubuntu --profile desktop-builds --gui "${COMMON_PLAN[@]}"
+bash "$REPO_ROOT/scripts/bootstrap.sh" --platform ubuntu --profile desktop-builds --no-gui "${COMMON_PLAN[@]}"
 
 if bash "$REPO_ROOT/scripts/bootstrap.sh" --platform ubuntu --skip-browser --plan >/dev/null 2>&1; then
   echo "--skip-browser unexpectedly succeeded" >&2

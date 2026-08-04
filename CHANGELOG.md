@@ -4,6 +4,29 @@ All notable changes to this module will be documented in this file.
 
 ## [Unreleased]
 
+## [2.5.1] - 2026-08-04
+
+### Added
+
+- **Telegram Desktop** (v7.0.7) is now installed on the Ubuntu desktop profile as
+  a managed, SHA-256-verified tarball from `td.telegram.org`. The official Linux
+  portable build is extracted, the self-updating `Updater` binary is excluded,
+  and a `.desktop` launcher is deployed from a template. Declared in the contract
+  under `user_tools.telegram` + `desktop_entries.telegram`.
+
+### Changed
+
+- **BrowserOS .deb now uses a versioned GitHub release URL** (v0.47.18) with
+  SHA-256 verification instead of the volatile CDN "latest" pointer. The CDN URL
+  changed its content every ~2 weeks with no checksum, breaking reproducibility.
+  `desktop.sh` now uses `rldyour::download_verified_file` for the .deb, matching
+  the supply-chain guarantees of every other managed artifact.
+- **`device_integrity.py`** now handles GUI apps that don't support `--version`
+  (Telegram Desktop): falls back to declared-version provenance when a binary is
+  present but its version probe produces empty/error output.
+- **`install.sh`** gained `tarx` archive kind for `.tar.xz` extraction (Telegram
+  ships as xz, not gzip).
+
 ## [2.5.0] - 2026-08-04
 
 ### Added

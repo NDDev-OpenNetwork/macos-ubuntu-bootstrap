@@ -27,7 +27,7 @@ When prose and implementation disagree, verify the scripts and contract, then
 update the affected documentation in the same change. Do not invent a second
 policy source.
 
-## Contract `2.5.0`
+## Contract `2.5.1`
 
 Ubuntu profile selection is always explicit. Never infer server/rootful Docker
 from `uname=Linux`; require `--profile desktop|server`.
@@ -155,7 +155,7 @@ can create unrelated agent configs.
 ZCode is owned by the `nddev-harnesses` repository and installed through its own
 lifecycle. Bootstrap never installs ZCode via an apt `.deb` or a
 `RLDYOUR_ZCODE_SHA256` gate; both were removed in contract `2.0.0`, and the
-remaining module delegation was removed in `2.5.0`. Do not reintroduce a silent
+remaining module delegation was removed in `2.5.1`. Do not reintroduce a silent
 download, fallback checksum, or integrity bypass.
 
 Authentication is a post-install owner handoff. `scripts/auth-handoff.sh` may

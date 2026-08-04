@@ -287,16 +287,33 @@ def _pinned_source_tool_versions(bin_dir: Path) -> dict[str, str]:
 
 
 def _user_tool_state(bin_dir: Path) -> dict[str, dict[str, str]]:
-    """Collect installed user tools (herdr) declared in the contract."""
+    """Collect installed user tools (herdr, telegram) declared in the contract."""
     contract = load_contract()
     declared = contract.get("user_tools", {})
     state: dict[str, dict[str, str]] = {}
     for name, spec in declared.items():
         if not _applies_to_current_os(spec):
             continue
-        binary = shutil.which(name) or str(bin_dir / name)
+        # Resolve the on-disk binary name: the contract's bin_target basename
+        # is authoritative (e.g. "telegram" user_tool publishes "telegram-desktop").
+        bin_target = spec.get("bin_target", "")
+        bin_name = Path(bin_target).name if bin_target else name
+        binary = shutil.which(bin_name) or str(bin_dir / bin_name)
+        # Some tools (notably Telegram Desktop) don't support --version and
+        # either exit non-zero, time out, or produce empty output. For those,
+        # fall back to presence + declared version (proven by SHA-256 at install
+        # time). _run_version returns "absent", "error:...", or "" for those.
         raw = _run_version(Path(binary), "--version")
-        normalized = _normalize_version(raw, name)
+        path = Path(binary)
+        if not raw or raw.startswith("error:") or raw == "absent":
+            if path.exists() or path.is_symlink():
+                # Binary is present but doesn't report a version. Trust the
+                # receipt-based provenance and record the declared version.
+                normalized = spec.get("version", "unknown")
+            else:
+                normalized = "absent"
+        else:
+            normalized = _normalize_version(raw, name)
         entry: dict[str, str] = {
             "declared_version": spec.get("version", "unknown"),
             "installed_version": normalized,

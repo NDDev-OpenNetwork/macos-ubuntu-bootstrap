@@ -112,7 +112,7 @@ def _parse_user_tool_rows(source: str) -> dict[str, list[str]]:
     sha_x64;sha_arm64;url_x64;url_arm64`` — the same contract as
     PINNED_SOURCE_TOOLS.
     """
-    match = re.search(r"USER_TOOLS=\(\s*(.*?)\)", source, re.DOTALL)
+    match = re.search(r"USER_TOOLS=\(\s*(.*?)\n\)", source, re.DOTALL)
     assert match is not None, "USER_TOOLS array not found"
     rows: dict[str, list[str]] = {}
     for raw in re.findall(r'"([^"]+)"', match.group(1)):
@@ -133,6 +133,47 @@ def test_user_tools_match_the_contract() -> None:
     for name, row in rows.items():
         spec = declared[name]
         assert row[1] == spec["version"], f"{name}: version drift ({row[1]} vs {spec['version']})"
-        assert row[6] == spec["sha256"]["x86_64"], f"{name}: x64 SHA-256 drift"
-        assert row[7] == spec["sha256"]["aarch64"], f"{name}: arm64 SHA-256 drift"
+        # herdr uses per-arch sha256 dict; telegram uses a single archive_sha256
+        # (same hash for both arch slots in the bash array since the tarball is
+        # x86_64-only and the arm64 slot is a mirror for the parser).
+        if "sha256" in spec:
+            assert row[6] == spec["sha256"]["x86_64"], f"{name}: x64 SHA-256 drift"
+            assert row[7] == spec["sha256"]["aarch64"], f"{name}: arm64 SHA-256 drift"
+        elif "archive_sha256" in spec:
+            assert row[6] == spec["archive_sha256"], f"{name}: archive SHA-256 drift"
+            assert row[7] == spec["archive_sha256"], f"{name}: archive SHA-256 (arm64 slot) drift"
+
+
+def test_browseros_deb_url_and_sha_in_contract() -> None:
+    """BrowserOS .deb must be versioned (not CDN latest) with a pinned SHA-256."""
+    desktop_apps = CONTRACT["ubuntu_apt_packages"]["desktop_apps"]
+    browseros = next(app for app in desktop_apps if isinstance(app, dict) and app.get("name") == "browseros")
+    assert "version" in browseros, "browseros desktop_app missing version"
+    assert "sha256" in browseros, "browseros desktop_app missing sha256"
+    assert "github.com" in browseros["url"], (
+        f"browseros URL must be a versioned GitHub release, not CDN latest: {browseros['url']}"
+    )
+    assert browseros["sha256"] != "", "browseros sha256 must not be empty"
+
+
+def test_browseros_desktop_sh_uses_versioned_url_and_sha() -> None:
+    """desktop.sh must download BrowserOS from the versioned GitHub URL with SHA-256 verification."""
+    desktop_sh = (ROOT / "scripts/ubuntu/desktop.sh").read_text(encoding="utf-8")
+    browseros = next(
+        app for app in CONTRACT["ubuntu_apt_packages"]["desktop_apps"]
+        if isinstance(app, dict) and app.get("name") == "browseros"
+    )
+    assert browseros["url"] in desktop_sh, (
+        f"desktop.sh missing versioned BrowserOS URL: {browseros['url']}"
+    )
+    assert browseros["sha256"] in desktop_sh, (
+        "desktop.sh missing BrowserOS SHA-256 constant"
+    )
+    assert "download_verified_file" in desktop_sh, (
+        "desktop.sh must use rldyour::download_verified_file, not bare wget"
+    )
+    assert "cdn.browseros.com" not in desktop_sh, (
+        "desktop.sh must not reference the volatile CDN latest pointer"
+    )
+
 

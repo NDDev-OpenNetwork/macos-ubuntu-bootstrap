@@ -245,53 +245,62 @@ verify_apply() {
   fi
 }
 
-if [ "${1:-}" = "--help" ]; then
-  usage
-  exit 0
-fi
-
-rldyour::assert_root "$REPO_ROOT"
-rldyour::ensure_path
-[ "$LOCAL_EXECUTION_POLICY" = "source-lsp-only" ] || {
-  rldyour::log "error" "macOS must use source-lsp-only policy"
-  exit 2
-}
-if [ "$RLDYOUR_DRY_RUN" -eq 0 ]; then
-  if [ "$(uname -s)" != "Darwin" ] || [ "$(uname -m)" != "arm64" ]; then
-    rldyour::log "error" "supported macOS apply target is Apple Silicon (arm64)"
-    exit 2
+main() {
+  if [ "${1:-}" = "--help" ]; then
+    usage
+    exit 0
   fi
-fi
 
-rldyour::section "macos-ubuntu-bootstrap (macOS) installer"
-rldyour::log "info" "mode: $([ "$RLDYOUR_DRY_RUN" -eq 1 ] && echo dry-run || echo apply); gui: $GUI_ENABLED; policy: $LOCAL_EXECUTION_POLICY"
-
-if [ "$SKIP_SYSTEM" -eq 0 ]; then
-  ensure_homebrew
+  rldyour::assert_root "$REPO_ROOT"
   rldyour::ensure_path
-  if command -v brew >/dev/null 2>&1 || [ "$RLDYOUR_DRY_RUN" -eq 1 ]; then
-    install_source_packages
-    install_gui_apps
-  elif [ "$STRICT" -eq 1 ]; then
-    rldyour::log "error" "Homebrew unavailable after installation"
-    exit 1
+  [ "$LOCAL_EXECUTION_POLICY" = "source-lsp-only" ] || {
+    rldyour::log "error" "macOS must use source-lsp-only policy"
+    exit 2
+  }
+  if [ "$RLDYOUR_DRY_RUN" -eq 0 ]; then
+    if [ "$(uname -s)" != "Darwin" ] || [ "$(uname -m)" != "arm64" ]; then
+      rldyour::log "error" "supported macOS apply target is Apple Silicon (arm64)"
+      exit 2
+    fi
   fi
-  rldyour::ensure_git_perf
-  rldyour::ensure_git_delta_config
-  rldyour::install_terminal_configs "$REPO_ROOT/templates/terminal"
-else
-  rldyour::log "warn" "system layer skipped by explicit recovery flag"
+
+  rldyour::section "macos-ubuntu-bootstrap (macOS) installer"
+  rldyour::log "info" "mode: $([ "$RLDYOUR_DRY_RUN" -eq 1 ] && echo dry-run || echo apply); gui: $GUI_ENABLED; policy: $LOCAL_EXECUTION_POLICY"
+
+  if [ "$SKIP_SYSTEM" -eq 0 ]; then
+    ensure_homebrew
+    rldyour::ensure_path
+    if command -v brew >/dev/null 2>&1 || [ "$RLDYOUR_DRY_RUN" -eq 1 ]; then
+      install_source_packages
+      install_gui_apps
+    elif [ "$STRICT" -eq 1 ]; then
+      rldyour::log "error" "Homebrew unavailable after installation"
+      exit 1
+    fi
+    rldyour::ensure_git_perf
+    rldyour::ensure_git_delta_config
+    rldyour::install_terminal_configs "$REPO_ROOT/templates/terminal"
+  else
+    rldyour::log "warn" "system layer skipped by explicit recovery flag"
+  fi
+
+  [ "$SKIP_LSPS" -eq 1 ] || install_bun_lsps
+
+  # Mandatory on GUI and no-GUI profiles. No skip/fallback path exists.
+  rldyour::install_browser_providers
+  configure_cmux_hooks
+
+  # Harness last, for the reason documented in scripts/ubuntu/install.sh: the layer
+  # delegates to a module whose fail-closed guards depend on local state this
+  # repository does not own, and an abort there must not strand the layers behind it.
+  [ "$SKIP_AI" -eq 1 ] || install_ai_runtimes
+  verify_apply
+  rldyour::log "info" "Run 'bash scripts/auth-handoff.sh' for user-controlled sign-in steps."
+}
+
+# Guard so the main flow only runs when executed directly, not when sourced.
+# Mirrors scripts/ubuntu/install.sh and scripts/ubuntu/server.sh so macOS
+# install.sh is safe to source from tests.
+if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then
+  main "$@"
 fi
-
-[ "$SKIP_LSPS" -eq 1 ] || install_bun_lsps
-
-# Mandatory on GUI and no-GUI profiles. No skip/fallback path exists.
-rldyour::install_browser_providers
-configure_cmux_hooks
-
-# Harness last, for the reason documented in scripts/ubuntu/install.sh: the layer
-# delegates to a module whose fail-closed guards depend on local state this
-# repository does not own, and an abort there must not strand the layers behind it.
-[ "$SKIP_AI" -eq 1 ] || install_ai_runtimes
-verify_apply
-rldyour::log "info" "Run 'bash scripts/auth-handoff.sh' for user-controlled sign-in steps."

@@ -115,16 +115,30 @@ def test_server_does_not_plan_user_tools_or_desktop_entries() -> None:
 
 
 def test_desktop_does_not_plan_server_layer() -> None:
-    """Desktop profile must never plan Docker, openssh-server, UFW, or hardening."""
-    output = run_plan_full("--platform", "ubuntu", "--profile", "desktop", "--gui")
-    # Server-layer specific strings that must not appear in a desktop plan.
-    assert "docker-ce" not in output
+    """Desktop profile must never reach the server layer.
+
+    Unlike test_plan_matrix_is_non_destructive (which uses --skip-system and
+    therefore can only assert vacuously), this test runs plan mode WITHOUT
+    --skip-system so run_server_layer actually executes its dry-run path.
+    The PROFILE guard at the top of run_server_layer must prevent the server
+    module from loading for desktop.
+    """
+    output = run_plan("--platform", "ubuntu", "--profile", "desktop")
+    # The server module header is emitted by run_server_layer -> server.sh main.
+    # It must NOT appear in a desktop plan — if it did, the PROFILE guard was
+    # removed or bypassed.
+    assert "Ubuntu server module" not in output
     assert "openssh-server" not in output
-    assert "unattended-upgrades" not in output
-    # The server layer section header (from run_server_layer) must not appear.
-    # run_server_layer is a silent return-0 for desktop, but if the guard were
-    # removed, the server.sh invocation would show in plan output.
-    assert "Ubuntu server layer" not in output
+
+
+def test_server_does_plan_server_layer() -> None:
+    """Server profile must reach the server layer and print its module header.
+
+    The positive complement to test_desktop_does_not_plan_server_layer: proves
+    the dispatch is not just "never run server layer" but "run it iff server".
+    """
+    output = run_plan("--platform", "ubuntu", "--profile", "server")
+    assert "Ubuntu server module" in output
 
 
 def test_desktop_no_gui_skips_desktop_customization_but_keeps_toolchain() -> None:
@@ -273,6 +287,14 @@ def test_install_sh_has_bash_source_guard() -> None:
     source = INSTALL.read_text(encoding="utf-8")
     assert '"${BASH_SOURCE[0]}" == "$0"' in source, (
         "install.sh missing BASH_SOURCE guard — cannot be safely sourced for testing"
+    )
+
+
+def test_macos_install_sh_has_bash_source_guard() -> None:
+    """macOS install.sh must also guard its main flow so it is safe to source."""
+    macos_install = (ROOT / "scripts/macos/install.sh").read_text(encoding="utf-8")
+    assert '"${BASH_SOURCE[0]}" == "$0"' in macos_install, (
+        "macos/install.sh missing BASH_SOURCE guard — cannot be safely sourced for testing"
     )
 
 

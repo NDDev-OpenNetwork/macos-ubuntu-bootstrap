@@ -100,3 +100,39 @@ def test_bun_constants_match_contract() -> None:
     assert _constant(UBUNTU_INSTALL, "BUN_VERSION") == runtime["ubuntu_bun"]
     assert _constant(UBUNTU_INSTALL, "BUN_SHA256_X64") == runtime["ubuntu_bun_sha256"]["x64"]
     assert _constant(UBUNTU_INSTALL, "BUN_SHA256_ARM64") == runtime["ubuntu_bun_sha256"]["arm64"]
+
+
+# ----------------------------- USER_TOOLS (herdr) -----------------------------
+
+
+def _parse_user_tool_rows(source: str) -> dict[str, list[str]]:
+    """Parse the USER_TOOLS bash array into {name: [fields]}.
+
+    Each row is ``name;version;kind;member_x64;member_arm64;link;
+    sha_x64;sha_arm64;url_x64;url_arm64`` — the same contract as
+    PINNED_SOURCE_TOOLS.
+    """
+    match = re.search(r"USER_TOOLS=\(\s*(.*?)\)", source, re.DOTALL)
+    assert match is not None, "USER_TOOLS array not found"
+    rows: dict[str, list[str]] = {}
+    for raw in re.findall(r'"([^"]+)"', match.group(1)):
+        fields = raw.split(";")
+        rows[fields[0]] = fields
+    return rows
+
+
+def test_user_tools_match_the_contract() -> None:
+    """USER_TOOLS bash array must match contract user_tools: name, version, SHA-256."""
+    declared = CONTRACT.get("user_tools", {})
+    rows = _parse_user_tool_rows(UBUNTU_INSTALL)
+    assert set(declared) == set(rows), (
+        f"contract and installer disagree on user_tools set:\n"
+        f"  contract only: {set(declared) - set(rows)}\n"
+        f"  installer only: {set(rows) - set(declared)}"
+    )
+    for name, row in rows.items():
+        spec = declared[name]
+        assert row[1] == spec["version"], f"{name}: version drift ({row[1]} vs {spec['version']})"
+        assert row[6] == spec["sha256"]["x86_64"], f"{name}: x64 SHA-256 drift"
+        assert row[7] == spec["sha256"]["aarch64"], f"{name}: arm64 SHA-256 drift"
+

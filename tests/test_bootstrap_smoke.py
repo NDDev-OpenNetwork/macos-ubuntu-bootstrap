@@ -62,13 +62,12 @@ def test_plan_matrix_is_non_destructive() -> None:
         assert result.returncode == 0, result.stderr + result.stdout
         assert "dry-run" in result.stdout
         assert "CloakBrowser" in result.stdout
-        if "server" in profile:
-            # With --skip-system, run_server_layer early-returns before any
-            # Docker/openssh/UFW work. Assert no server-layer mutation strings
-            # leak into plan output — the prior assertion checked for a substring
-            # ("Ubuntu server module") that never existed in the codebase.
-            assert "docker-ce" not in result.stdout
-            assert "openssh-server" not in result.stdout
+        # NOTE: the server-layer dispatch assertion lived here but was vacuously
+        # true under --skip-system (run_server_layer returns at the SKIP_SYSTEM
+        # guard before printing anything). The meaningful server-vs-desktop
+        # dispatch test is in test_profile_isolation.py, which runs plan mode
+        # WITHOUT --skip-system to prove the server layer header appears for
+        # server and is absent for desktop.
 
 
 def test_skip_system_covers_ubuntu_server_layer() -> None:

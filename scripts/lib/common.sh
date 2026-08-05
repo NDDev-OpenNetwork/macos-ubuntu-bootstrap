@@ -210,6 +210,13 @@ rldyour::ensure_path() {
     # publishes no link into the managed prefix, so the harness target's bin
     # directory is the only place `codex` can be resolved from.
     "${RLDYOUR_CODEX_HOME:-$HOME/.codex}/bin"
+    # Apple Silicon Homebrew. ensure_homebrew installs brew into /opt/homebrew
+    # but the Homebrew installer only edits the login shell profile, never the
+    # current process, so without this the macOS apply run cannot resolve `brew`
+    # (or the dart/bun/node it just installed) right after installing it. The
+    # dir guard makes this a no-op on Linux and on a pre-brew macOS pass.
+    "/opt/homebrew/bin"
+    "/opt/homebrew/sbin"
   )
   local prefix=""
   for p in "${candidates[@]}"; do

@@ -4,6 +4,33 @@ All notable changes to this module will be documented in this file.
 
 ## [Unreleased]
 
+## [2.6.1] - 2026-08-05
+
+### Fixed
+
+- **macOS fresh-device apply now provisions the Homebrew layer.**
+  `rldyour::ensure_path` adds the Apple Silicon Homebrew prefix
+  (`/opt/homebrew/bin` and `/opt/homebrew/sbin`, directory-guarded so it is a
+  no-op on Linux and on a pre-brew pass). Previously `ensure_homebrew` installed
+  Homebrew but the immediate `command -v brew` check in `macos/install.sh`
+  failed — brew was not on the process PATH — so under the default non-strict
+  mode the source-package and GUI-cask layers were silently skipped on a
+  brand-new Mac.
+- **A correct Ubuntu server can finally be PROVEN.** `device_integrity.py` is
+  now profile-aware: the receipt records the device profile, and verify skips
+  the desktop-only compiled language hosts (`go`/`gopls`/`rustc`/`dart`), pinned
+  source tools, user tools, and desktop entries on the `server` profile — which
+  never installs them. `node`/`uv`/`bun` stay required on every profile because
+  the mandatory Bun browser stack needs them. `build` takes a `--profile` flag
+  (falling back to `RLDYOUR_PROFILE`, then the execution policy, then the strict
+  desktop superset).
+
+### Tests
+
+- The `build`→`verify` round-trip tests skip on a device not provisioned to the
+  pinned toolchain (a bare CI runner) instead of asserting a NOT_PROVEN device
+  is PROVEN; they still run in full on a provisioned dev machine.
+
 ## [2.6.0] - 2026-08-04
 
 ### Added — desktop-builds profile
@@ -34,8 +61,6 @@ All notable changes to this module will be documented in this file.
   to `PROFILE = server` — desktop-builds receives Go/Rust/Dart.
 - **`install_gui_apps`** and **user tools** guards changed to `PROFILE = server`
   negation — desktop-builds gets GUI apps and user tools.
-
-## [2.5.1] - 2026-08-04
 
 ## [2.5.1] - 2026-08-04
 

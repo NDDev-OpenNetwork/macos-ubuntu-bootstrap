@@ -373,6 +373,30 @@ def test_desktop_template_exists() -> None:
 # ----------------------------- build / verify CLI -----------------------------
 
 
+def _device_matches_desktop_contract() -> bool:
+    """True only on a device actually provisioned to the desktop contract.
+
+    The build->verify round-trip tests prove a real PROVEN receipt, which needs
+    the pinned toolchain installed at the contract versions. A bare CI runner
+    has none of it (node/go at runner defaults, bun/dart/scanners absent), so
+    those two tests skip there instead of asserting a NOT_PROVEN device is
+    PROVEN. On a provisioned dev machine they run in full.
+    """
+    try:
+        di._verify_contract_versions(
+            di.collect_state(home=Path.home(), profile="desktop"), profile="desktop"
+        )
+        return True
+    except di.IntegrityError:
+        return False
+
+
+requires_provisioned_device = pytest.mark.skipif(
+    not _device_matches_desktop_contract(),
+    reason="requires a device provisioned with the pinned toolchain (a bare CI runner is not)",
+)
+
+
 def test_build_writes_canonical_receipt(tmp_path: Path) -> None:
     output = tmp_path / "built.json"
     # build uses the real machine state, which is fine — we only assert the
@@ -384,6 +408,7 @@ def test_build_writes_canonical_receipt(tmp_path: Path) -> None:
     assert loaded["schema"] == di.SCHEMA
 
 
+@requires_provisioned_device
 def test_verify_cli_returns_zero_on_valid_receipt(tmp_path: Path) -> None:
     """verify subcommand via CLI must exit 0 and print PROVEN for a fresh receipt."""
     receipt = tmp_path / "verify.json"
@@ -391,6 +416,7 @@ def test_verify_cli_returns_zero_on_valid_receipt(tmp_path: Path) -> None:
     assert _run_cli("verify", "--receipt", str(receipt)) == 0
 
 
+@requires_provisioned_device
 def test_verify_cli_json_output(tmp_path: Path) -> None:
     """verify --json must emit a canonical JSON status envelope."""
     import io

@@ -243,6 +243,97 @@ def test_verify_contract_versions_detects_user_tool_drift() -> None:
         di._verify_contract_versions(state)
 
 
+# ----------------------------- profile awareness -----------------------------
+
+
+def _server_state_node_uv_bun_present() -> dict[str, object]:
+    """A server-shaped state: node/uv/bun match the contract; the desktop-only
+    compiled hosts are absent; no pinned source tools or user tools."""
+    contract = di.load_contract()
+    rs = contract["runtime_support"]
+    runtime_hosts: dict[str, object] = {}
+    for name, (_flag, field) in di.RUNTIME_HOSTS.items():
+        if name in di.COMPILED_LANGUAGE_HOSTS:
+            runtime_hosts[name] = {
+                "normalized": "absent",
+                "raw": "absent",
+                "path": f"/bin/{name}",
+            }
+        else:
+            runtime_hosts[name] = {
+                "normalized": di._normalize_version(rs[field], name),
+                "raw": rs[field],
+                "path": f"/bin/{name}",
+            }
+    return {
+        "runtime_hosts": runtime_hosts,
+        "pinned_source_tools": {},
+        "user_tools": {},
+    }
+
+
+def test_server_profile_allows_absent_desktop_only_tools() -> None:
+    """On server, absent compiled hosts / pinned tools / user tools are expected
+    — but the same state must still fail as desktop, proving the gate is real."""
+    state = _server_state_node_uv_bun_present()
+    # Server: must not raise despite go/gopls/rustc/dart absent.
+    di._verify_contract_versions(state, profile="server")
+    # Desktop (the pre-fix behavior): the same state is drift.
+    with pytest.raises(di.IntegrityError, match="absent"):
+        di._verify_contract_versions(state, profile="desktop")
+
+
+def test_server_profile_still_requires_node_uv_bun() -> None:
+    """node/uv/bun are provisioned on every profile; a server drift still fails."""
+    state = _server_state_node_uv_bun_present()
+    state["runtime_hosts"]["node"]["normalized"] = "0.0.0"
+    with pytest.raises(di.IntegrityError, match="node: installed 0.0.0"):
+        di._verify_contract_versions(state, profile="server")
+
+
+def test_resolve_build_profile_precedence(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.delenv("RLDYOUR_PROFILE", raising=False)
+    monkeypatch.delenv("RLDYOUR_LOCAL_EXECUTION_POLICY", raising=False)
+    # Explicit wins.
+    assert di._resolve_build_profile("server") == "server"
+    # Env profile next.
+    monkeypatch.setenv("RLDYOUR_PROFILE", "server")
+    assert di._resolve_build_profile(None) == "server"
+    # Execution policy maps to a profile.
+    monkeypatch.delenv("RLDYOUR_PROFILE", raising=False)
+    monkeypatch.setenv("RLDYOUR_LOCAL_EXECUTION_POLICY", "container-execution-only")
+    assert di._resolve_build_profile(None) == "server"
+    # Nothing set falls back to the strict desktop superset.
+    monkeypatch.delenv("RLDYOUR_LOCAL_EXECUTION_POLICY", raising=False)
+    assert di._resolve_build_profile(None) == "desktop"
+
+
+def test_collect_state_records_profile() -> None:
+    state = di.collect_state(home=Path.home(), profile="server")
+    assert state["profile"] == "server"
+
+
+def test_collect_state_rejects_invalid_profile() -> None:
+    with pytest.raises(di.IntegrityError, match="profile is invalid"):
+        di.collect_state(home=Path.home(), profile="bogus")
+
+
+def test_verify_receipt_rejects_missing_profile(tmp_path: Path) -> None:
+    """A pre-profile receipt (or one with a bad profile) fails closed."""
+    receipt = tmp_path / "no-profile.json"
+    write_receipt(receipt, minimal_state())  # minimal_state has no "profile"
+    with pytest.raises(di.IntegrityError, match="missing a valid profile"):
+        di.verify_receipt(receipt)
+
+
+def test_build_server_profile_flag_plumbs_through(tmp_path: Path) -> None:
+    """`build --profile server` records the server profile in the receipt."""
+    receipt = tmp_path / "server.json"
+    assert _run_cli("build", "--output", str(receipt), "--profile", "server") == 0
+    loaded = di.load_receipt(receipt)
+    assert loaded["profile"] == "server"
+
+
 # ----------------------------- contract parity (static) -----------------------------
 
 

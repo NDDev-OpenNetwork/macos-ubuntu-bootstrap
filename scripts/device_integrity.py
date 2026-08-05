@@ -62,6 +62,20 @@ RUNTIME_HOSTS: dict[str, tuple[str, str]] = {
 # Each is installed as a managed binary under ~/.local/bin/<name>.
 PINNED_SOURCE_TOOLS_CONTRACT = "ubuntu_pinned_source_tools"
 
+# The device profiles the receipt understands. These mirror the contract's
+# targets block and scripts/bootstrap.sh.
+VALID_PROFILES = ("desktop", "desktop-builds", "server")
+
+# Runtime hosts provisioned only on the desktop and desktop-builds profiles.
+# scripts/ubuntu/install.sh gates these behind install_compiled_language_hosts,
+# which returns early on the server profile (execution_policy
+# container-execution-only) and also skips the pinned source tools, user tools,
+# and desktop entries. node/uv/bun are deliberately NOT here: the mandatory Bun
+# browser stack needs them, so they are installed on every profile. Requiring a
+# server device to carry the desktop-only set is what forced a permanent
+# NOT_PROVEN on a fully-correct server.
+COMPILED_LANGUAGE_HOSTS = frozenset({"go", "gopls", "rustc", "dart"})
+
 
 class IntegrityError(RuntimeError):
     """A device runtime invariant was not proven."""
@@ -119,6 +133,33 @@ def _applies_to_current_os(spec: dict[str, Any]) -> bool:
         if entry_os in normalized or (entry_os == "ubuntu" and current == "linux"):
             return True
     return False
+
+
+def _resolve_build_profile(explicit: str | None) -> str:
+    """Resolve the device profile a ``build`` records into the receipt.
+
+    Precedence: an explicit ``--profile``, then ``RLDYOUR_PROFILE``, then the
+    execution policy the installer exports (``RLDYOUR_LOCAL_EXECUTION_POLICY``).
+    When none is set we fall back to ``desktop`` — the strict superset that
+    verifies every runtime host and tool. That default is fail-closed: a server
+    receipt built without a profile is over-verified into a loud NOT_PROVEN, not
+    silently under-verified into a false PROVEN. The one automated caller
+    (scripts/bootstrap-device.sh run_doctor) always passes ``--profile``.
+    """
+    if explicit:
+        if explicit not in VALID_PROFILES:
+            fail(f"unknown profile {explicit!r}; expected one of {', '.join(VALID_PROFILES)}")
+        return explicit
+    env_profile = os.environ.get("RLDYOUR_PROFILE", "").strip()
+    if env_profile in VALID_PROFILES:
+        return env_profile
+    policy_map = {
+        "source-lsp-only": "desktop",
+        "local-dev-with-builds": "desktop-builds",
+        "container-execution-only": "server",
+    }
+    policy = os.environ.get("RLDYOUR_LOCAL_EXECUTION_POLICY", "").strip()
+    return policy_map.get(policy, "desktop")
 
 
 # ----------------------------- safety primitives -----------------------------
@@ -343,8 +384,16 @@ def _desktop_entry_state(applications_dir: Path) -> dict[str, dict[str, str]]:
     return state
 
 
-def collect_state(*, home: Path) -> dict[str, Any]:
-    """Build the full device state dict from the live machine."""
+def collect_state(*, home: Path, profile: str) -> dict[str, Any]:
+    """Build the full device state dict from the live machine.
+
+    ``profile`` is recorded so verify requires exactly the tool set the profile
+    provisions. Collection itself is profile-independent — a host absent by
+    design still reads as ``absent`` symmetrically at build and verify time — so
+    only the contract-version gate consults the profile.
+    """
+    if profile not in VALID_PROFILES:
+        fail(f"device profile is invalid: {profile!r}")
     bin_dir = home / ".local/bin"
     share_rldyour = home / ".local/share/rldyour"
     applications_dir = home / ".local/share/applications"
@@ -363,6 +412,7 @@ def collect_state(*, home: Path) -> dict[str, Any]:
         "schema": SCHEMA,
         "owner": OWNER,
         "bootstrap_version": BOOTSTRAP_VERSION,
+        "profile": profile,
         "home": str(home),
         "platform": f"{os.uname().sysname}-{os.uname().machine}",
         "policy_hashes": policy_hashes(),
@@ -416,25 +466,36 @@ def verify_receipt(path: Path) -> dict[str, Any]:
     data = load_receipt(path)
     if data.get("bootstrap_version") != BOOTSTRAP_VERSION:
         fail("device receipt belongs to a different bootstrap version")
+    profile = data.get("profile")
+    if profile not in VALID_PROFILES:
+        fail("device receipt is missing a valid profile; rebuild the receipt")
     expected_home = Path.home()
     if data.get("home") != str(expected_home):
         fail("device receipt belongs to a different home directory")
-    actual = collect_state(home=expected_home)
+    actual = collect_state(home=expected_home, profile=profile)
     expected = dict(data)
     expected.pop("payload_sha256", None)
     if actual != expected:
         fail("installed device runtime differs from its exact receipt")
-    _verify_contract_versions(actual)
+    _verify_contract_versions(actual, profile=profile)
     return data
 
 
-def _verify_contract_versions(state: dict[str, Any]) -> None:
+def _verify_contract_versions(state: dict[str, Any], *, profile: str = "desktop") -> None:
     """Assert every installed runtime/tool version matches the contract.
 
     This closes the gap that ``ubuntu/verify.sh`` leaves open: that script
     compares against literals hardcoded in bash, which can drift from the
     contract. Here the contract is the single source of truth.
+
+    ``profile`` scopes the required set the way the installer does. The server
+    profile (container-execution-only) never provisions the compiled-language
+    hosts, pinned source tools, user tools, or desktop entries, so requiring
+    them there is a false drift — the whole reason a correct server used to fail.
+    node/uv/bun stay required on every profile because the mandatory browser
+    stack depends on them. The default is ``desktop``, the strict superset.
     """
+    server = profile == "server"
     contract = load_contract()
     runtime_support = contract.get("runtime_support", {})
     drifts: list[str] = []
@@ -442,6 +503,10 @@ def _verify_contract_versions(state: dict[str, Any]) -> None:
     for name, _flag, field in [
         (n, RUNTIME_HOSTS[n][0], RUNTIME_HOSTS[n][1]) for n in RUNTIME_HOSTS
     ]:
+        # Compiled-language hosts are desktop-only; the server installer skips
+        # them, so their absence there is expected, not drift.
+        if server and name in COMPILED_LANGUAGE_HOSTS:
+            continue
         declared = runtime_support.get(field)
         if declared is None:
             continue
@@ -455,27 +520,31 @@ def _verify_contract_versions(state: dict[str, Any]) -> None:
         elif installed != declared_norm:
             drifts.append(f"{name}: installed {installed} != contract {declared}")
 
-    declared_tools = runtime_support.get(PINNED_SOURCE_TOOLS_CONTRACT, {})
-    installed_tools = state.get("pinned_source_tools", {})
-    for name, spec in declared_tools.items():
-        declared = spec.get("version")
-        installed = installed_tools.get(name)
-        if installed is None:
-            drifts.append(f"{name}: absent (contract declares {declared})")
-        elif installed != declared:
-            drifts.append(f"{name}: installed {installed} != contract {declared}")
+    # Pinned source tools, user tools, and desktop entries are all desktop-only
+    # (install_compiled_language_hosts and the `PROFILE != server` gate in
+    # install.sh). Skip them entirely on the server profile.
+    if not server:
+        declared_tools = runtime_support.get(PINNED_SOURCE_TOOLS_CONTRACT, {})
+        installed_tools = state.get("pinned_source_tools", {})
+        for name, spec in declared_tools.items():
+            declared = spec.get("version")
+            installed = installed_tools.get(name)
+            if installed is None:
+                drifts.append(f"{name}: absent (contract declares {declared})")
+            elif installed != declared:
+                drifts.append(f"{name}: installed {installed} != contract {declared}")
 
-    declared_user_tools = contract.get("user_tools", {})
-    installed_user_tools = state.get("user_tools", {})
-    for name, spec in declared_user_tools.items():
-        if not _applies_to_current_os(spec):
-            continue
-        declared = spec.get("version")
-        installed = installed_user_tools.get(name, {}).get("installed_version")
-        if installed is None or installed == "absent":
-            drifts.append(f"{name}: absent (contract declares {declared})")
-        elif installed != declared:
-            drifts.append(f"{name}: installed {installed} != contract {declared}")
+        declared_user_tools = contract.get("user_tools", {})
+        installed_user_tools = state.get("user_tools", {})
+        for name, spec in declared_user_tools.items():
+            if not _applies_to_current_os(spec):
+                continue
+            declared = spec.get("version")
+            installed = installed_user_tools.get(name, {}).get("installed_version")
+            if installed is None or installed == "absent":
+                drifts.append(f"{name}: absent (contract declares {declared})")
+            elif installed != declared:
+                drifts.append(f"{name}: installed {installed} != contract {declared}")
 
     if drifts:
         fail("device drifts from contract:\n  " + "\n  ".join(drifts))
@@ -497,6 +566,15 @@ def build_parser() -> argparse.ArgumentParser:
         default=DEFAULT_RECEIPT,
         help=f"receipt path (default: {DEFAULT_RECEIPT})",
     )
+    build.add_argument(
+        "--profile",
+        choices=list(VALID_PROFILES),
+        default=None,
+        help=(
+            "device profile this receipt records; falls back to RLDYOUR_PROFILE, "
+            "then RLDYOUR_LOCAL_EXECUTION_POLICY, then desktop"
+        ),
+    )
 
     verify = subparsers.add_parser(
         "verify", help="verify the device matches its receipt and the contract"
@@ -516,6 +594,7 @@ def main() -> int:
     args = build_parser().parse_args()
     try:
         if args.command == "build":
+            profile = _resolve_build_profile(getattr(args, "profile", None))
             output: Path = args.output
             output.parent.mkdir(parents=True, exist_ok=True)
             if output.exists() or output.is_symlink():
@@ -527,7 +606,7 @@ def main() -> int:
                     fail(f"refusing to overwrite unmanaged receipt: {output}")
                 backup = output.with_suffix(".json.bak")
                 output.rename(backup)
-            state = collect_state(home=Path.home())
+            state = collect_state(home=Path.home(), profile=profile)
             flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL
             descriptor = os.open(output, flags, 0o600)
             try:

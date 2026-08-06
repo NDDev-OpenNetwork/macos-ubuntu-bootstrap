@@ -276,7 +276,9 @@ def _run_version(binary: Path, flag: str) -> str:
             env=env,
             timeout=15,
         )
-    except (OSError, subprocess.TimeoutExpired) as exc:
+    except subprocess.TimeoutExpired:
+        return f"error:version probe timed out for {binary.name}"
+    except OSError as exc:
         raise IntegrityError(f"version probe failed for {binary.name}") from exc
     if result.returncode != 0:
         detail = (result.stderr or result.stdout).strip()
@@ -327,11 +329,16 @@ def _pinned_source_tool_versions(bin_dir: Path) -> dict[str, str]:
     return versions
 
 
-def _user_tool_state(bin_dir: Path) -> dict[str, dict[str, str]]:
+def _expand_home_path(value: str, home: Path) -> Path:
+    """Expand the contract's explicit ``${HOME}`` placeholder."""
+    return Path(value.replace("${HOME}", str(home), 1))
+
+
+def _user_tool_state(bin_dir: Path, home: Path) -> dict[str, dict[str, Any]]:
     """Collect installed user tools (herdr, telegram) declared in the contract."""
     contract = load_contract()
     declared = contract.get("user_tools", {})
-    state: dict[str, dict[str, str]] = {}
+    state: dict[str, dict[str, Any]] = {}
     for name, spec in declared.items():
         if not _applies_to_current_os(spec):
             continue
@@ -340,22 +347,29 @@ def _user_tool_state(bin_dir: Path) -> dict[str, dict[str, str]]:
         bin_target = spec.get("bin_target", "")
         bin_name = Path(bin_target).name if bin_target else name
         binary = shutil.which(bin_name) or str(bin_dir / bin_name)
-        # Some tools (notably Telegram Desktop) don't support --version and
-        # either exit non-zero, time out, or produce empty output. For those,
-        # fall back to presence + declared version (proven by SHA-256 at install
-        # time). _run_version returns "absent", "error:...", or "" for those.
-        raw = _run_version(Path(binary), "--version")
         path = Path(binary)
-        if not raw or raw.startswith("error:") or raw == "absent":
+        # GUI programs such as Telegram do not implement --version: invoking it
+        # starts the full Qt application, can hang without a compatible display,
+        # and mutates desktop-session state. The contract must opt those tools
+        # into a non-executing presence probe; their version/provenance is
+        # already bound by the install receipt and archive SHA-256.
+        if spec.get("version_probe") == "presence-only":
+            raw = "presence-only" if path.exists() or path.is_symlink() else "absent"
+        else:
+            raw = _run_version(path, "--version")
+        if (
+            spec.get("version_probe") == "presence-only"
+            or not raw
+            or raw.startswith("error:")
+            or raw == "absent"
+        ):
             if path.exists() or path.is_symlink():
-                # Binary is present but doesn't report a version. Trust the
-                # receipt-based provenance and record the declared version.
                 normalized = spec.get("version", "unknown")
             else:
                 normalized = "absent"
         else:
             normalized = _normalize_version(raw, name)
-        entry: dict[str, str] = {
+        entry: dict[str, Any] = {
             "declared_version": spec.get("version", "unknown"),
             "installed_version": normalized,
             "raw": raw,
@@ -364,22 +378,54 @@ def _user_tool_state(bin_dir: Path) -> dict[str, dict[str, str]]:
         path = Path(binary)
         if path.exists() and not path.is_symlink():
             entry["sha256"] = sha256_file(path)
+
+        policy_target = spec.get("external_updater_policy_target")
+        policy_marker = spec.get("external_updater_policy_marker")
+        if isinstance(policy_target, str) and isinstance(policy_marker, str):
+            policy = _expand_home_path(policy_target, home)
+            launcher = _expand_home_path(spec["bin_target"], home)
+            resolved = launcher.resolve(strict=False)
+            expected_lines = [policy_marker, str(launcher), str(resolved)]
+            regular = policy.is_file() and not policy.is_symlink()
+            lines: list[str] = []
+            if regular:
+                try:
+                    lines = policy.read_text(encoding="utf-8").splitlines()
+                    entry["external_updater_policy_sha256"] = sha256_file(policy)
+                except OSError:
+                    regular = False
+            entry["external_updater_policy_path"] = str(policy)
+            entry["external_updater_policy_valid"] = regular and lines == expected_lines
         state[name] = entry
     return state
 
 
-def _desktop_entry_state(applications_dir: Path) -> dict[str, dict[str, str]]:
-    """Collect the SHA-256 of each declared desktop entry's installed file."""
+def _desktop_entry_state(home: Path) -> dict[str, dict[str, Any]]:
+    """Collect each declared desktop entry and its pinned icon assets."""
     contract = load_contract()
     declared = contract.get("desktop_entries", {})
-    state: dict[str, dict[str, str]] = {}
+    state: dict[str, dict[str, Any]] = {}
     for name, spec in declared.items():
         if not _applies_to_current_os(spec):
             continue
-        target = applications_dir / f"{name}.desktop"
-        entry: dict[str, str] = {"path": str(target), "present": str(target.exists())}
-        if target.exists() and target.is_file():
+        target = _expand_home_path(spec["target"], home)
+        entry: dict[str, Any] = {
+            "path": str(target),
+            "present": str(target.exists() and not target.is_symlink()),
+        }
+        if target.exists() and target.is_file() and not target.is_symlink():
             entry["sha256"] = sha256_file(target)
+        assets: dict[str, dict[str, str]] = {}
+        for asset_spec in spec.get("icon_assets", []):
+            asset = _expand_home_path(asset_spec["target"], home)
+            asset_entry = {
+                "present": str(asset.exists() and not asset.is_symlink())
+            }
+            if asset.exists() and asset.is_file() and not asset.is_symlink():
+                asset_entry["sha256"] = sha256_file(asset)
+            assets[str(asset)] = asset_entry
+        if assets:
+            entry["icon_assets"] = assets
         state[name] = entry
     return state
 
@@ -418,8 +464,8 @@ def collect_state(*, home: Path, profile: str) -> dict[str, Any]:
         "policy_hashes": policy_hashes(),
         "runtime_hosts": _runtime_versions(bin_dir),
         "pinned_source_tools": _pinned_source_tool_versions(bin_dir),
-        "user_tools": _user_tool_state(bin_dir),
-        "desktop_entries": _desktop_entry_state(applications_dir),
+        "user_tools": _user_tool_state(bin_dir, home),
+        "desktop_entries": _desktop_entry_state(home),
     }
 
 
@@ -452,6 +498,8 @@ def load_receipt(path: Path, *, metadata_only: bool = False) -> dict[str, Any]:
         fail("device receipt payload digest changed")
     if data.get("schema") != SCHEMA or data.get("owner") != OWNER:
         fail("device receipt ownership/schema is wrong")
+    if metadata_only:
+        return data
     return data
 
 
@@ -545,6 +593,14 @@ def _verify_contract_versions(state: dict[str, Any], *, profile: str = "desktop"
                 drifts.append(f"{name}: absent (contract declares {declared})")
             elif installed != declared:
                 drifts.append(f"{name}: installed {installed} != contract {declared}")
+            if (
+                spec.get("external_updater_policy_target")
+                and installed_user_tools.get(name, {}).get(
+                    "external_updater_policy_valid"
+                )
+                is not True
+            ):
+                drifts.append(f"{name}: external updater policy is absent or divergent")
 
     if drifts:
         fail("device drifts from contract:\n  " + "\n  ".join(drifts))

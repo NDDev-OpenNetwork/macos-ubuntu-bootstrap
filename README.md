@@ -74,25 +74,20 @@ mode. macOS does not support the server profile.
 
 ## Active Catalog
 
-| CLI | Managed version |
-| --- | --- |
-| Claude Code | `2.1.206` |
-| Codex | `0.144.1` |
-| OpenCode | `1.17.18` |
-| MiMoCode | `0.1.5` |
-| Antigravity (`agy`) | exact `1.1.1`, self-update disabled |
+The bootstrap installs exactly one harness (`codex`) under a one-owner-per-harness
+policy. Other harnesses (Claude Code, ZCode, OpenCode, etc.) are delegated to
+their respective owner modules and are not installed or version-pinned here.
 
-The exact sources of truth are `config/rldyour-contract.json`,
-`scripts/macos/install.sh`, and `scripts/ubuntu/install.sh`.
+| Harness | Role | Module commit |
+| --- | --- | --- |
+| Codex | active (installed) | `nddev-codex-app` @ `a69d77f1c62b5e02cdd9b886c412a53cee92e24a` |
+| ZCode | delegated (not installed) | owned by `nddev-harnesses` |
 
-Claude's managed launcher and shell environment set both
-`DISABLE_AUTOUPDATER=1` and `DISABLE_UPDATES=1`; Antigravity sets
-`AGY_CLI_DISABLE_AUTO_UPDATE=true`. Exact runtime pins therefore remain under
-repository control instead of drifting through a background or manual updater.
-The Codex launcher executes the lock-installed platform-native binary directly
-and removes inherited npm/Bun/pnpm provenance. This preserves bundled Codex
-resources while preventing diagnostics or update actions from targeting an
-unrelated global package-manager prefix.
+The source of truth is `config/rldyour-contract.json` (`harnesses.active` and
+`harnesses.delegated`). The Codex launcher executes the lock-installed
+platform-native binary directly and removes inherited npm/Bun/pnpm provenance.
+This preserves bundled Codex resources while preventing diagnostics or update
+actions from targeting an unrelated global package-manager prefix.
 
 ## Native Boundaries
 
@@ -146,6 +141,17 @@ The same apply command is the supported update and repair path: it revalidates
 owned receipts, preserves unmanaged or user-modified state, and changes only
 missing or contract-divergent managed artifacts. The `ry-repair` workflow must
 use these repository entry points rather than reproducing installation logic.
+
+On Ubuntu the persistent headless CloakBrowser service is isolated from the
+desktop session D-Bus. This preserves pre-login CDP availability under systemd
+linger without starting GUI portal or keyring backends before GNOME is ready.
+The Ubuntu desktop overlay also keeps the pinned Telegram portable binary from
+self-updating through a managed `externalupdater.d` policy and launches its Qt
+UI through XCB/XWayland, which is the stable backend on the estate's NVIDIA
+Wayland workstation. Since Telegram skips its built-in Linux desktop
+integration whenever that updater policy is active, bootstrap owns the
+upstream `org.telegram.desktop.desktop` launcher and installs the SHA-256-pinned
+application and symbolic tray icons from the matching Telegram source commit.
 
 Run the full Ubuntu bootstrap while logged in as the non-root developer account
 that will own `~/.local`, AI configuration, and the CloakBrowser user service;

@@ -177,6 +177,11 @@ jobs:
       artifact-metadata: write   # actions/attest artifact storage record (required at v4.1.1)
     uses: NDDev-it-com/ci-workflows/.github/workflows/release-supply-chain.yml@7f69c724923d06b2c2057c5a6ad341c37f1a8995 # 0.13.3
     with:
+      # Public repo: pull_request runs untrusted fork code. Pin the hosted runner
+      # explicitly — several ci-workflows reusables now default `runner` to the
+      # self-hosted `amsterdam` label, so inheriting the default on a pin bump
+      # would put fork PRs on trusted private infrastructure.
+      runner: ubuntu-latest
       version: ${{ needs.resolve.outputs.version }}
       package_name: macos-ubuntu-bootstrap
       archive_paths: "README.md LICENSE NOTICE SECURITY.md VERSION CHANGELOG.md AGENTS.md .claude .github config scripts templates docs"

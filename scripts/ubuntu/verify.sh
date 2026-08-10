@@ -77,6 +77,56 @@ rldyour::ubuntu_verify::tool_host_provenance() {
   rldyour::log "ok" "Ubuntu Node.js, uv, and Bun receipts and managed links verified"
 }
 
+rldyour::ubuntu_verify::telegram_policy() {
+  local launcher="$HOME/.local/bin/telegram-desktop"
+  local namespace="$HOME/.local/share/rldyour/telegram"
+  local policy="$HOME/.local/share/TelegramDesktop/externalupdater.d/macos-ubuntu-bootstrap"
+  local marker="# Managed by macos-ubuntu-bootstrap: telegram-external-updater-v1"
+  local desktop_id="org.telegram.desktop.desktop"
+  local desktop_entry="$HOME/.local/share/applications/$desktop_id"
+  local resolved row expected asset actual candidate
+  local -a icon_assets=(
+    "3fb1400c7dc9bbc3b5cb3ffedcbf4a9b09c53e28b57a7ff33a8a6b9048864090;$HOME/.local/share/icons/hicolor/256x256/apps/org.telegram.desktop.png"
+    "a93380f2c7e6aae4d5fde8940020bd966e97ad8c4880f45c016edfef3f5193e1;$HOME/.local/share/icons/hicolor/symbolic/apps/org.telegram.desktop-symbolic.svg"
+    "2b67ee19839dbbb9f57f2d7433fd6dc1059634d6d081c5e4c422c14f53fcfcc7;$HOME/.local/share/icons/hicolor/symbolic/apps/org.telegram.desktop-attention-symbolic.svg"
+    "efa1439bd60b58db7b755f5d21be854ea686a0e1e2f1aa6e43bf35c083ee72fc;$HOME/.local/share/icons/hicolor/symbolic/apps/org.telegram.desktop-mute-symbolic.svg"
+  )
+
+  [ -L "$launcher" ] && [ -x "$launcher" ] || return 1
+  case "$(readlink "$launcher")" in
+    "$namespace"/*) ;;
+    *) return 1 ;;
+  esac
+  resolved="$(readlink -f -- "$launcher")" || return 1
+  [ -f "$policy" ] && [ ! -L "$policy" ] || return 1
+  [ "$(wc -l <"$policy")" -eq 3 ] || return 1
+  [ "$(grep -Fxc "$marker" "$policy")" -eq 1 ] || return 1
+  [ "$(grep -Fxc "$launcher" "$policy")" -eq 1 ] || return 1
+  [ "$(grep -Fxc "$resolved" "$policy")" -eq 1 ] || return 1
+
+  if [ "$GUI_ENABLED" -eq 1 ]; then
+    [ -f "$desktop_entry" ] && [ ! -L "$desktop_entry" ] || return 1
+    cmp -s "$REPO_ROOT/templates/desktop/org.telegram.desktop.desktop" "$desktop_entry" || return 1
+    [ ! -e "$HOME/.local/share/applications/telegram.desktop" ] &&
+      [ ! -L "$HOME/.local/share/applications/telegram.desktop" ] || return 1
+    for row in "${icon_assets[@]}"; do
+      IFS=';' read -r expected asset <<<"$row"
+      [ -f "$asset" ] && [ ! -L "$asset" ] || return 1
+      actual="$(rldyour::sha256_file "$asset")" || return 1
+      [ "$actual" = "$expected" ] || return 1
+    done
+    for candidate in \
+      "$HOME/.local/share/applications"/org.telegram.desktop._*.desktop \
+      "$HOME/.local/share/dbus-1/services"/org.telegram.desktop._*.service; do
+      [ ! -e "$candidate" ] && [ ! -L "$candidate" ] || return 1
+    done
+    if command -v xdg-mime >/dev/null 2>&1; then
+      [ "$(xdg-mime query default x-scheme-handler/tg)" = "$desktop_id" ] || return 1
+      [ "$(xdg-mime query default x-scheme-handler/tonsite)" = "$desktop_id" ] || return 1
+    fi
+  fi
+}
+
 STRICT=0
 PROFILE="${RLDYOUR_PROFILE:-server}"
 GUI_ENABLED="${RLDYOUR_GUI_ENABLED:-0}"
@@ -146,6 +196,10 @@ if [ "$PROFILE" != "server" ]; then
   # failed install must not stay invisible.
   rldyour::require_cmd herdr required
   rldyour::require_cmd telegram-desktop required
+  rldyour::ubuntu_verify::telegram_policy || {
+    rldyour::log "missing" "Telegram updater isolation and XCB launcher contract"
+    exit 1
+  }
   # cmake-language-server ships in PYTHON_SOURCE_TOOLS but was never verified,
   # so a failed install stayed invisible on Ubuntu while macOS gated on it.
   rldyour::require_cmd cmake-language-server required

@@ -4,6 +4,63 @@ All notable changes to this module will be documented in this file.
 
 ## [Unreleased]
 
+### Added
+
+- Source/LSP-only desktops can invoke builds and tests on a separately
+  provisioned server through `scripts/remote-exec.sh`. The handoff requires
+  clean local and remote worktrees at the same exact Git commit and transfers
+  neither workspace files nor credentials.
+
+### Changed
+
+- ZCode remains in the catalogue but is explicitly `on-pause`; bootstrap does
+  not install, start, verify, authenticate, remove, or adopt it.
+
+### Fixed
+
+- **Persistent Linux CloakBrowser no longer poisons the desktop portal before
+  login.** The systemd-user unit now pins
+  `DBUS_SESSION_BUS_ADDRESS=disabled:`, preserving the mandatory pre-login CDP
+  endpoint under user lingering while preventing headless Chromium from
+  activating GUI portal/keyring backends before GNOME exports its display
+  environment. This fixes later Qt applications, including Telegram Desktop,
+  stalling against a portal instance that started without a display.
+- **Telegram Desktop now stays reproducible and opens on the NVIDIA Wayland
+  workstation.** Bootstrap publishes Telegram's supported
+  `externalupdater.d` policy for both the managed launcher and its resolved
+  receipt-bound binary, preventing the portable executable from replacing
+  itself after install. The managed desktop entry launches Qt through XCB on
+  XWayland and explicitly disables D-Bus activation, avoiding the observed
+  NVIDIA Wayland `EGL_BAD_MATCH` no-window startup. Recognized path-hashed
+  launchers/services are retired to a recoverable backup, while MIME handlers
+  and an existing GNOME favorite migrate to the upstream App ID
+  `org.telegram.desktop`. Because updater isolation also disables Telegram's
+  own `InstallLauncher()`, bootstrap installs the exact v7.0.7 application and
+  symbolic tray icons from upstream commit `ee93b401`, verifies all four
+  SHA-256 digests, and refreshes the user icon-theme cache. Favorite migration
+  happens before legacy files are archived so GNOME cannot silently drop the
+  dock item during the handoff. Device receipt collection now uses an explicit
+  non-executing presence probe for Telegram instead of launching the GUI with
+  an unsupported `--version` flag.
+- **Mandatory browser repair now runs before optional user tools.** A preserved
+  unmanaged tool can still fail the apply, but no longer prevents the mandatory
+  CDP/portal layer from being repaired. The user-tool loop attempts every entry
+  before returning an aggregate failure, so an unmanaged herdr does not strand
+  Telegram's independent migration.
+
+### Tests
+
+- The browser contract, static bootstrap checks, installed-runtime verifier,
+  and live health wrapper now require the Linux session-bus isolation; a
+  managed unit missing it fails closed.
+- Telegram policy tests cover exact updater-disable paths, idempotence,
+  preservation of unmanaged policy files, dry-run behavior, and the XCB desktop
+  contract, official desktop/icon identity, pinned asset parity, managed-v1
+  migration, favorite-before-retirement ordering, recoverable retirement of
+  generated integrations, and independent user-tool attempts. Ubuntu
+  verification rejects missing or divergent launchers, handlers, and icon
+  assets; the device receipt tracks those assets for later drift.
+
 ## [2.6.1] - 2026-08-05
 
 ### Fixed

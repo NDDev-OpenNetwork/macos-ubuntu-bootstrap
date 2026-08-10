@@ -159,6 +159,7 @@ def test_active_harness_set_is_only_codex() -> None:
     # The delegation stays declared, so it reads as a decision, not an omission.
     delegated = harnesses["delegated"]
     assert delegated["zcode"]["owner_repo"] == "nddev-harnesses"
+    assert delegated["zcode"]["work_policy"] == "on-pause"
     assert delegated["zcode"]["reason"]
     assert "zcode" not in harnesses["active"]
 
@@ -199,10 +200,11 @@ def test_harness_delegation_wires_exact_module_commands() -> None:
     assert 'python3 "$module/$entry" install-cli --target "$target"' in common
     assert 'python3 "$module/$entry" apply --setup "$setup" --target "$target"' in common
     assert 'python3 "$module/$entry" install-builder --target "$target"' in common
-    # Codex module entrypoint and safe-by-default setup.
+    # Codex module entrypoint and owner-selected full-auto setup.
     assert 'entry="cli-tools/nddev_codex.py"' in common
-    assert 'setup="safe"' in common
-    assert "RLDYOUR_CODEX_FULL_AUTO" in common
+    assert 'setup="full-auto"' in common
+    assert 'setup="safe"' not in common
+    assert "RLDYOUR_CODEX_FULL_AUTO" not in common
     # ADR 0006: the zcode delegation is removed outright rather than softened into
     # a warn-and-continue step, which would be exactly the best-effort fallback
     # this repository forbids. No zcode installer may come back here.
@@ -379,6 +381,7 @@ def test_browser_stack_is_mandatory_and_fixed_to_cloak() -> None:
         "provider": "cloakbrowser",
         "cloakbrowser": "0.4.12",
         "cdp_endpoint": "http://127.0.0.1:9222",
+        "linux_service_dbus_address": "disabled:",
         "fallback_allowed": False,
         "chrome_devtools_mcp": "1.6.0",
         "playwright_cli": "0.1.17",
@@ -439,6 +442,8 @@ def test_browser_fail_closed_regressions_are_guarded() -> None:
     assert "retired by the fail-closed browser policy" in common
     assert "exit 78" in common
     assert "MainPID" in common
+    assert "Environment=DBUS_SESSION_BUS_ADDRESS=disabled:" in common
+    assert "managed systemd service must disable the session D-Bus" in common
     assert "fixed CDP listener is not owned by the managed service PID" in common
     assert "service executable is not the verified CloakBrowser binary" in common
     assert "browser provider executable smoke check failed" in common
@@ -662,7 +667,7 @@ def test_auth_handoff_contains_all_manual_boundaries() -> None:
         "codex login --device-auth",
         "open ChatGPT.app",
         "open Codex.app",
-        "zcode.z.ai",
+        "ZCode remains catalogued but its work-policy is on-pause",
         "cloakbrowser-cdp-health",
         "Settings → Secrets and variables → Actions",
     ):

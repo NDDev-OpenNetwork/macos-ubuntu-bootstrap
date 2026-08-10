@@ -21,6 +21,7 @@ SCHEMA = "rldyour-browser-runtime-receipt-v1"
 BOOTSTRAP_VERSION = "1.0.0"
 MARKER = "# Managed by macos-ubuntu-bootstrap: browser-stack-v1"
 ENDPOINT = "http://127.0.0.1:9222"
+LINUX_SERVICE_DBUS_ADDRESS = "disabled:"
 CHROME_VERSION = "1.6.0"
 PLAYWRIGHT_VERSION = "0.1.17"
 CLOAK_VERSION = "0.4.12"
@@ -244,6 +245,11 @@ def require_exact_wrapper_contract(
         for line in health_lines
     ):
         fail("Cloak health wrapper lacks listener ownership enforcement")
+    if not any(
+        "managed systemd service must disable the session D-Bus" in line
+        for line in health_lines
+    ):
+        fail("Cloak health wrapper lacks systemd session-bus isolation enforcement")
 
     chrome_lines = exact_lines(Path(wrappers["chrome-devtools-mcp"]["path"]))
     for required in (
@@ -309,6 +315,7 @@ def validate_contract() -> None:
         "provider": "cloakbrowser",
         "cloakbrowser": CLOAK_VERSION,
         "cdp_endpoint": ENDPOINT,
+        "linux_service_dbus_address": LINUX_SERVICE_DBUS_ADDRESS,
         "fallback_allowed": False,
         "chrome_devtools_mcp": CHROME_VERSION,
         "playwright_cli": PLAYWRIGHT_VERSION,
@@ -498,6 +505,10 @@ def collect_state(
         else MARKER
     )
     require_marker(service_lines, service_marker, service_file)
+    if platform.system() != "Darwin" and service_lines.count(
+        f"Environment=DBUS_SESSION_BUS_ADDRESS={LINUX_SERVICE_DBUS_ADDRESS}"
+    ) != 1:
+        fail("CloakBrowser systemd service is not isolated from the desktop session bus")
 
     if run_health:
         env = os.environ.copy()

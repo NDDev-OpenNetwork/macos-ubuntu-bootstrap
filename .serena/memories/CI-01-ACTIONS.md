@@ -1,7 +1,7 @@
 <!-- Memory Metadata
-Last updated: 2026-08-04
-Last verified: 2026-08-04
-Last commit: 47b1b549bb55830f839834ef33bac41a5f278a69 feat(rtk)!: remove rtk from the bootstrap (2.4.0)
+Last updated: 2026-08-10
+Last verified: 2026-08-10
+Last commit: e672a49 docs(ci): record that codeql.yml is inert and the mode is default
 Scope: GitHub Actions and local CI policy
 Area: CI
 -->
@@ -16,16 +16,23 @@ GitHub Actions and local CI policy
 - `path:README.md`
 
 ## Last verified
-- date: 2026-07-10
-- commit: `25e5b7bbf07ca90192022ac8fb9f300d443b9410`
-- checked by: Codex final consistency sync
+- date: 2026-08-10
+- commit: `e672a49`
+- checked by: Claude review-driven runner-selection sync
 
 ## Facts
 - Local lint, validation, and pytest entrypoints mirror the hosted bootstrap gate; release publication remains exact-tag and immutable.
+- Every caller of a `ci-workflows` reusable that exposes a `runner` input passes `runner: ubuntu-latest` explicitly, in all eight callers: `actionlint`, `docs-quality`, `osv-scan`, `pytest`, `release`, `secret-scan`, `semgrep`, `zizmor`. This repository is public, so `pull_request` executes untrusted fork code; the reusable's `runner` default is a property of the pinned commit, and on current `ci-workflows` main 39 of 46 reusables default it to the estate's self-hosted `amsterdam` label. At the pin in use (`7f69c724923d06b2c2057c5a6ad341c37f1a8995`) all eight still default to `ubuntu-latest`, so the explicit value is currently a no-op and becomes load-bearing on the next pin bump. Dependabot groups `github-actions` with `patterns: ['*']` weekly, so that bump is routine and carries no diff here to review.
+- `ci-workflows` enforces the same rule through `scripts/check_workflow_contracts.py`, but only for its own self-calls; nothing extends it to external consumers, so the constraint lives in this repository's `AGENTS.md` and `.claude/CLAUDE.md`.
+- CodeQL mode is `default`. Code scanning runs through CodeQL default setup, configured 2026-07-31 for `actions` and `python` on a weekly schedule. The tracked advanced-setup workflow `.github/workflows/codeql.yml` is **inert**: the platform reports `state: disabled_manually`, its last run was 2026-07-03, and every recorded run failed. The file is retained for a possible switch back and now carries a header saying so. A committed workflow file is not evidence that it executes — verify with `GET /repos/{owner}/{repo}/actions/workflows`. Exactly one CodeQL mode is intended at a time; re-enabling the workflow requires disabling default setup first, because security-configuration attachment is atomic per repository.
 
 ## Evidence
 - `commit:25e5b7bbf07ca90192022ac8fb9f300d443b9410`
+- `commit:69679c8` fix(ci): select the hosted runner explicitly in ci-workflows callers
+- `commit:8abda12` docs(agents): record the explicit-runner rule for public callers
 - `path:.github/workflows`
+- `path:AGENTS.md`
+- `path:.claude/CLAUDE.md`
 - `path:README.md`
 
 ## Known pitfalls

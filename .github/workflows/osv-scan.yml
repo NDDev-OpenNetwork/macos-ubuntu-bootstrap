@@ -22,4 +22,9 @@ jobs:
       contents: read
     uses: NDDev-it-com/ci-workflows/.github/workflows/osv-scan.yml@7f69c724923d06b2c2057c5a6ad341c37f1a8995 # 0.13.3
     with:
+      # Public repo: pull_request runs untrusted fork code. Pin the hosted runner
+      # explicitly — several ci-workflows reusables now default `runner` to the
+      # self-hosted `amsterdam` label, so inheriting the default on a pin bump
+      # would put fork PRs on trusted private infrastructure.
+      runner: ubuntu-latest
       scan_args: '--recursive .'

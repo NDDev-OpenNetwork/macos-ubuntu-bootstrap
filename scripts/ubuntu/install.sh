@@ -87,10 +87,12 @@ CARAPACE_SHA256_X64="35ab52bfe7bdd8296d90c3687660bde80497599badde840ab615d2f421f
 CARAPACE_SHA256_ARM64="b2456cb09d77004db87de2567d6d7588a61ceb4724522c463e2b1c1f87b4d4b9"
 
 APT_SOURCE_PACKAGES=(
-  build-essential ca-certificates curl gpg gnupg git jq python3 python3-venv
+  ca-certificates curl gpg gnupg git jq python3 python3-venv
   shellcheck shfmt clangd zsh unzip xz-utils wget zip lsb-release yamllint
   fd-find bat fzf zoxide tmux btop duf hexyl gh ripgrep httpie miller
 )
+
+APT_DESKTOP_BUILD_PACKAGES=(build-essential)
 
 # Runtime libraries/fonts from the CloakBrowser v0.4.12 upstream Linux image.
 # They support the mandatory downloaded Chromium binary; they are not a stock
@@ -276,10 +278,9 @@ install_apt_baseline() {
   rldyour::ubuntu::as_root apt-get update
   apt_install software-properties-common \
     "${APT_SOURCE_PACKAGES[@]}" "${APT_CLOAK_RUNTIME_PACKAGES[@]}"
-  # The server profile is a container-execution host: project builds/tests run
-  # inside Docker, never on the host. It therefore installs no host build
-  # toolchain (build-essential, pkg-config, language SDKs). Docker Engine is
-  # provisioned separately by scripts/ubuntu/server.sh.
+  if [ "$PROFILE" != "server" ]; then
+    apt_install "${APT_DESKTOP_BUILD_PACKAGES[@]}"
+  fi
 }
 
 ensure_node_link() {

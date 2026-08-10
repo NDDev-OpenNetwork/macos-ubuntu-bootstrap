@@ -26,6 +26,7 @@ def test_remote_execution_requires_explicit_safe_target() -> None:
     assert run().returncode == 2
     assert run("--host", "build.example", "--remote-repo", "relative", "--", "true").returncode == 2
     assert run("--host", "bad host", "--remote-repo", "/srv/work", "--", "true").returncode == 2
+    assert run("--host", "-oProxyCommand=bad", "--remote-repo", "/srv/work", "--", "true").returncode == 2
 
 
 def test_remote_execution_has_no_eval_or_implicit_sync() -> None:
@@ -34,3 +35,5 @@ def test_remote_execution_has_no_eval_or_implicit_sync() -> None:
     assert "rsync" not in source
     assert "scp " not in source
     assert 'exec -- "$@"' in source
+    assert '[ -d "$repo/.git" ]' not in source
+    assert "rev-parse --is-inside-work-tree" in source

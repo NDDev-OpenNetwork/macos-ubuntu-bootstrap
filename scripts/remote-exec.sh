@@ -22,6 +22,7 @@ while [ "$#" -gt 0 ]; do
 done
 [ -n "$host" ] || { echo "--host is required" >&2; exit 2; }
 case "$host" in *[!A-Za-z0-9._@:-]*) echo "unsafe SSH destination" >&2; exit 2 ;; esac
+case "$host" in -*) echo "unsafe SSH destination" >&2; exit 2 ;; esac
 case "$remote_repo" in /*) ;; *) echo "--remote-repo must be absolute" >&2; exit 2 ;; esac
 [ "$#" -gt 0 ] || { echo "a command argv is required after --" >&2; exit 2; }
 
@@ -38,7 +39,10 @@ ssh -- "$host" bash -s -- "$remote_repo" "$head" "$@" <<'REMOTE'
 set -euo pipefail
 repo=$1 expected=$2
 shift 2
-[ -d "$repo/.git" ] || { echo "remote repository is unavailable: $repo" >&2; exit 4; }
+git -C "$repo" rev-parse --is-inside-work-tree >/dev/null 2>&1 || {
+  echo "remote repository is unavailable: $repo" >&2
+  exit 4
+}
 [ -z "$(git -C "$repo" status --porcelain)" ] || { echo "remote repository is dirty" >&2; exit 5; }
 actual="$(git -C "$repo" rev-parse HEAD)"
 [ "$actual" = "$expected" ] || {

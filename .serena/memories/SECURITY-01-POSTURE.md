@@ -1,6 +1,6 @@
 <!-- Memory Metadata
-Last updated: 2026-08-04
-Last verified: 2026-08-04
+Last updated: 2026-08-10
+Last verified: 2026-08-10
 Last commit: 47b1b549bb55830f839834ef33bac41a5f278a69 feat(rtk)!: remove rtk from the bootstrap (2.4.0)
 Scope: security posture and blocking/warning policy
 Area: SECURITY
@@ -15,12 +15,13 @@ security posture and blocking/warning policy
 - `path:README.md`
 
 ## Last verified
-- date: 2026-07-10
+- date: 2026-08-10
 - commit: `25e5b7bbf07ca90192022ac8fb9f300d443b9410`
 - checked by: Codex final consistency sync
 
 ## Facts
 - Downloads require repository-governed integrity evidence; credentials stay external, browser routing fails closed, and server hardening is explicit and validated.
+- CI trust boundary: this repository is public, so `pull_request` executes untrusted fork code, which must never reach the estate's trusted self-hosted runners. The control is an explicit `runner: ubuntu-latest` in every `ci-workflows` caller that accepts it, because the reusable's default belongs to the pinned commit rather than to this repository. See `mem:CI-01-ACTIONS` for the caller list and the pin-bump review step.
 
 ## Evidence
 - `commit:25e5b7bbf07ca90192022ac8fb9f300d443b9410`

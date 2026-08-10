@@ -602,11 +602,6 @@ rldyour::ubuntu::retire_telegram_generated_integrations() {
   local expected_name backup_root="" backup_dir=""
   local -a candidates=()
 
-  if [ ! -L "$launcher" ] || [ ! -x "$launcher" ]; then
-    rldyour::log "error" "managed Telegram launcher is unavailable during integration migration"
-    return 1
-  fi
-  resolved="$(readlink -f -- "$launcher")" || return 1
   for candidate in \
     "$HOME/.local/share/applications"/org.telegram.desktop._*.desktop \
     "$HOME/.local/share/dbus-1/services"/org.telegram.desktop._*.service; do
@@ -614,6 +609,16 @@ rldyour::ubuntu::retire_telegram_generated_integrations() {
     candidates+=("$candidate")
   done
   [ "${#candidates[@]}" -gt 0 ] || return 0
+
+  # A fresh plan has neither an installed launcher nor generated integrations.
+  # Discover candidates first so read-only planning never requires state that
+  # the corresponding apply has not created yet. If a candidate does exist,
+  # its provenance remains bound to the exact managed launcher below.
+  if [ ! -L "$launcher" ] || [ ! -x "$launcher" ]; then
+    rldyour::log "error" "managed Telegram launcher is unavailable during integration migration"
+    return 1
+  fi
+  resolved="$(readlink -f -- "$launcher")" || return 1
 
   for candidate in "${candidates[@]}"; do
     basename="$(basename "$candidate")"

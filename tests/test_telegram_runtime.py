@@ -84,10 +84,12 @@ def _run_desktop_assets(
     )
 
 
-def _run_retire_integrations(home: Path) -> subprocess.CompletedProcess[str]:
+def _run_retire_integrations(
+    home: Path, *, dry_run: bool = False
+) -> subprocess.CompletedProcess[str]:
     env = os.environ.copy()
     env["HOME"] = str(home)
-    env["RLDYOUR_DRY_RUN"] = "0"
+    env["RLDYOUR_DRY_RUN"] = "1" if dry_run else "0"
     env.pop("XDG_DATA_HOME", None)
     return subprocess.run(
         [
@@ -336,6 +338,12 @@ def test_generated_telegram_integrations_are_retired_recoverably(
     assert len(backup_dirs) == 1
     assert (backup_dirs[0] / desktop.name).is_file()
     assert (backup_dirs[0] / service.name).is_file()
+
+
+def test_fresh_dry_run_needs_no_installed_telegram_launcher(tmp_path: Path) -> None:
+    result = _run_retire_integrations(tmp_path, dry_run=True)
+    assert result.returncode == 0, result.stderr
+    assert "managed Telegram launcher is unavailable" not in result.stdout
 
 
 def test_divergent_generated_telegram_integration_is_preserved(

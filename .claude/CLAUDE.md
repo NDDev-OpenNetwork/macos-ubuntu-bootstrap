@@ -224,3 +224,11 @@ workflow.
 - Do not weaken mandatory checks into warnings or best-effort fallbacks.
 - Never commit secrets, browser profiles, traces, caches, runtime markers, or
   local authentication state.
+- **Keep `runner: ubuntu-latest` in every `ci-workflows` caller that accepts
+  it.** This repository is public, so `pull_request` runs untrusted fork code.
+  Several of those reusables default `runner` to the estate's self-hosted
+  `amsterdam` label, and the default belongs to the *pinned commit* — so
+  removing the explicit value would let a Dependabot pin bump silently move fork
+  PRs onto trusted private infrastructure, with nothing in this repository's
+  diff to catch it. On any pin bump, diff `inputs.runner.default` between the
+  old and new commit.

@@ -291,3 +291,11 @@ Docker runtime evidence that was not actually produced.
   immutable release publication.
 - Move any superproject gitlink only after this repository's changes are pushed
   and verified.
+- This repository is public, so `pull_request` executes untrusted fork code.
+  Every caller of a `ci-workflows` reusable that exposes a `runner` input must
+  pass `runner: ubuntu-latest` explicitly and keep it. Several of those
+  reusables default `runner` to the estate's self-hosted `amsterdam` label, and
+  a default belongs to the pinned commit — so dropping the explicit value would
+  let a routine Dependabot pin bump route fork PRs onto trusted private
+  infrastructure with no diff here to review. When reviewing a pin bump, diff
+  the reusable's `inputs.runner.default` between the old and new commit.

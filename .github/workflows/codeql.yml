@@ -1,3 +1,18 @@
+# INERT — this workflow does not run. CodeQL *default setup* owns code scanning
+# for this repository (configured 2026-07-31 for `actions` and `python`), and
+# enabling it disabled this advanced-setup workflow: the platform reports
+# `state: disabled_manually` for this file. Its last run was 2026-07-03 and
+# every recorded run failed.
+#
+# It is kept, not deleted, because default setup cannot express a pinned
+# reusable caller and switching back is a one-setting change. Nothing here can
+# tell you the file is disabled — check
+# `GET /repos/{owner}/{repo}/actions/workflows` before assuming a committed
+# workflow runs. Re-enabling it means disabling default setup first: attachment
+# is atomic, and forcing default setup onto a repository with an active
+# advanced setup fails the whole attachment.
+#
+# Exactly one CodeQL mode is intended at a time. The current mode is `default`.
 name: codeql-analysis
 
 on:

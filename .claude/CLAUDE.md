@@ -224,6 +224,13 @@ workflow.
 - Do not weaken mandatory checks into warnings or best-effort fallbacks.
 - Never commit secrets, browser profiles, traces, caches, runtime markers, or
   local authentication state.
+- **`.github/workflows/codeql.yml` does not run.** CodeQL *default setup* owns
+  code scanning here (configured 2026-07-31 for `actions` and `python`); the
+  tracked workflow is `disabled_manually` at the platform and last ran
+  2026-07-03, failing. It is kept for a possible switch back. A committed
+  workflow file is not evidence that it executes — check
+  `GET /repos/{owner}/{repo}/actions/workflows`. One CodeQL mode at a time:
+  re-enabling this file requires disabling default setup first.
 - **Keep `runner: ubuntu-latest` in every `ci-workflows` caller that accepts
   it.** This repository is public, so `pull_request` runs untrusted fork code.
   Several of those reusables default `runner` to the estate's self-hosted

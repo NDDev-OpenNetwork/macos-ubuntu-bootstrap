@@ -11,8 +11,8 @@
 # What it does (desktop profile only):
 #   1. GNOME dock: move to bottom, centered, macOS-style.
 #   2. Keyboard: add Russian layout with Alt+Shift toggle.
-#   3. Pinned .deb applications: BrowserOS and RustDesk.
-#   4. Google Chrome: install from the fingerprint-verified signed apt source.
+#   3. Google Chrome: install from the fingerprint-verified signed apt source.
+#   4. RustDesk: optional pinned .deb.
 #   5. Firefox: remove the stock snap+apt Firefox completely.
 #
 # Server profile (headless) skips this entirely.
@@ -27,9 +27,11 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 . "$SCRIPT_DIR/../lib/common.sh"
 
 # Desktop applications upstream publishes only as a .deb. One row per
-# application, one generic installer: BrowserOS and RustDesk have exactly the
-# same shape, and a second bespoke install path is how one of them quietly
-# stops being verified.
+# application, one generic installer: a second bespoke install path is how an
+# application quietly stops being verified. BrowserOS used to be here too and
+# was removed by owner decision when Google Chrome became the standard browser;
+# an already-installed copy is left alone, because bootstrap does not remove
+# what it no longer provisions.
 #
 # Row format (semicolon-separated, no spaces inside a field):
 #   name;package;url_x64;sha256_x64;url_arm64;sha256_arm64
@@ -39,7 +41,6 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # the application at all. Every digest below was confirmed by downloading the
 # artifact, not copied from a release note.
 DESKTOP_DEBS=(
-  "browseros;browseros;https://github.com/browseros-ai/BrowserOS/releases/download/v0.47.18/BrowserOS_v0.47.18_amd64.deb;bfdda9be19ab0ec69602156a5c8aba3bd163351ca89539ecfda2761596b4dc7b;;"
   "rustdesk;rustdesk;https://github.com/rustdesk/rustdesk/releases/download/1.4.9/rustdesk-1.4.9-x86_64.deb;7244ba47c40e804172044bfbe659467c54ce46554c98e78c8c0406f1d612fda3;https://github.com/rustdesk/rustdesk/releases/download/1.4.9/rustdesk-1.4.9-aarch64.deb;ce62c996f14d33f3bbe3a330e953644a44bace7f05885a7953f7395d69fb49c0"
 )
 
@@ -63,12 +64,13 @@ warn() { printf '\033[1;33m  ! %s\033[0m\n' "$*"; }
 die()  { printf '\033[1;31m  \u2717 %s\033[0m\n' "$*" >&2; exit 1; }
 
 # Steps whose failure makes the desktop layer wrong rather than merely
-# unstyled. BrowserOS is a contract-declared, SHA-256-pinned application and
-# the Firefox removal is a declared policy; the dock and keyboard layout are
-# cosmetic and legitimately unavailable on a session without the dash-to-dock
-# extension or xkb data. Required failures make the run fail.
-REQUIRED_STEPS=(browseros rustdesk google_chrome firefox_removal)
-OPTIONAL_STEPS=(gnome_dock russian_layout)
+# incomplete. Google Chrome is the estate's standard browser and the Firefox
+# removal is a declared policy, so both are required. RustDesk is a convenience
+# the owner asked to keep optional; the dock and keyboard layout are cosmetic
+# and legitimately unavailable on a session without the dash-to-dock extension
+# or xkb data. Only a required failure fails the run.
+REQUIRED_STEPS=(google_chrome firefox_removal)
+OPTIONAL_STEPS=(gnome_dock russian_layout rustdesk)
 
 # Populated by nddev::_record; read by the aggregate report.
 declare -A STEP_STATUS=()
@@ -105,7 +107,7 @@ nddev::desktop_configure() {
   command -v localectl >/dev/null || die "localectl missing (needs systemd)"
 
   if [ "${RLDYOUR_DRY_RUN:-1}" -eq 1 ]; then
-    rldyour::log "info" "[DRY-RUN] desktop customization: GNOME dock bottom, Russian layout, BrowserOS and RustDesk install, Google Chrome install, Firefox removal"
+    rldyour::log "info" "[DRY-RUN] desktop customization: GNOME dock bottom, Russian layout, Google Chrome install, optional RustDesk install, Firefox removal"
     return 0
   fi
 
@@ -116,9 +118,8 @@ nddev::desktop_configure() {
 
   nddev::_step gnome_dock nddev::_gnome_dock_bottom
   nddev::_step russian_layout nddev::_russian_keyboard_layout
-  nddev::_step browseros nddev::_install_desktop_deb browseros
-  nddev::_step rustdesk nddev::_install_desktop_deb rustdesk
   nddev::_step google_chrome nddev::_install_google_chrome
+  nddev::_step rustdesk nddev::_install_desktop_deb rustdesk
   nddev::_step firefox_removal nddev::_remove_firefox
 
   # Report the real outcome. Announcing "complete" unconditionally is what let

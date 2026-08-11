@@ -46,14 +46,14 @@ BASE_STUBS: dict[str, str] = {
 }
 
 
-# BrowserOS must be reported as absent so the step proceeds past its
+# The package must be reported as absent so the step proceeds past its
 # already-installed short circuit, and the download must fail so the test never
-# fetches the real package.
+# fetches the real artifact.
 # `dpkg --print-architecture` must answer here or the .deb step reports
 # `skipped` and the test loses its subject. The Chrome step then also attempts
 # and fails on a host without Chrome -- harmless, because what is asserted is
 # that BrowserOS failed and that the steps after it still ran.
-BROWSEROS_FAILS: dict[str, str] = {
+DEB_STEP_FAILS: dict[str, str] = {
     "dpkg": '[ "$1" = "--print-architecture" ] && { echo amd64; exit 0; }\nexit 1\n',
     "dpkg-query": "exit 1\n",
     "curl": "exit 1\n",
@@ -91,18 +91,19 @@ def test_all_required_steps_ok_reports_complete(tmp_path: Path) -> None:
     assert "desktop customization complete" in result.stdout
 
 
-def test_failed_browseros_does_not_skip_the_firefox_step(tmp_path: Path) -> None:
+def test_failed_deb_step_does_not_skip_the_firefox_step(tmp_path: Path) -> None:
     """The ``die``-inside-``||`` regression: later steps must still run."""
-    stubs = write_stubs(tmp_path / "bin", BROWSEROS_FAILS)
+    stubs = write_stubs(tmp_path / "bin", DEB_STEP_FAILS)
     result = run_desktop(stubs)
     combined = result.stdout + result.stderr
-    assert (stubs / "snap-ran").exists(), "Firefox removal never ran after BrowserOS failed"
-    assert "browseros: FAILED (required)" in combined
+    assert (stubs / "snap-ran").exists(), "Firefox removal never ran after the .deb step failed"
+    assert "rustdesk: failed (optional)" in combined
+    # google_chrome is required and also fails under these stubs.
     assert result.returncode != 0
 
 
 def test_required_failure_is_not_reported_as_complete(tmp_path: Path) -> None:
-    stubs = write_stubs(tmp_path / "bin", BROWSEROS_FAILS)
+    stubs = write_stubs(tmp_path / "bin", DEB_STEP_FAILS)
     result = run_desktop(stubs)
     combined = result.stdout + result.stderr
     assert "desktop customization incomplete" in combined
@@ -215,12 +216,13 @@ def test_installer_pins_the_same_fingerprint_as_the_contract() -> None:
     assert CHROME_FINGERPRINT in verify, "the verifier must gate on the same key"
 
 
-def test_chrome_is_a_required_desktop_step() -> None:
+def test_chrome_is_required_and_rustdesk_is_optional() -> None:
     source = DESKTOP.read_text(encoding="utf-8")
-    assert "REQUIRED_STEPS=(browseros rustdesk google_chrome firefox_removal)" in source
+    assert "REQUIRED_STEPS=(google_chrome firefox_removal)" in source
     body = source.split("nddev::desktop_configure() {", 1)[1]
-    assert body.index("nddev::_step browseros") < body.index("nddev::_step google_chrome")
     assert "nddev::_step rustdesk nddev::_install_desktop_deb rustdesk" in body
+    # RustDesk is a convenience the owner asked to keep optional.
+    assert "OPTIONAL_STEPS=(gnome_dock russian_layout rustdesk)" in source
 
 
 def _extract(function: str, path: Path) -> str:
@@ -323,7 +325,18 @@ def test_every_deb_application_goes_through_one_installer() -> None:
     assert "nddev::_install_browseros" not in source
     assert source.count("nddev::_install_desktop_deb()") == 1
     names = {row[0] for row in _deb_rows()}
-    assert names == {"browseros", "rustdesk"}
+    assert names == {"rustdesk"}
+    # BrowserOS was removed by owner decision when Chrome became the standard
+    # browser. What must not come back is the provisioning: no row, no step, no
+    # verifier requirement. The comment explaining the removal is expected to
+    # stay -- an assertion that bans the word would ban the rationale too.
+    assert "nddev::_step browseros" not in source
+    assert '"browseros;' not in source
+    verify = (ROOT / "scripts/ubuntu/verify.sh").read_text(encoding="utf-8")
+    assert "dpkg-query -W -f='${Status}' browseros" not in verify
+    # Nor is bootstrap responsible for removing an existing installation: it no
+    # longer provisions BrowserOS, which is not the same as owning its removal.
+    assert "purge browseros" not in verify and "remove browseros" not in source
 
 
 def test_every_deb_row_is_well_formed_and_digest_pinned() -> None:

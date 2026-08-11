@@ -13,6 +13,11 @@ All notable changes to this module will be documented in this file.
 
 ### Removed
 
+- **BrowserOS is no longer part of the standard desktop set.** Google Chrome
+  replaces it as the estate's standard browser, by owner decision. Bootstrap no
+  longer declares, installs or verifies BrowserOS — and deliberately does not
+  remove an existing installation either: it stopped provisioning the
+  application, which is not the same as owning its removal.
 - **The Open Design layer is gone.** `scripts/ubuntu/open-design.sh`, the
   `--install-open-design` flag, the `RLDYOUR_INSTALL_OPEN_DESIGN` env var, the
   `install_open_design_layer` step and the `open_design` contract block are all
@@ -68,15 +73,14 @@ All notable changes to this module will be documented in this file.
   managed PATH stays exactly what the contract declares. The table's comment now
   says what it is — pinned upstream CLI artifacts — instead of "source-analysis
   tools", which had not described `delta`, `yq` or `ast-grep` for some time.
-- **RustDesk `1.4.9` is provisioned, and every `.deb` application now goes
-  through one installer.** BrowserOS and RustDesk have identical shape, so
-  `DESKTOP_DEBS` is a table and `nddev::_install_desktop_deb` is the only path;
-  a second bespoke one is how an application quietly stops being verified.
-  RustDesk publishes both architectures, BrowserOS only amd64, so a row may
-  declare an arm64 pair or omit it — a half-declared architecture is rejected by
+- **RustDesk `1.4.9` is provisioned as an optional application.** It is
+  installed by default, but `requirement: optional` in the contract and
+  membership of `OPTIONAL_STEPS` mean its absence or a failed install is
+  reported and never fails the desktop layer. `.deb` applications go through a
+  single table-driven installer rather than a bespoke function each; a row may
+  declare an arm64 pair or omit it, a half-declared architecture is rejected by
   a test, and an absent one makes the step report `skipped` rather than fail a
-  device that cannot have the application at all. The BrowserOS contract entry
-  moved to the same per-architecture shape; one concept now has one shape.
+  device that cannot have the application at all.
 - `wl-clipboard` and `libsecret-tools` join the apt baseline. Both were already
   relied on by the live desktop and declared nowhere.
 - **One-owner-per-harness is now checkable on a device, not only asserted in

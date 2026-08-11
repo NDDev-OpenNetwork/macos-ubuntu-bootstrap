@@ -147,8 +147,11 @@ be committed.
 - macOS GUI: Ghostty, cmux, ChatGPT, and the separate Codex app.
 - Ubuntu GUI: no bootstrap-installed harness apps; the ZCode desktop app is
   installed by the `nddev-harnesses` repository. Desktop customization
-  (GNOME dock, Russian layout, BrowserOS install, Firefox removal) is owned by
-  `scripts/ubuntu/desktop.sh`.
+  (GNOME dock, Russian layout, Google Chrome install, optional RustDesk,
+  Firefox removal) is owned by `scripts/ubuntu/desktop.sh`. Google Chrome is the
+  standard browser and is pinned by signing-key fingerprint rather than by
+  version; BrowserOS was removed from the standard set by owner decision and an
+  already-installed copy is left alone.
 - Ubuntu server: no GUI applications.
 
 macOS GUI apply configures cmux non-interactively only for Codex. Do not replace

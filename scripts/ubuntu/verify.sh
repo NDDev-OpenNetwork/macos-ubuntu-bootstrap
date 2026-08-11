@@ -136,7 +136,7 @@ rldyour::ubuntu_verify::telegram_policy() {
 }
 
 # The desktop composer's required outcomes. Strict verification checked none of
-# them, so a desktop that never installed BrowserOS -- or that still carries the
+# them, so a desktop that never installed Chrome -- or that still carries the
 # Firefox this bootstrap is supposed to remove -- verified clean. The cosmetic
 # outcomes (dock position, keyboard layout) stay report-only: they depend on a
 # live GNOME session that a verification run does not necessarily have.
@@ -144,20 +144,12 @@ rldyour::ubuntu_verify::desktop_outcomes() {
   local failed=0
 
   if command -v dpkg-query >/dev/null 2>&1; then
-    if dpkg-query -W -f='${Status}' browseros 2>/dev/null |
-      command grep -q "install ok installed"; then
-      rldyour::log "ok" "BrowserOS installed"
-    else
-      rldyour::log "missing" "BrowserOS is declared in desktop_apps but not installed"
-      failed=1
-    fi
-
+    # RustDesk is an optional convenience: reported, never required.
     if dpkg-query -W -f='${Status}' rustdesk 2>/dev/null |
       command grep -q "install ok installed"; then
-      rldyour::log "ok" "RustDesk installed"
+      rldyour::log "ok" "RustDesk installed (optional)"
     else
-      rldyour::log "missing" "RustDesk is declared in desktop_apps but not installed"
-      failed=1
+      rldyour::log "warn" "RustDesk is not installed (optional)"
     fi
 
     if dpkg-query -W -f='${Status}' google-chrome-stable 2>/dev/null |

@@ -457,18 +457,6 @@
     ],
     "desktop_apps": [
       {
-        "_doc": "Agentic browser. Upstream publishes an amd64 .deb only; the absent arm64 entry is why the installer reports `skipped` rather than failing on that architecture.",
-        "name": "browseros",
-        "version": "0.47.18",
-        "deb_version": "148.0.7966.97",
-        "url": {
-          "x64": "https://github.com/browseros-ai/BrowserOS/releases/download/v0.47.18/BrowserOS_v0.47.18_amd64.deb"
-        },
-        "sha256": {
-          "x64": "bfdda9be19ab0ec69602156a5c8aba3bd163351ca89539ecfda2761596b4dc7b"
-        }
-      },
-      {
         "_doc": "Google Chrome is the estate's daily browser and the default handler for http/https on the Ubuntu desktop. It is the one deliberate exception to the pin-everything rule: `version_policy` tracks the stable channel rather than a SHA-256, because pinning a browser to an old build trades a real security liability for a reproducibility gain the estate does not need here. Supply-chain control comes from the signing key instead -- the primary fingerprint below is verified before the source is trusted, and it was confirmed against two independent sources (dl.google.com/linux/linux_signing_key.pub and the key embedded in the package's own /etc/cron.daily/google-chrome).",
         "name": "google-chrome-stable",
         "version_policy": "tracks-stable-channel",
@@ -486,8 +474,9 @@
         }
       },
       {
-        "_doc": "Remote desktop used across the estate. Upstream publishes no apt repository, only per-architecture .deb releases, so it follows the same pinned-artifact contract as BrowserOS: exact version, per-architecture SHA-256 confirmed by download.",
+        "_doc": "Remote desktop used across the estate. Upstream publishes no apt repository, only per-architecture .deb releases, so it carries an exact version and a per-architecture SHA-256 confirmed by download. `requirement: optional` by owner decision: it is installed by default but its absence or a failed install never fails the desktop layer.",
         "name": "rustdesk",
+        "requirement": "optional",
         "version": "1.4.9",
         "sha256": {
           "x64": "7244ba47c40e804172044bfbe659467c54ce46554c98e78c8c0406f1d612fda3",

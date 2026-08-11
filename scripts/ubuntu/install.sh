@@ -1432,6 +1432,11 @@ install_ai_runtimes() {
   rldyour::install_selected_harnesses
 }
 
+# Set by install_gui_apps when a required desktop step failed. Reported at the
+# end of main so a cosmetic-looking layer cannot strand the layers behind it,
+# and cannot report success either.
+GUI_LAYER_FAILED=0
+
 install_gui_apps() {
   if [ "$PROFILE" = "server" ] || [ "$GUI_ENABLED" -ne 1 ]; then
     rldyour::log "info" "GUI application layer disabled"
@@ -1447,7 +1452,14 @@ install_gui_apps() {
   local desktop_script
   desktop_script="$(dirname "${BASH_SOURCE[0]}")/desktop.sh"
   if [ -f "$desktop_script" ]; then
-    rldyour::run bash "$desktop_script" || rldyour::log "warn" "desktop customization reported issues (non-fatal)"
+    # desktop.sh now distinguishes a cosmetic step from a required one and
+    # returns non-zero only for the latter. Swallowing that into a warning is
+    # what let a desktop missing BrowserOS, or still carrying Firefox, report a
+    # successful apply and then pass strict verification.
+    if ! rldyour::run bash "$desktop_script"; then
+      GUI_LAYER_FAILED=1
+      rldyour::log "error" "desktop customization failed a required step"
+    fi
   fi
 }
 
@@ -1591,6 +1603,10 @@ main() {
   # verify.sh requires. Ordering it last keeps the failure fatal, which it must be,
   # while making it fatal to itself instead of to the whole device.
   [ "$SKIP_AI" -eq 1 ] || install_ai_runtimes
+  if [ "$GUI_LAYER_FAILED" -ne 0 ]; then
+    rldyour::log "error" "desktop customization failed a required step; every other layer was still attempted"
+    return 1
+  fi
   verify_apply
   rldyour::log "info" "Run 'bash scripts/auth-handoff.sh' for user-controlled sign-in steps."
 }

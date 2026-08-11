@@ -127,6 +127,56 @@ rldyour::ubuntu_verify::telegram_policy() {
   fi
 }
 
+# The desktop composer's required outcomes. Strict verification checked none of
+# them, so a desktop that never installed BrowserOS -- or that still carries the
+# Firefox this bootstrap is supposed to remove -- verified clean. The cosmetic
+# outcomes (dock position, keyboard layout) stay report-only: they depend on a
+# live GNOME session that a verification run does not necessarily have.
+rldyour::ubuntu_verify::desktop_outcomes() {
+  local failed=0
+
+  if command -v dpkg-query >/dev/null 2>&1; then
+    if dpkg-query -W -f='${Status}' browseros 2>/dev/null |
+      command grep -q "install ok installed"; then
+      rldyour::log "ok" "BrowserOS installed"
+    else
+      rldyour::log "missing" "BrowserOS is declared in desktop_apps but not installed"
+      failed=1
+    fi
+
+    if dpkg -l firefox 2>/dev/null | command grep -q '^ii'; then
+      rldyour::log "missing" "apt Firefox is still present; the desktop layer must remove it"
+      failed=1
+    else
+      rldyour::log "ok" "apt Firefox absent"
+    fi
+  fi
+
+  if command -v snap >/dev/null 2>&1; then
+    if snap list firefox >/dev/null 2>&1; then
+      rldyour::log "missing" "snap Firefox is still present; the desktop layer must remove it"
+      failed=1
+    else
+      rldyour::log "ok" "snap Firefox absent"
+    fi
+  fi
+
+  # Report-only: absence here is a cosmetic gap, not a wrong device. Probe the
+  # source a GNOME session actually reads. `localectl` reports the system X11
+  # keymap, which a Wayland session ignores entirely -- checking only that is
+  # how a desktop with no usable Russian layout still looked configured.
+  if command -v gsettings >/dev/null 2>&1; then
+    if gsettings get org.gnome.desktop.input-sources sources 2>/dev/null |
+      command grep -q "'ru'"; then
+      rldyour::log "ok" "GNOME input sources include ru"
+    else
+      rldyour::log "warn" "GNOME input sources do not include ru"
+    fi
+  fi
+
+  return "$failed"
+}
+
 STRICT=0
 PROFILE="${RLDYOUR_PROFILE:-server}"
 GUI_ENABLED="${RLDYOUR_GUI_ENABLED:-0}"
@@ -248,9 +298,16 @@ if [ "$PROFILE" != "server" ]; then
   if [ "$GUI_ENABLED" -eq 1 ]; then
     # Harness desktop apps (e.g. ZCode via nddev-harnesses) are owned and
     # verified by their own repositories; this bootstrap installs no GUI harness
-    # package to check here. BrowserOS and the Firefox removal are desktop
-    # customization owned by desktop.sh, which reports its own result.
+    # package to check here.
     rldyour::log "ok" "desktop GUI harness apps are owned by their own repositories"
+    # "desktop.sh reports its own result" was the reason this block checked
+    # nothing -- while desktop.sh reported success unconditionally. Verify the
+    # outcomes here too: an apply-time report and an independent verification
+    # are not the same evidence.
+    rldyour::ubuntu_verify::desktop_outcomes || {
+      rldyour::log "missing" "required Ubuntu desktop customization outcomes"
+      exit 1
+    }
   fi
 else
   args=(--docker-mode "$DOCKER_MODE")

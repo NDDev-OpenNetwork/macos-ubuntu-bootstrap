@@ -30,6 +30,30 @@ All notable changes to this module will be documented in this file.
   repository path is charset-validated like the SSH destination was, and each
   local dirty state (unstaged, staged, untracked) now fails with its own reason
   instead of exiting silently.
+- **Ubuntu desktop customization reports what actually happened.** The composer
+  ran four `step || warn` lines and then printed "desktop customization
+  complete" unconditionally, so a desktop missing BrowserOS or still carrying
+  Firefox reported a successful apply. One of those steps did not even warn:
+  `_install_browseros` ended in `die`, which is `exit 1`, and `exit` inside a
+  function on the left of `||` terminates the whole script — a failed BrowserOS
+  install silently skipped the Firefox removal that was supposed to be
+  independent of it. Steps now return instead of exiting, each outcome is
+  recorded as ok/skipped/failed, and the run fails when a *required* step
+  (BrowserOS, Firefox removal) failed while cosmetic ones (dock, keyboard) only
+  warn. `install.sh` surfaces that result at the end of `main`, so the layer can
+  neither report false success nor strand the layers behind it.
+- **The Russian layout is now applied where a GNOME session reads it.**
+  `_russian_keyboard_layout` set only the system X11 keymap through `localectl`,
+  which a Wayland session ignores. The estate's own desktop showed
+  `X11 Layout: us` while the layout that worked had been added by hand in GNOME
+  Settings — a fresh device would have had no Russian layout at all. Bootstrap
+  now also appends `('xkb', 'ru')` to `org.gnome.desktop.input-sources`,
+  preserving the owner's existing entries and order, and verification probes
+  that list rather than `localectl`.
+- **Strict Ubuntu verification checks the desktop outcomes.** BrowserOS
+  installed and Firefox absent (snap and apt) are now required on a GUI desktop;
+  the keyboard layout is reported. The block previously deferred to "desktop.sh
+  reports its own result" — while desktop.sh reported success unconditionally.
 - **Replacing the device receipt is now a transaction, and an unverifiable
   receipt is no longer consumed silently.** `build` decided ownership from the
   receipt's `schema` and `owner` alone — never its canonical form, payload
@@ -76,6 +100,17 @@ All notable changes to this module will be documented in this file.
 
 ### Tests
 
+- `scripts/ci/lint.sh` discovers every owned shell script instead of carrying a
+  hand-maintained list. The list had silently skipped `scripts/ubuntu/desktop.sh`
+  and `scripts/ubuntu/open-design.sh` since the day each was added, and would
+  have skipped `scripts/remote-exec.sh` too; discovery immediately surfaced four
+  real shellcheck findings in `desktop.sh`, one of them the `&& ok || die`
+  construct behind the skipped-Firefox-step defect. Coverage went from 12 files
+  to 15, and `EXCLUDED_PATHS` is empty on purpose.
+- Desktop customization has its own offline test module: per-step failure
+  injection proving later steps still run, required-versus-optional aggregation,
+  skipped preconditions, the installer wiring, and a `bash -n` check over every
+  discovered script. Seven of them fail against the previous implementation.
 - Device-receipt replacement is covered by fault injection: an edited payload,
   a non-canonical body, a symlink, a group-writable mode, a failing
   `collect_state`, and a failing `os.replace` must each leave the previous

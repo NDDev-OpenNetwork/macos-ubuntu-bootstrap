@@ -24,20 +24,34 @@ check_script() {
 check_cmd bash
 check_cmd shellcheck
 
-SCRIPT_PATHS=(
-  "$REPO_ROOT/scripts/bootstrap.sh"
-  "$REPO_ROOT/scripts/auth-handoff.sh"
-  "$REPO_ROOT/scripts/verify-browser-runtime.sh"
-  "$REPO_ROOT/scripts/lib/common.sh"
-  "$REPO_ROOT/scripts/macos/install.sh"
-  "$REPO_ROOT/scripts/macos/verify.sh"
-  "$REPO_ROOT/scripts/ubuntu/install.sh"
-  "$REPO_ROOT/scripts/ubuntu/server.sh"
-  "$REPO_ROOT/scripts/ubuntu/verify.sh"
-  "$REPO_ROOT/scripts/ubuntu/verify-server.sh"
-  "$REPO_ROOT/scripts/ci/lint.sh"
-  "$REPO_ROOT/scripts/ci/validate.sh"
+# Every owned shell file is checked. A hand-maintained allowlist silently
+# skipped scripts/ubuntu/desktop.sh and scripts/ubuntu/open-design.sh from the
+# day each was added, and would have skipped scripts/remote-exec.sh too: the
+# list is edited by whoever remembers, and a new file is exactly the case
+# nobody remembers. Discovery inverts that default.
+#
+# EXCLUDED_PATHS holds paths that are deliberately not checked. It is empty on
+# purpose -- add an entry only with the reason, never to silence a finding.
+EXCLUDED_PATHS=()
+
+mapfile -t SCRIPT_PATHS < <(
+  find "$REPO_ROOT/scripts" -type f -name '*.sh' -print | sort
 )
+if [ "${#SCRIPT_PATHS[@]}" -eq 0 ]; then
+  echo "no shell scripts discovered under $REPO_ROOT/scripts" >&2
+  exit 1
+fi
+
+filtered=()
+for script in "${SCRIPT_PATHS[@]}"; do
+  skip=0
+  for excluded in ${EXCLUDED_PATHS[@]+"${EXCLUDED_PATHS[@]}"}; do
+    [ "$script" = "$REPO_ROOT/$excluded" ] && skip=1 && break
+  done
+  [ "$skip" -eq 1 ] || filtered+=("$script")
+done
+SCRIPT_PATHS=("${filtered[@]}")
+printf 'linting %d shell scripts\n' "${#SCRIPT_PATHS[@]}"
 
 for script in "${SCRIPT_PATHS[@]}"; do
   check_script "$script"

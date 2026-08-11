@@ -20,9 +20,9 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-MODULE_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 
 # shellcheck source=../lib/common.sh
+# shellcheck disable=SC1091
 . "$SCRIPT_DIR/../lib/common.sh"
 
 BROWSEROS_DEB_URL="https://github.com/browseros-ai/BrowserOS/releases/download/v0.47.18/BrowserOS_v0.47.18_amd64.deb"
@@ -34,6 +34,42 @@ info() { printf '\033[1;34m==> %s\033[0m\n' "$*"; }
 ok()   { printf '\033[1;32m  \u2713 %s\033[0m\n' "$*"; }
 warn() { printf '\033[1;33m  ! %s\033[0m\n' "$*"; }
 die()  { printf '\033[1;31m  \u2717 %s\033[0m\n' "$*" >&2; exit 1; }
+
+# Steps whose failure makes the desktop layer wrong rather than merely
+# unstyled. BrowserOS is a contract-declared, SHA-256-pinned application and
+# the Firefox removal is a declared policy; the dock and keyboard layout are
+# cosmetic and legitimately unavailable on a session without the dash-to-dock
+# extension or xkb data. Required failures make the run fail.
+REQUIRED_STEPS=(browseros firefox_removal)
+OPTIONAL_STEPS=(gnome_dock russian_layout)
+
+# Populated by nddev::_record; read by the aggregate report.
+declare -A STEP_STATUS=()
+
+nddev::_record() {
+  STEP_STATUS["$1"]=$2
+}
+
+nddev::_is_required() {
+  local candidate
+  for candidate in "${REQUIRED_STEPS[@]}"; do
+    [ "$candidate" = "$1" ] && return 0
+  done
+  return 1
+}
+
+# Run one step, remember its outcome, and never let it abort the run. Steps
+# report `skipped` for a precondition they do not own (a missing GNOME
+# extension) and `failed` for work they attempted and could not finish.
+nddev::_step() {
+  local name=$1
+  shift
+  if "$@"; then
+    [ -n "${STEP_STATUS[$name]:-}" ] || nddev::_record "$name" ok
+  else
+    nddev::_record "$name" failed
+  fi
+}
 
 # ----------------------------- preflight -----------------------------
 nddev::desktop_configure() {
@@ -51,10 +87,40 @@ nddev::desktop_configure() {
   info "Authenticating sudo (will be refreshed as needed)"
   sudo -v || die "sudo authentication failed — cannot continue"
 
-  nddev::_gnome_dock_bottom || warn "GNOME dock step reported an error (continuing)"
-  nddev::_russian_keyboard_layout || warn "Russian keyboard step reported an error (continuing)"
-  nddev::_install_browseros || warn "BrowserOS install step reported an error (continuing)"
-  nddev::_remove_firefox || warn "Firefox removal step reported an error (continuing)"
+  nddev::_step gnome_dock nddev::_gnome_dock_bottom
+  nddev::_step russian_layout nddev::_russian_keyboard_layout
+  nddev::_step browseros nddev::_install_browseros
+  nddev::_step firefox_removal nddev::_remove_firefox
+
+  # Report the real outcome. Announcing "complete" unconditionally is what let
+  # a half-configured desktop pass both apply and strict verification.
+  local name status failed_required=0 failed_optional=0
+  for name in "${REQUIRED_STEPS[@]}" "${OPTIONAL_STEPS[@]}"; do
+    status=${STEP_STATUS[$name]:-missing}
+    case "$status" in
+      ok) ok "$name: ok" ;;
+      skipped) warn "$name: skipped (precondition absent)" ;;
+      *)
+        if nddev::_is_required "$name"; then
+          printf '\033[1;31m  ✗ %s\033[0m\n' "$name: FAILED (required)" >&2
+          failed_required=$((failed_required + 1))
+        else
+          warn "$name: failed (optional)"
+          failed_optional=$((failed_optional + 1))
+        fi
+        ;;
+    esac
+  done
+
+  if [ "$failed_required" -gt 0 ]; then
+    printf '\033[1;31m  ✗ desktop customization incomplete: %d required step(s) failed\033[0m\n' \
+      "$failed_required" >&2
+    return 1
+  fi
+  if [ "$failed_optional" -gt 0 ]; then
+    warn "desktop customization complete with $failed_optional optional step(s) failed"
+    return 0
+  fi
   ok "desktop customization complete"
 }
 
@@ -71,7 +137,7 @@ nddev::_gnome_dock_bottom() {
   info "Configuring GNOME dock (bottom, centered, macOS-style)"
   local schema="org.gnome.shell.extensions.dash-to-dock"
   gsettings list-schemas | command grep -q "^${schema}$" \
-    || { warn "dash-to-dock schema not found — skipping"; return 0; }
+    || { nddev::_record gnome_dock skipped; return 0; }
 
   gsettings set "$schema" dock-position 'BOTTOM'
   gsettings set "$schema" extend-height false
@@ -85,19 +151,74 @@ nddev::_gnome_dock_bottom() {
 nddev::_russian_keyboard_layout() {
   info "Adding Russian keyboard layout (Alt+Shift toggle)"
   [ -f /usr/share/X11/xkb/symbols/ru ] \
-    || { warn "Russian xkb data missing — install: sudo apt install xkb-data"; return 0; }
+    || {
+      warn "Russian xkb data missing — install: sudo apt install xkb-data"
+      nddev::_record russian_layout skipped
+      return 0
+    }
 
   nddev::_sudo_refresh
   # System locale.
   sudo sed -i 's/^# *ru_RU\.UTF-8 UTF-8/ru_RU.UTF-8 UTF-8/' /etc/locale.gen
   sudo locale-gen >/dev/null 2>&1
-  locale -a | command grep -qi 'ru_RU.utf8' \
-    && ok "ru_RU.UTF-8 generated" \
-    || warn "ru_RU.UTF-8 not found in locale -a"
+  if locale -a | command grep -qi 'ru_RU.utf8'; then
+    ok "ru_RU.UTF-8 generated"
+  else
+    warn "ru_RU.UTF-8 not found in locale -a"
+    return 1
+  fi
 
   # System X11 keymap: us,ru + Alt+Shift toggle.
   sudo localectl --no-convert set-x11-keymap us,ru pc105 , grp:alt_shift_toggle
   ok "X11 keymap set to us,ru with Alt+Shift toggle"
+
+  # A GNOME session does not read the system X11 keymap: it reads the per-user
+  # org.gnome.desktop.input-sources list, and on Wayland there is no X server
+  # to read the former at all. Setting only localectl left the estate's own
+  # desktop with `X11 Layout: us` while the layout that actually worked had
+  # been added by hand through GNOME Settings. Append ru if it is missing and
+  # preserve whatever the owner already has, including order.
+  nddev::_gnome_add_russian_input_source
+}
+
+# Append ('xkb', 'ru') to the GNOME input sources without reordering or
+# dropping the owner's existing entries. Idempotent: an already-present ru is
+# left exactly as it is.
+nddev::_gnome_add_russian_input_source() {
+  local current updated
+  current="$(gsettings get org.gnome.desktop.input-sources sources 2>/dev/null)" || {
+    warn "GNOME input sources unavailable; the session layout was not changed"
+    return 0
+  }
+  updated="$(python3 - "$current" <<'PY'
+import ast
+import sys
+
+raw = sys.argv[1]
+for prefix in ("@a(ss) ", "@a(ss)"):
+    if raw.startswith(prefix):
+        raw = raw[len(prefix):]
+        break
+values = ast.literal_eval(raw)
+if not isinstance(values, list):
+    raise SystemExit("input-sources is not a list")
+entries = [tuple(value) for value in values]
+if ("xkb", "ru") not in entries:
+    entries.append(("xkb", "ru"))
+if ("xkb", "us") not in entries:
+    entries.insert(0, ("xkb", "us"))
+print("[" + ", ".join(f"('{kind}', '{name}')" for kind, name in entries) + "]")
+PY
+)" || {
+    warn "could not compute the GNOME input source list; leaving it unchanged"
+    return 0
+  }
+  if [ "$updated" = "$current" ]; then
+    ok "GNOME input sources already include ru"
+    return 0
+  fi
+  gsettings set org.gnome.desktop.input-sources sources "$updated" || return 1
+  ok "added ru to the GNOME input sources"
 }
 
 # ----------------------------- BrowserOS -----------------------------
@@ -120,9 +241,16 @@ nddev::_install_browseros() {
     || sudo apt-get install -f -y 2>/dev/null
   rm -f "$BROWSEROS_DEB_TMP"
 
-  dpkg-query -W -f='${Status}' browseros 2>/dev/null | command grep -q "install ok installed" \
-    && ok "BrowserOS installed" \
-    || die "BrowserOS installation failed"
+  # `die` here used to exit the whole script from inside a `step || warn`
+  # chain, so a failed BrowserOS install silently skipped the Firefox removal
+  # that runs after it -- the exact opposite of the "each step is independent"
+  # contract this function claims. A step reports its own failure and returns.
+  if dpkg-query -W -f='${Status}' browseros 2>/dev/null | command grep -q "install ok installed"; then
+    ok "BrowserOS installed"
+    return 0
+  fi
+  warn "BrowserOS installation failed"
+  return 1
 }
 
 # ----------------------------- Firefox removal -----------------------------

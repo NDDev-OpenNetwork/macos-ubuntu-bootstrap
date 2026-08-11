@@ -212,6 +212,20 @@
           "arm64": "42600522e7455282e11c71c9fc62dc8e98b05bcdb830210fe16eb673a871e866"
         }
       },
+      "just": {
+        "version": "1.58.0",
+        "sha256": {
+          "x64": "4a5cc2f53e6f0f8c59092a6cc38291eb729d46a7dd95d3ae582008881b84931d",
+          "arm64": "748237128c4c40cbdabc65e841d05ceba13cc23a91eaba395495894c1d9764df"
+        }
+      },
+      "age": {
+        "version": "1.3.1",
+        "sha256": {
+          "x64": "bdc69c09cbdd6cf8b1f333d372a1f58247b3a33146406333e30c0f26e8f51377",
+          "arm64": "c6878a324421b69e3e20b00ba17c04bc5c6dab0030cfe55bf8f68fa8d9e9093a"
+        }
+      },
       "ast-grep": {
         "version": "0.45.0",
         "sha256": {
@@ -443,11 +457,16 @@
     ],
     "desktop_apps": [
       {
+        "_doc": "Agentic browser. Upstream publishes an amd64 .deb only; the absent arm64 entry is why the installer reports `skipped` rather than failing on that architecture.",
         "name": "browseros",
         "version": "0.47.18",
         "deb_version": "148.0.7966.97",
-        "url": "https://github.com/browseros-ai/BrowserOS/releases/download/v0.47.18/BrowserOS_v0.47.18_amd64.deb",
-        "sha256": "bfdda9be19ab0ec69602156a5c8aba3bd163351ca89539ecfda2761596b4dc7b"
+        "url": {
+          "x64": "https://github.com/browseros-ai/BrowserOS/releases/download/v0.47.18/BrowserOS_v0.47.18_amd64.deb"
+        },
+        "sha256": {
+          "x64": "bfdda9be19ab0ec69602156a5c8aba3bd163351ca89539ecfda2761596b4dc7b"
+        }
       },
       {
         "_doc": "Google Chrome is the estate's daily browser and the default handler for http/https on the Ubuntu desktop. It is the one deliberate exception to the pin-everything rule: `version_policy` tracks the stable channel rather than a SHA-256, because pinning a browser to an old build trades a real security liability for a reproducibility gain the estate does not need here. Supply-chain control comes from the signing key instead -- the primary fingerprint below is verified before the source is trusted, and it was confirmed against two independent sources (dl.google.com/linux/linux_signing_key.pub and the key embedded in the package's own /etc/cron.daily/google-chrome).",
@@ -464,6 +483,19 @@
           "managed_source": "/etc/apt/sources.list.d/rldyour-google-chrome.sources",
           "vendor_repo_add_once": "false",
           "vendor_source_policy": "preserve-when-key-verifies"
+        }
+      },
+      {
+        "_doc": "Remote desktop used across the estate. Upstream publishes no apt repository, only per-architecture .deb releases, so it follows the same pinned-artifact contract as BrowserOS: exact version, per-architecture SHA-256 confirmed by download.",
+        "name": "rustdesk",
+        "version": "1.4.9",
+        "sha256": {
+          "x64": "7244ba47c40e804172044bfbe659467c54ce46554c98e78c8c0406f1d612fda3",
+          "arm64": "ce62c996f14d33f3bbe3a330e953644a44bace7f05885a7953f7395d69fb49c0"
+        },
+        "url": {
+          "x64": "https://github.com/rustdesk/rustdesk/releases/download/1.4.9/rustdesk-1.4.9-x86_64.deb",
+          "arm64": "https://github.com/rustdesk/rustdesk/releases/download/1.4.9/rustdesk-1.4.9-aarch64.deb"
         }
       },
       "deskflow",

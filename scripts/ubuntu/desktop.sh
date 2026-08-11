@@ -11,7 +11,7 @@
 # What it does (desktop profile only):
 #   1. GNOME dock: move to bottom, centered, macOS-style.
 #   2. Keyboard: add Russian layout with Alt+Shift toggle.
-#   3. BrowserOS: install the open-source agentic browser (.deb).
+#   3. Pinned .deb applications: BrowserOS and RustDesk.
 #   4. Google Chrome: install from the fingerprint-verified signed apt source.
 #   5. Firefox: remove the stock snap+apt Firefox completely.
 #
@@ -26,9 +26,22 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck disable=SC1091
 . "$SCRIPT_DIR/../lib/common.sh"
 
-BROWSEROS_DEB_URL="https://github.com/browseros-ai/BrowserOS/releases/download/v0.47.18/BrowserOS_v0.47.18_amd64.deb"
-BROWSEROS_DEB_SHA256="bfdda9be19ab0ec69602156a5c8aba3bd163351ca89539ecfda2761596b4dc7b"
-BROWSEROS_DEB_TMP="/tmp/BrowserOS.deb"
+# Desktop applications upstream publishes only as a .deb. One row per
+# application, one generic installer: BrowserOS and RustDesk have exactly the
+# same shape, and a second bespoke install path is how one of them quietly
+# stops being verified.
+#
+# Row format (semicolon-separated, no spaces inside a field):
+#   name;package;url_x64;sha256_x64;url_arm64;sha256_arm64
+#
+# An empty arm64 pair means upstream publishes no arm64 build; the step reports
+# `skipped` on that architecture rather than failing a device that cannot have
+# the application at all. Every digest below was confirmed by downloading the
+# artifact, not copied from a release note.
+DESKTOP_DEBS=(
+  "browseros;browseros;https://github.com/browseros-ai/BrowserOS/releases/download/v0.47.18/BrowserOS_v0.47.18_amd64.deb;bfdda9be19ab0ec69602156a5c8aba3bd163351ca89539ecfda2761596b4dc7b;;"
+  "rustdesk;rustdesk;https://github.com/rustdesk/rustdesk/releases/download/1.4.9/rustdesk-1.4.9-x86_64.deb;7244ba47c40e804172044bfbe659467c54ce46554c98e78c8c0406f1d612fda3;https://github.com/rustdesk/rustdesk/releases/download/1.4.9/rustdesk-1.4.9-aarch64.deb;ce62c996f14d33f3bbe3a330e953644a44bace7f05885a7953f7395d69fb49c0"
+)
 
 # Google Chrome. Deliberately NOT pinned to a SHA-256: pinning a browser to an
 # old build is a security liability, not a reproducibility gain, so the supply
@@ -54,7 +67,7 @@ die()  { printf '\033[1;31m  \u2717 %s\033[0m\n' "$*" >&2; exit 1; }
 # the Firefox removal is a declared policy; the dock and keyboard layout are
 # cosmetic and legitimately unavailable on a session without the dash-to-dock
 # extension or xkb data. Required failures make the run fail.
-REQUIRED_STEPS=(browseros google_chrome firefox_removal)
+REQUIRED_STEPS=(browseros rustdesk google_chrome firefox_removal)
 OPTIONAL_STEPS=(gnome_dock russian_layout)
 
 # Populated by nddev::_record; read by the aggregate report.
@@ -92,7 +105,7 @@ nddev::desktop_configure() {
   command -v localectl >/dev/null || die "localectl missing (needs systemd)"
 
   if [ "${RLDYOUR_DRY_RUN:-1}" -eq 1 ]; then
-    rldyour::log "info" "[DRY-RUN] desktop customization: GNOME dock bottom, Russian layout, BrowserOS install, Google Chrome install, Firefox removal"
+    rldyour::log "info" "[DRY-RUN] desktop customization: GNOME dock bottom, Russian layout, BrowserOS and RustDesk install, Google Chrome install, Firefox removal"
     return 0
   fi
 
@@ -103,7 +116,8 @@ nddev::desktop_configure() {
 
   nddev::_step gnome_dock nddev::_gnome_dock_bottom
   nddev::_step russian_layout nddev::_russian_keyboard_layout
-  nddev::_step browseros nddev::_install_browseros
+  nddev::_step browseros nddev::_install_desktop_deb browseros
+  nddev::_step rustdesk nddev::_install_desktop_deb rustdesk
   nddev::_step google_chrome nddev::_install_google_chrome
   nddev::_step firefox_removal nddev::_remove_firefox
 
@@ -236,35 +250,65 @@ PY
   ok "added ru to the GNOME input sources"
 }
 
-# ----------------------------- BrowserOS -----------------------------
-nddev::_install_browseros() {
-  info "Installing BrowserOS (open-source agentic browser)"
-  local installed
-  installed="$(dpkg-query -W -f='${Status}' browseros 2>/dev/null || true)"
-  if printf '%s' "$installed" | command grep -q "install ok installed"; then
-    ok "BrowserOS already installed"
+# ----------------------------- pinned .deb applications -----------------------------
+
+# Install one row from DESKTOP_DEBS. Idempotent: an already-installed package is
+# preserved untouched. The download is SHA-256 verified before dpkg ever sees
+# it, and a failure returns rather than exiting so the remaining steps still run.
+nddev::_install_desktop_deb() {
+  local wanted=$1 row name package url_x64 sha_x64 url_arm64 sha_arm64
+  local url sha arch tmp
+
+  for row in "${DESKTOP_DEBS[@]}"; do
+    IFS=';' read -r name package url_x64 sha_x64 url_arm64 sha_arm64 <<<"$row"
+    [ "$name" = "$wanted" ] && break
+    name=""
+  done
+  if [ -z "$name" ]; then
+    warn "no DESKTOP_DEBS row named ${wanted}"
+    return 1
+  fi
+
+  arch="$(dpkg --print-architecture 2>/dev/null)"
+  case "$arch" in
+    amd64) url=$url_x64; sha=$sha_x64 ;;
+    arm64) url=$url_arm64; sha=$sha_arm64 ;;
+    *) url=""; sha="" ;;
+  esac
+  if [ -z "$url" ] || [ -z "$sha" ]; then
+    warn "${name}: upstream publishes no ${arch:-unknown} build"
+    nddev::_record "$name" skipped
+    return 0
+  fi
+
+  info "Installing ${name} (pinned .deb, SHA-256 verified)"
+  if dpkg-query -W -f='${Status}' "$package" 2>/dev/null |
+    command grep -q "install ok installed"; then
+    ok "${name} already installed"
     return 0
   fi
 
   nddev::_sudo_refresh
-  info "Downloading BrowserOS .deb (versioned, SHA-256 verified)"
-  rldyour::download_verified_file "$BROWSEROS_DEB_URL" "$BROWSEROS_DEB_SHA256" "$BROWSEROS_DEB_TMP" \
-    || { warn "BrowserOS .deb download or SHA-256 verification failed"; return 1; }
-  ok "downloaded and verified ($(du -h "$BROWSEROS_DEB_TMP" | cut -f1))"
+  tmp="$(mktemp --suffix=.deb)" || return 1
+  if ! rldyour::download_verified_file "$url" "$sha" "$tmp"; then
+    rm -f "$tmp"
+    warn "${name} .deb download or SHA-256 verification failed"
+    return 1
+  fi
+  ok "downloaded and verified ($(du -h "$tmp" | cut -f1))"
 
-  sudo dpkg -i "$BROWSEROS_DEB_TMP" 2>/dev/null \
-    || sudo apt-get install -f -y 2>/dev/null
-  rm -f "$BROWSEROS_DEB_TMP"
+  sudo dpkg -i "$tmp" 2>/dev/null || sudo apt-get install -f -y 2>/dev/null
+  rm -f "$tmp"
 
   # `die` here used to exit the whole script from inside a `step || warn`
-  # chain, so a failed BrowserOS install silently skipped the Firefox removal
-  # that runs after it -- the exact opposite of the "each step is independent"
-  # contract this function claims. A step reports its own failure and returns.
-  if dpkg-query -W -f='${Status}' browseros 2>/dev/null | command grep -q "install ok installed"; then
-    ok "BrowserOS installed"
+  # chain, so a failed install silently skipped every step after it. A step
+  # reports its own failure and returns.
+  if dpkg-query -W -f='${Status}' "$package" 2>/dev/null |
+    command grep -q "install ok installed"; then
+    ok "${name} installed"
     return 0
   fi
-  warn "BrowserOS installation failed"
+  warn "${name} installation failed"
   return 1
 }
 

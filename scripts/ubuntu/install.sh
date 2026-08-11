@@ -141,8 +141,12 @@ PYTHON_SOURCE_TOOLS=(
   "semgrep==1.170.0"
 )
 
-# Source-analysis tools that macOS gets from Homebrew and Ubuntu has no
-# acceptable distribution package for. Each is a single upstream release
+# Pinned upstream CLI artifacts: the tools macOS gets from Homebrew for which
+# Ubuntu has no acceptable distribution package, either because none exists or
+# because the archive lags too far behind. "Too far behind" is a judgement each
+# row justifies in a comment, not a reflex — apt is preferred wherever its
+# version is acceptable, which is why ripgrep, fd-find, bat and fzf are apt
+# packages and not rows here. Each is a single upstream release
 # artifact with a tracked per-architecture SHA-256, installed into an owned
 # versioned directory with a runtime receipt — the same contract as Node, uv,
 # Bun, Go, and Rust. Adding a row here is the only way to add such a tool; there
@@ -180,6 +184,18 @@ PINNED_SOURCE_TOOLS=(
   # deprecation banner and exits non-zero, and on a host that has util-linux it
   # would shadow the setgid `sg`.
   "ast-grep;0.45.0;zip;ast-grep;ast-grep;ast-grep;78931ae35ebac33d9a72b3aecea3e3d62d6e5b0b718ac8bbedfbe69d68421e41;62b60892dafacfa76d6de87157659f880bbf85ff38bdab52db12f1f14ec60f94;https://github.com/ast-grep/ast-grep/releases/download/0.45.0/app-x86_64-unknown-linux-gnu.zip;https://github.com/ast-grep/ast-grep/releases/download/0.45.0/app-aarch64-unknown-linux-gnu.zip"
+  # Command runner used across the estate's repositories. Ubuntu 26.04 ships
+  # 1.45.0 against upstream 1.58.0; a justfile written against a newer feature
+  # would fail on the distribution build, so the recipe runner is pinned like
+  # every other tool whose exact behaviour a repository depends on. Both digests
+  # were confirmed by download and matched against upstream's SHA256SUMS.
+  "just;1.58.0;tar0;just;just;just;4a5cc2f53e6f0f8c59092a6cc38291eb729d46a7dd95d3ae582008881b84931d;748237128c4c40cbdabc65e841d05ceba13cc23a91eaba395495894c1d9764df;https://github.com/casey/just/releases/download/1.58.0/just-1.58.0-x86_64-unknown-linux-musl.tar.gz;https://github.com/casey/just/releases/download/1.58.0/just-1.58.0-aarch64-unknown-linux-musl.tar.gz"
+  # File encryption for estate secrets at rest. Ubuntu ships 1.2.1 against
+  # upstream 1.3.1; for a cryptographic tool the current release is the one to
+  # carry. The archive also contains age-inspect and age-plugin-batchpass, which
+  # are deliberately not published: only the two commands the estate uses are
+  # linked, so the managed PATH stays exactly what the contract declares.
+  "age;1.3.1;tar1;age,age-keygen;age,age-keygen;age,age-keygen;bdc69c09cbdd6cf8b1f333d372a1f58247b3a33146406333e30c0f26e8f51377;c6878a324421b69e3e20b00ba17c04bc5c6dab0030cfe55bf8f68fa8d9e9093a;https://github.com/FiloSottile/age/releases/download/v1.3.1/age-v1.3.1-linux-amd64.tar.gz;https://github.com/FiloSottile/age/releases/download/v1.3.1/age-v1.3.1-linux-arm64.tar.gz"
 )
 
 # User-selected CLI tools that are not language hosts, LSPs, or scanners but

@@ -16,6 +16,7 @@ package as absent and then fails ``curl``, so the suite never fetches the real
 from __future__ import annotations
 
 import os
+import re
 import subprocess
 from pathlib import Path
 
@@ -48,7 +49,15 @@ BASE_STUBS: dict[str, str] = {
 # BrowserOS must be reported as absent so the step proceeds past its
 # already-installed short circuit, and the download must fail so the test never
 # fetches the real package.
-BROWSEROS_FAILS: dict[str, str] = {"dpkg-query": "exit 1\n", "curl": "exit 1\n"}
+# `dpkg --print-architecture` must answer here or the .deb step reports
+# `skipped` and the test loses its subject. The Chrome step then also attempts
+# and fails on a host without Chrome -- harmless, because what is asserted is
+# that BrowserOS failed and that the steps after it still ran.
+BROWSEROS_FAILS: dict[str, str] = {
+    "dpkg": '[ "$1" = "--print-architecture" ] && { echo amd64; exit 0; }\nexit 1\n',
+    "dpkg-query": "exit 1\n",
+    "curl": "exit 1\n",
+}
 
 
 def write_stubs(bin_dir: Path, overrides: dict[str, str] | None = None) -> Path:
@@ -208,9 +217,10 @@ def test_installer_pins_the_same_fingerprint_as_the_contract() -> None:
 
 def test_chrome_is_a_required_desktop_step() -> None:
     source = DESKTOP.read_text(encoding="utf-8")
-    assert "REQUIRED_STEPS=(browseros google_chrome firefox_removal)" in source
+    assert "REQUIRED_STEPS=(browseros rustdesk google_chrome firefox_removal)" in source
     body = source.split("nddev::desktop_configure() {", 1)[1]
     assert body.index("nddev::_step browseros") < body.index("nddev::_step google_chrome")
+    assert "nddev::_step rustdesk nddev::_install_desktop_deb rustdesk" in body
 
 
 def _extract(function: str, path: Path) -> str:
@@ -289,3 +299,88 @@ def test_both_google_repository_paths_are_recognised() -> None:
         assert "dl.google.com/linux/chrome/deb'" not in text, (
             f"{path.name} still matches only the cron path"
         )
+
+
+# ------------------- pinned .deb applications (one installer) -------------------
+
+
+def _deb_rows() -> list[list[str]]:
+    import re
+
+    source = DESKTOP.read_text(encoding="utf-8")
+    block = re.search(r"^DESKTOP_DEBS=\((.*?)^\)", source, re.M | re.S)
+    assert block, "DESKTOP_DEBS table missing"
+    return [
+        line.strip().strip('"').split(";")
+        for line in block.group(1).splitlines()
+        if line.strip().startswith('"')
+    ]
+
+
+def test_every_deb_application_goes_through_one_installer() -> None:
+    """A second bespoke .deb path is how one application stops being verified."""
+    source = DESKTOP.read_text(encoding="utf-8")
+    assert "nddev::_install_browseros" not in source
+    assert source.count("nddev::_install_desktop_deb()") == 1
+    names = {row[0] for row in _deb_rows()}
+    assert names == {"browseros", "rustdesk"}
+
+
+def test_every_deb_row_is_well_formed_and_digest_pinned() -> None:
+    for row in _deb_rows():
+        assert len(row) == 6, f"malformed row: {row}"
+        name, package, url_x64, sha_x64, url_arm64, sha_arm64 = row
+        assert name and package
+        assert url_x64.startswith("https://")
+        assert re.fullmatch(r"[0-9a-f]{64}", sha_x64), f"{name}: bad x64 digest"
+        # An arm64 build is optional, but a URL without a digest is never valid.
+        assert bool(url_arm64) == bool(sha_arm64), f"{name}: half-declared arm64"
+        if url_arm64:
+            assert url_arm64.startswith("https://")
+            assert re.fullmatch(r"[0-9a-f]{64}", sha_arm64), f"{name}: bad arm64 digest"
+
+
+def test_deb_rows_match_the_contract() -> None:
+    """One shape for one concept: every declared .deb is per-architecture."""
+    import json
+
+    apps = json.loads(CONTRACT.read_text(encoding="utf-8"))["ubuntu_apt_packages"][
+        "desktop_apps"
+    ]
+    declared = {
+        entry["name"]: entry
+        for entry in apps
+        if isinstance(entry, dict) and "sha256" in entry
+    }
+    rows = {row[0]: row for row in _deb_rows()}
+    assert set(rows) == set(declared), "installer table and contract disagree"
+
+    for name, row in rows.items():
+        _name, _package, url_x64, sha_x64, url_arm64, sha_arm64 = row
+        spec = declared[name]
+        assert isinstance(spec["sha256"], dict), f"{name}: flat digest, expected per-arch"
+        assert spec["sha256"]["x64"] == sha_x64, name
+        assert spec["url"]["x64"] == url_x64, name
+        # An architecture upstream does not publish must be absent from both
+        # sides, never half-declared.
+        assert ("arm64" in spec["sha256"]) == bool(sha_arm64), name
+        if sha_arm64:
+            assert spec["sha256"]["arm64"] == sha_arm64, name
+            assert spec["url"]["arm64"] == url_arm64, name
+
+
+def test_unknown_deb_row_is_refused(tmp_path: Path) -> None:
+    source = DESKTOP.read_text(encoding="utf-8")
+    import re as _re
+
+    table = _re.search(r"^DESKTOP_DEBS=\(.*?^\)", source, _re.M | _re.S).group(0)
+    fn = _extract("nddev::_install_desktop_deb", DESKTOP)
+    result = subprocess.run(
+        ["bash", "-c",
+         "info(){ :; }; ok(){ :; }; warn(){ printf '%s\\n' \"$*\"; }\n"
+         "nddev::_record(){ :; }; nddev::_sudo_refresh(){ :; }\n"
+         f"{table}\n{fn}\nnddev::_install_desktop_deb nonesuch"],
+        capture_output=True, text=True, check=False,
+    )
+    assert result.returncode != 0
+    assert "no DESKTOP_DEBS row named nonesuch" in result.stdout

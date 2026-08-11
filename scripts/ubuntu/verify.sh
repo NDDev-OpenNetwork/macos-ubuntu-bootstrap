@@ -152,6 +152,14 @@ rldyour::ubuntu_verify::desktop_outcomes() {
       failed=1
     fi
 
+    if dpkg-query -W -f='${Status}' rustdesk 2>/dev/null |
+      command grep -q "install ok installed"; then
+      rldyour::log "ok" "RustDesk installed"
+    else
+      rldyour::log "missing" "RustDesk is declared in desktop_apps but not installed"
+      failed=1
+    fi
+
     if dpkg-query -W -f='${Status}' google-chrome-stable 2>/dev/null |
       command grep -q "install ok installed"; then
       rldyour::log "ok" "Google Chrome installed"
@@ -274,10 +282,12 @@ if [ "$PROFILE" != "server" ]; then
   for cmd in go gopls rustc cargo rust-analyzer dart; do
     rldyour::require_cmd "$cmd" required
   done
-  # Pinned source-analysis tools: the four CI-parity scanners, the Markdown
-  # language server, the git pager that ensure_git_delta_config configures, and
-  # the structured YAML/AST utilities.
-  for cmd in gitleaks osv-scanner actionlint hadolint markdown-oxide delta yq ast-grep; do
+  # Pinned upstream CLI artifacts: the four CI-parity scanners, the Markdown
+  # language server, the git pager that ensure_git_delta_config configures, the
+  # structured YAML/AST utilities, the estate's command runner, and the file
+  # encryption pair.
+  for cmd in gitleaks osv-scanner actionlint hadolint markdown-oxide delta yq ast-grep \
+    just age age-keygen; do
     rldyour::require_cmd "$cmd" required
   done
   # User-selected desktop tools (herdr, telegram). Installed by install_user_tools

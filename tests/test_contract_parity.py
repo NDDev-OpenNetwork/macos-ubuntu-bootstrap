@@ -153,35 +153,47 @@ def test_user_tools_match_the_contract() -> None:
             assert row[7] == spec["archive_sha256"], f"{name}: archive SHA-256 (arm64 slot) drift"
 
 
-def test_browseros_deb_url_and_sha_in_contract() -> None:
-    """BrowserOS .deb must be versioned (not CDN latest) with a pinned SHA-256."""
-    desktop_apps = CONTRACT["ubuntu_apt_packages"]["desktop_apps"]
-    browseros = next(app for app in desktop_apps if isinstance(app, dict) and app.get("name") == "browseros")
-    assert "version" in browseros, "browseros desktop_app missing version"
-    assert "sha256" in browseros, "browseros desktop_app missing sha256"
-    assert "github.com" in browseros["url"], (
-        f"browseros URL must be a versioned GitHub release, not CDN latest: {browseros['url']}"
-    )
-    assert browseros["sha256"] != "", "browseros sha256 must not be empty"
+def _declared_debs() -> dict:
+    """Every desktop_apps entry distributed as a pinned .deb."""
+    return {
+        app["name"]: app
+        for app in CONTRACT["ubuntu_apt_packages"]["desktop_apps"]
+        if isinstance(app, dict) and "sha256" in app
+    }
 
 
-def test_browseros_desktop_sh_uses_versioned_url_and_sha() -> None:
-    """desktop.sh must download BrowserOS from the versioned GitHub URL with SHA-256 verification."""
+def test_every_declared_deb_is_versioned_and_digest_pinned() -> None:
+    """Generalised from a BrowserOS-only check: the guard must cover every
+    .deb application, or the next one added silently escapes it."""
+    debs = _declared_debs()
+    assert debs, "no .deb applications declared"
+    for name, app in debs.items():
+        assert "version" in app, f"{name}: missing version"
+        assert isinstance(app["sha256"], dict), f"{name}: digest must be per-architecture"
+        assert isinstance(app["url"], dict), f"{name}: url must be per-architecture"
+        assert set(app["url"]) == set(app["sha256"]), f"{name}: url/digest arches disagree"
+        for arch, url in app["url"].items():
+            assert "github.com" in url, (
+                f"{name}/{arch} must be a versioned GitHub release, not a CDN pointer: {url}"
+            )
+            assert "/latest/" not in url, f"{name}/{arch} uses a volatile latest pointer"
+            assert app["version"] in url, (
+                f"{name}/{arch} URL does not carry the declared version {app['version']}"
+            )
+            assert re.fullmatch(r"[0-9a-f]{64}", app["sha256"][arch]), (
+                f"{name}/{arch}: malformed digest"
+            )
+
+
+def test_desktop_sh_downloads_every_declared_deb_verified() -> None:
     desktop_sh = (ROOT / "scripts/ubuntu/desktop.sh").read_text(encoding="utf-8")
-    browseros = next(
-        app for app in CONTRACT["ubuntu_apt_packages"]["desktop_apps"]
-        if isinstance(app, dict) and app.get("name") == "browseros"
-    )
-    assert browseros["url"] in desktop_sh, (
-        f"desktop.sh missing versioned BrowserOS URL: {browseros['url']}"
-    )
-    assert browseros["sha256"] in desktop_sh, (
-        "desktop.sh missing BrowserOS SHA-256 constant"
-    )
+    for name, app in _declared_debs().items():
+        for arch, url in app["url"].items():
+            assert url in desktop_sh, f"desktop.sh missing {name}/{arch} URL"
+            assert app["sha256"][arch] in desktop_sh, f"desktop.sh missing {name}/{arch} digest"
     assert "download_verified_file" in desktop_sh, (
-        "desktop.sh must use rldyour::download_verified_file, not bare wget"
+        "desktop.sh must use rldyour::download_verified_file, not a bare download"
     )
     assert "cdn.browseros.com" not in desktop_sh, (
         "desktop.sh must not reference the volatile CDN latest pointer"
     )
-

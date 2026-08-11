@@ -46,6 +46,26 @@ All notable changes to this module will be documented in this file.
   upgrade), and `/etc/default/google-chrome` is set to `repo_add_once=false` so
   the package's postinst never adds a competing one. Strict verification
   requires Chrome to be installed and its source to be signed by that exact key.
+- **`just` `1.58.0` and `age` `1.3.1` are pinned upstream artifacts.** Both were
+  installed by hand and declared nowhere. Ubuntu ships `just` 1.45.0 and `age`
+  1.2.1; a justfile written against a newer feature fails on the distribution
+  build, and for a cryptographic tool the current release is the one to carry,
+  so both follow the existing pinned-artifact contract rather than apt. The
+  `just` digests were confirmed by download *and* matched against upstream's
+  published `SHA256SUMS`. `age` ships `age-inspect` and `age-plugin-batchpass`
+  in the same archive; only the two commands the estate uses are linked, so the
+  managed PATH stays exactly what the contract declares. The table's comment now
+  says what it is — pinned upstream CLI artifacts — instead of "source-analysis
+  tools", which had not described `delta`, `yq` or `ast-grep` for some time.
+- **RustDesk `1.4.9` is provisioned, and every `.deb` application now goes
+  through one installer.** BrowserOS and RustDesk have identical shape, so
+  `DESKTOP_DEBS` is a table and `nddev::_install_desktop_deb` is the only path;
+  a second bespoke one is how an application quietly stops being verified.
+  RustDesk publishes both architectures, BrowserOS only amd64, so a row may
+  declare an arm64 pair or omit it — a half-declared architecture is rejected by
+  a test, and an absent one makes the step report `skipped` rather than fail a
+  device that cannot have the application at all. The BrowserOS contract entry
+  moved to the same per-architecture shape; one concept now has one shape.
 - `wl-clipboard` and `libsecret-tools` join the apt baseline. Both were already
   relied on by the live desktop and declared nowhere.
 - **One-owner-per-harness is now checkable on a device, not only asserted in
@@ -164,6 +184,11 @@ All notable changes to this module will be documented in this file.
   real shellcheck findings in `desktop.sh`, one of them the `&& ok || die`
   construct behind the skipped-Firefox-step defect. `EXCLUDED_PATHS` is empty on
   purpose.
+- The two BrowserOS-specific parity tests were generalised to every declared
+  `.deb`: versioned GitHub URL carrying the declared version, no `latest`
+  pointer, well-formed per-architecture digests, and every URL and digest
+  present in `desktop.sh`. As written they would not have covered RustDesk at
+  all.
 - Telegram `userapp` retirement is covered end to end: a generated pair is
   retired while a `userapp` entry for another application survives, a
   hand-written lookalike is preserved and fails closed, the dry run changes

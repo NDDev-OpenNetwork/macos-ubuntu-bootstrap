@@ -11,6 +11,18 @@ All notable changes to this module will be documented in this file.
   clean local and remote worktrees at the same exact Git commit and transfers
   neither workspace files nor credentials.
 
+### Removed
+
+- **The Open Design layer is gone.** `scripts/ubuntu/open-design.sh`, the
+  `--install-open-design` flag, the `RLDYOUR_INSTALL_OPEN_DESIGN` env var, the
+  `install_open_design_layer` step and the `open_design` contract block are all
+  removed by owner decision. It was the module's only mutable supply chain — a
+  `--depth 1` clone of a default branch that was never checked out to an
+  approved commit, plus `ghcr.io/nexu-io/od:latest` — handed to a reachable
+  Docker daemon, and its result was reported as available regardless of pull,
+  health or receipt failure. Deleting the layer resolves both of those rather
+  than hardening a workload the estate does not want provisioned.
+
 ### Changed
 
 - ZCode remains in the catalogue but is explicitly `on-pause`; bootstrap does
@@ -102,11 +114,11 @@ All notable changes to this module will be documented in this file.
 
 - `scripts/ci/lint.sh` discovers every owned shell script instead of carrying a
   hand-maintained list. The list had silently skipped `scripts/ubuntu/desktop.sh`
-  and `scripts/ubuntu/open-design.sh` since the day each was added, and would
-  have skipped `scripts/remote-exec.sh` too; discovery immediately surfaced four
+  since the day it was added, and would have skipped `scripts/remote-exec.sh`
+  too; discovery immediately surfaced four
   real shellcheck findings in `desktop.sh`, one of them the `&& ok || die`
-  construct behind the skipped-Firefox-step defect. Coverage went from 12 files
-  to 15, and `EXCLUDED_PATHS` is empty on purpose.
+  construct behind the skipped-Firefox-step defect. `EXCLUDED_PATHS` is empty on
+  purpose.
 - Desktop customization has its own offline test module: per-step failure
   injection proving later steps still run, required-versus-optional aggregation,
   skipped preconditions, the installer wiring, and a `bash -n` check over every

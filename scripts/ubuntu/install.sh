@@ -10,9 +10,6 @@ source "$SCRIPT_DIR/../lib/common.sh"
 # shellcheck source=server.sh
 # shellcheck disable=SC1091
 source "$SCRIPT_DIR/server.sh"
-# shellcheck source=open-design.sh
-# shellcheck disable=SC1091
-source "$SCRIPT_DIR/open-design.sh"
 
 RLDYOUR_DRY_RUN="${RLDYOUR_DRY_RUN:-1}"
 PROFILE="${RLDYOUR_PROFILE:-server}"
@@ -1497,18 +1494,6 @@ run_server_layer() {
   rldyour::ubuntu_server::main "${args[@]}"
 }
 
-# Open Design docker-compose workload. Gated behind an explicit operator
-# opt-in (RLDYOUR_INSTALL_OPEN_DESIGN=1). Runs on both profiles: on desktop it
-# requires Docker to already be present (never installs it); on server it runs
-# after the server layer has installed Docker. Non-fatal on failure, mirroring
-# install_gui_apps. See scripts/ubuntu/open-design.sh for the rationale.
-install_open_design_layer() {
-  [ "${RLDYOUR_INSTALL_OPEN_DESIGN:-0}" -eq 1 ] || return 0
-  rldyour::section "Install Open Design (opt-in Docker workload)"
-  rldyour::ubuntu_opendesign::install \
-    || rldyour::log "warn" "open-design layer reported issues (non-fatal)"
-}
-
 verify_apply() {
   if [ "$RLDYOUR_DRY_RUN" -eq 1 ]; then
     rldyour::log "info" "plan complete; verification runs only after apply"
@@ -1587,11 +1572,6 @@ main() {
 
   install_gui_apps
   run_server_layer
-
-  # Opt-in Open Design docker-compose workload. Runs after the server layer so
-  # Docker is already installed on server profiles; on desktop it preflights an
-  # already-present Docker (it never installs Docker itself).
-  install_open_design_layer
 
   # The harness layer runs LAST of the installing layers, and deliberately so.
   # It delegates to a separate module whose own fail-closed guards depend on local

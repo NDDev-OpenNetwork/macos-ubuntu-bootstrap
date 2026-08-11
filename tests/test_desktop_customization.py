@@ -151,7 +151,6 @@ def test_every_owned_shell_script_is_linted() -> None:
     discovered = sorted(p.relative_to(ROOT) for p in (ROOT / "scripts").rglob("*.sh"))
     for required in (
         Path("scripts/ubuntu/desktop.sh"),
-        Path("scripts/ubuntu/open-design.sh"),
         Path("scripts/remote-exec.sh"),
     ):
         assert required in discovered

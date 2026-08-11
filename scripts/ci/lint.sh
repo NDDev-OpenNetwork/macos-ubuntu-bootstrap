@@ -25,8 +25,8 @@ check_cmd bash
 check_cmd shellcheck
 
 # Every owned shell file is checked. A hand-maintained allowlist silently
-# skipped scripts/ubuntu/desktop.sh and scripts/ubuntu/open-design.sh from the
-# day each was added, and would have skipped scripts/remote-exec.sh too: the
+# skipped scripts/ubuntu/desktop.sh from the day it was added, and would have
+# skipped scripts/remote-exec.sh too: the
 # list is edited by whoever remembers, and a new file is exactly the case
 # nobody remembers. Discovery inverts that default.
 #

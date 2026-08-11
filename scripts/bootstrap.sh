@@ -16,7 +16,6 @@ SKIP_CHECKS=0
 HARDEN_SSH=0
 ENABLE_UFW=0
 WITH_FAIL2BAN=0
-INSTALL_OPEN_DESIGN=0
 
 usage() {
   cat <<'EOF'
@@ -25,7 +24,6 @@ Usage: scripts/bootstrap.sh [--platform macos|ubuntu] [--profile desktop|desktop
                            [--apply|--plan] [--skip-system] [--skip-ai]
                            [--skip-lsps] [--skip-checks] [--strict]
                            [--harden-ssh] [--enable-ufw] [--with-fail2ban]
-                           [--install-open-design]
 
 Entrypoint for the module installer.
 
@@ -50,15 +48,6 @@ Safety:
   apply run because a generic remote-host mutation can lock out SSH or expose
   Docker-published ports. Plan mode remains the default.
 
-Optional workload:
-  --install-open-design  Bring up Open Design (https://github.com/nexu-io/open-design)
-                         as a Docker container on http://127.0.0.1:7456. Open Design
-                         publishes no native Linux builds, so on Linux it runs via the
-                         published Docker image ghcr.io/nexu-io/od. This is the first
-                         docker-compose workload in the module and is opt-in only; it
-                         does NOT relax the desktop source-lsp policy (Docker must
-                         already be present on desktop) and never adds the user to the
-                         docker group. Disabled by default.
 EOF
 }
 
@@ -126,10 +115,6 @@ while [ "$#" -gt 0 ]; do
       ;;
     --with-fail2ban)
       WITH_FAIL2BAN=1
-      shift
-      ;;
-    --install-open-design)
-      INSTALL_OPEN_DESIGN=1
       shift
       ;;
     -h | --help)
@@ -255,7 +240,6 @@ export RLDYOUR_SKIP_CHECKS=$SKIP_CHECKS
 export RLDYOUR_HARDEN_SSH=$HARDEN_SSH
 export RLDYOUR_ENABLE_UFW=$ENABLE_UFW
 export RLDYOUR_WITH_FAIL2BAN=$WITH_FAIL2BAN
-export RLDYOUR_INSTALL_OPEN_DESIGN=$INSTALL_OPEN_DESIGN
 if [ "$PROFILE" = "desktop" ]; then
   export RLDYOUR_LOCAL_EXECUTION_POLICY="source-lsp-only"
 elif [ "$PROFILE" = "desktop-builds" ]; then

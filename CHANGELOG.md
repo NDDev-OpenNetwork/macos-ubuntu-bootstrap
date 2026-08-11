@@ -163,6 +163,16 @@ All notable changes to this module will be documented in this file.
   `[Added Associations]` lines left dangling by the retirement. A `userapp`
   entry for any other application, and every other line and section of
   `mimeapps.list`, is preserved byte for byte. Verification rejects a survivor.
+- **One unavailable macOS cask no longer takes the mandatory layers down with
+  it.** `install_gui_apps` looped `ensure_cask` bare under `set -euo pipefail`,
+  and `ensure_cask` ends in `brew install --cask`. A single failing cask — a
+  Homebrew rename, a notarization change, a network blip — therefore aborted the
+  whole script, and because the GUI layer runs *before* the browser layer it
+  took the language servers, the **mandatory CloakBrowser layer**, the harness
+  layer and verification with it. This is the same failure the Ubuntu side had
+  already fixed twice. Every cask is now attempted, failures are counted, and
+  the result is reported at the end of `main` — so an optional layer can still
+  fail the run but can no longer strand the required ones.
 - **Ubuntu desktop customization reports what actually happened.** The composer
   ran four `step || warn` lines and then printed "desktop customization
   complete" unconditionally, so a desktop missing BrowserOS or still carrying

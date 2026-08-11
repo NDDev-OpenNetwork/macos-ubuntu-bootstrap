@@ -397,3 +397,46 @@ def test_unknown_deb_row_is_refused(tmp_path: Path) -> None:
     )
     assert result.returncode != 0
     assert "no DESKTOP_DEBS row named nonesuch" in result.stdout
+
+
+# ------------------- macOS: an optional layer cannot strand the rest -------------------
+#
+# macos/install.sh runs the GUI cask layer BEFORE the mandatory browser layer.
+# The loop used to call ensure_cask bare under `set -euo pipefail`, so one
+# unavailable cask aborted the script and took the language servers, the
+# mandatory browser layer, the harness layer and verification with it. This is
+# the failure this repository already fixed twice on the Ubuntu side.
+
+MACOS_INSTALL = ROOT / "scripts/macos/install.sh"
+
+
+def test_macos_gui_layer_attempts_every_cask() -> None:
+    source = MACOS_INSTALL.read_text(encoding="utf-8")
+    body = source.split("install_gui_apps() {", 1)[1].split("\n}", 1)[0]
+    assert "if ! ensure_cask" in body, (
+        "a bare ensure_cask under set -e aborts the whole run on the first "
+        "failing cask"
+    )
+    assert "GUI_LAYER_FAILED" in body
+
+
+def test_macos_gui_failure_does_not_precede_the_mandatory_browser_layer() -> None:
+    """Ordering is why this matters: the browser layer runs after the casks."""
+    source = MACOS_INSTALL.read_text(encoding="utf-8")
+    main = source.split("main() {", 1)[1]
+    gui = main.index("install_gui_apps")
+    browser = main.index("rldyour::install_browser_providers")
+    report = main.index('if [ "$GUI_LAYER_FAILED" -ne 0 ]')
+    assert gui < browser, "unexpected ordering; re-derive this test"
+    assert browser < report, (
+        "the GUI result must be reported after the mandatory layers have run, "
+        "not before them"
+    )
+
+
+def test_macos_gui_failure_still_fails_the_run() -> None:
+    """Attempting everything must not become reporting success."""
+    source = MACOS_INSTALL.read_text(encoding="utf-8")
+    main = source.split("main() {", 1)[1]
+    report = main.index('if [ "$GUI_LAYER_FAILED" -ne 0 ]')
+    assert "return 1" in main[report : report + 300]

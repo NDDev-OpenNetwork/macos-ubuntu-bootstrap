@@ -274,6 +274,19 @@ bash scripts/ubuntu/verify.sh --strict
 bash scripts/ubuntu/verify-server.sh --docker-mode rootful
 ```
 
+A real-target lane exercises the Ubuntu apply branches a stub cannot reach —
+fresh Chrome install, key refusal, pinned `.deb` install, digest refusal —
+against a disposable Ubuntu 26.04 container. It is opt-in because each case
+pulls packages:
+
+```bash
+RLDYOUR_CONTAINER_TESTS=1 python3 -m pytest tests/test_container_apply.py
+```
+
+It does not replace the deterministic suites, and it is not a VM: systemd, a
+GNOME session and macOS remain out of reach and are named rather than skipped
+quietly.
+
 For documentation-only changes, at minimum run `git diff --check` and targeted
 stale-fact scans. Do not claim macOS, Ubuntu GUI, SSH, firewall, systemd, or
 Docker runtime evidence that was not actually produced.

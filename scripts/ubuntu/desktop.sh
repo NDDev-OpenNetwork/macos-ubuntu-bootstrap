@@ -457,4 +457,11 @@ nddev::_remove_firefox() {
   fi
 }
 
-nddev::desktop_configure "$@"
+# Guard so the main flow only runs when executed directly, not when sourced.
+# This mirrors ubuntu/install.sh, ubuntu/server.sh and macos/install.sh. Without
+# it every test had to cut individual functions out of this file with sed, which
+# tests a copy rather than the script, and no test could exercise a step against
+# a real (containerised) system.
+if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then
+  nddev::desktop_configure "$@"
+fi

@@ -576,3 +576,56 @@ def test_arm64_verification_does_not_require_telegram() -> None:
     assert "upstream publishes no $(uname -m) build" in verify
     telegram_gate = verify.split("rldyour::require_cmd herdr required", 1)[1]
     assert "x86_64|amd64)" in telegram_gate.split("esac", 1)[0]
+
+
+def test_a_shared_association_line_keeps_its_surviving_handler(tmp_path: Path) -> None:
+    """Dropping the whole line would unregister a handler we never touched, and
+    keeping it whole would leave a reference to a file that no longer exists."""
+    _managed_launcher(tmp_path)
+    _userapp(
+        tmp_path, "T5RGT3",
+        exec_line="Exec=telegram-desktop -- %u",
+        comment="Comment=Custom definition for Telegram Desktop",
+    )
+    mimeapps = tmp_path / ".config/mimeapps.list"
+    mimeapps.parent.mkdir(parents=True, exist_ok=True)
+    mimeapps.write_text(
+        "[Default Applications]\n"
+        "x-scheme-handler/tg=org.telegram.desktop.desktop\n"
+        "\n"
+        "[Added Associations]\n"
+        "x-scheme-handler/tg=userapp-Telegram Desktop-T5RGT3.desktop;org.telegram.desktop.desktop;\n"
+        "x-scheme-handler/tonsite=userapp-Telegram Desktop-T5RGT3.desktop;\n"
+        "image/png=gimp.desktop;\n",
+        encoding="utf-8",
+    )
+
+    assert _run_userapp_retirement(tmp_path).returncode == 0
+    remaining = mimeapps.read_text(encoding="utf-8")
+
+    assert "userapp-Telegram Desktop-T5RGT3.desktop" not in remaining
+    # Shared line: the survivor stays registered.
+    assert "x-scheme-handler/tg=org.telegram.desktop.desktop;\n" in remaining
+    # Sole handler retired: the line goes.
+    assert "x-scheme-handler/tonsite=" not in remaining.split("[Added Associations]", 1)[1]
+    # Untouched neighbours, and the default section, survive verbatim.
+    assert "image/png=gimp.desktop;" in remaining
+    assert "[Default Applications]\nx-scheme-handler/tg=org.telegram.desktop.desktop\n" in remaining
+
+
+def test_the_pruner_never_treats_its_own_backup_as_a_handler() -> None:
+    """The mimeapps.list backup lands in the same directory as the retired
+    launchers, and the retired set is read from that directory."""
+    installer = INSTALL.read_text(encoding="utf-8")
+    # Bounded by the function that uses it: the embedded program contains
+    # blank lines, so splitting on one truncates it.
+    pruner = installer.split("RLDYOUR_PRUNE_ADDED_ASSOCIATIONS=", 1)[1].split(
+        "rldyour::ubuntu::retire_telegram_userapp_entries()", 1
+    )[0]
+    # Single quotes inside the embedded program are shell-escaped as '\'', so
+    # match on the quote-free part of the filter.
+    assert "if path.name.endswith(" in pruner, (
+        "the retired set must be filtered to launchers, not everything in the "
+        "backup directory"
+    )
+    assert ".desktop" in pruner

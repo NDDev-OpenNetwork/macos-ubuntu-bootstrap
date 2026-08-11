@@ -233,6 +233,22 @@ All notable changes to this module will be documented in this file.
 
 ### Tests
 
+- **The Ubuntu install branches that had never been executed now have real
+  evidence.** `tests/test_container_apply.py` runs them against a disposable
+  Ubuntu 26.04 container: a fresh Chrome install proves the managed keyring
+  carries the expected fingerprint, the deb822 source is written, the vendor's
+  `repo_add_once` opt-out is set *before* install, the package installs from the
+  managed source — and, the design bet that could not be checked any other way,
+  that the vendor's postinst then adds no competing source. Both fail-closed
+  paths are covered too: a key that does not verify leaves no apt source and no
+  package, and a `.deb` whose digest does not match never reaches dpkg. RustDesk
+  install and idempotence are covered on the same lane. Opt-in via
+  `RLDYOUR_CONTAINER_TESTS=1`; systemd, GNOME and macOS remain out of reach and
+  are named as such.
+- `scripts/ubuntu/desktop.sh` gained the `BASH_SOURCE` guard the other three
+  entry scripts already had. Without it every test had to cut functions out of
+  the file with `sed`, which tests a copy rather than the script — and no test
+  could exercise a step against a real system at all.
 - `tests/test_agent_context.py` holds the collapsed shape: the Claude file must
   import the guide and stay a delta, neither surface may copy a pin the contract
   owns, no surface may name a retired profile or policy, and the memory corpus

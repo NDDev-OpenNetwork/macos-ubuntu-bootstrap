@@ -690,16 +690,28 @@ RLDYOUR_PRUNE_ADDED_ASSOCIATIONS='import pathlib
 import sys
 
 source = pathlib.Path(sys.argv[1])
-retired = {path.name for path in pathlib.Path(sys.argv[2]).iterdir()}
+# Only the retired launchers, never the mimeapps.list backup that sits
+# beside them in the same directory.
+retired = {
+    path.name
+    for path in pathlib.Path(sys.argv[2]).iterdir()
+    if path.name.endswith('\''.desktop'\'')
+}
 section = ""
 for line in source.read_text(encoding='\''utf-8'\'').splitlines(keepends=True):
     stripped = line.strip()
     if stripped.startswith('\''['\'') and stripped.endswith('\'']'\''):
         section = stripped
     elif section == '\''[Added Associations]'\'' and '\''='\'' in stripped:
-        handlers = [h for h in stripped.split('\''='\'', 1)[1].split('\'';'\'') if h]
-        if handlers and all(h in retired for h in handlers):
-            continue
+        key, _, value = stripped.partition('\''='\'')
+        handlers = [h for h in value.split('\'';'\'') if h]
+        survivors = [h for h in handlers if h not in retired]
+        if handlers and not survivors:
+            continue  # every handler on this line was retired
+        if survivors != handlers:
+            # Keep the association, drop only the dead references. Removing
+            # the whole line would unregister a handler we never touched.
+            line = key + '\''='\'' + '\'';'\''.join(survivors) + '\'';\n'\''
     sys.stdout.write(line)'
 
 # GIO writes userapp-<Name>-<6 chars>.desktop whenever something picks a custom

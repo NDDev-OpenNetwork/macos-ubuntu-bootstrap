@@ -19,6 +19,11 @@ jobs:
       contents: read
     uses: NDDev-it-com/ci-workflows/.github/workflows/docs-quality.yml@7f69c724923d06b2c2057c5a6ad341c37f1a8995 # 0.13.3
     with:
+      # Public repo: pull_request runs untrusted fork code. Pin the hosted runner
+      # explicitly — several ci-workflows reusables now default `runner` to the
+      # self-hosted `amsterdam` label, so inheriting the default on a pin bump
+      # would put fork PRs on trusted private infrastructure.
+      runner: ubuntu-latest
       # Broken-link detection (lychee). Exclude openai.com: its marketing pages
       # return 403 to link-checkers (bot-blocked) — a false positive, valid in a
       # browser.

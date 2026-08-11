@@ -290,3 +290,21 @@ Docker runtime evidence that was not actually produced.
   immutable release publication.
 - Move any superproject gitlink only after this repository's changes are pushed
   and verified.
+- **CodeQL mode is `default`, and `.github/workflows/codeql.yml` is inert.**
+  Code scanning runs through CodeQL default setup (configured 2026-07-31 for
+  `actions` and `python`); the tracked advanced-setup workflow is
+  `disabled_manually` at the platform and last ran 2026-07-03, failing. The file
+  is kept for a possible switch back, but do not read its presence as evidence
+  that it runs — check `GET /repos/{owner}/{repo}/actions/workflows`. Exactly
+  one mode is intended at a time: re-enabling the workflow means disabling
+  default setup first, because configuration attachment is atomic and forcing
+  default setup onto a repository with an active advanced setup fails the whole
+  attachment.
+- This repository is public, so `pull_request` executes untrusted fork code.
+  Every caller of a `ci-workflows` reusable that exposes a `runner` input must
+  pass `runner: ubuntu-latest` explicitly and keep it. Several of those
+  reusables default `runner` to the estate's self-hosted `amsterdam` label, and
+  a default belongs to the pinned commit — so dropping the explicit value would
+  let a routine Dependabot pin bump route fork PRs onto trusted private
+  infrastructure with no diff here to review. When reviewing a pin bump, diff
+  the reusable's `inputs.runner.default` between the old and new commit.

@@ -301,7 +301,8 @@
       "install_method": "tarball",
       "url": "https://td.telegram.org/tlinux/tsetup.7.0.7.tar.xz",
       "archive_sha256": "45e4bdbe9bdbc800916b81147210f912f5c72f069fdec6f9b201fe305d0d2d9c",
-      "archive_kind": "tar0",
+      "architectures": ["x86_64"],
+      "archive_kind": "tarx",
       "archive_members": [
         "Telegram/Telegram"
       ],

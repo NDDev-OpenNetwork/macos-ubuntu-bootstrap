@@ -213,14 +213,18 @@ USER_TOOLS=(
   # Telegram Desktop official portable build. Only Telegram/Telegram is
   # published. The binary also has an internal updater, disabled separately by
   # install_telegram_update_policy so it cannot mutate this receipt-bound tree.
-  # x86_64-only: Telegram does not publish an arm64 Linux portable build.
-  "telegram;7.0.7;tarx;Telegram/Telegram;Telegram/Telegram;telegram-desktop;45e4bdbe9bdbc800916b81147210f912f5c72f069fdec6f9b201fe305d0d2d9c;45e4bdbe9bdbc800916b81147210f912f5c72f069fdec6f9b201fe305d0d2d9c;https://td.telegram.org/tlinux/tsetup.7.0.7.tar.xz;https://td.telegram.org/tlinux/tsetup.7.0.7.tar.xz"
+  # x86_64 only: Telegram publishes no arm64 Linux portable build, so the arm64
+  # digest and URL are deliberately empty and the row is skipped there. They
+  # used to hold the x86_64 values, which meant an arm64 desktop verified the
+  # SHA-256 of an executable it could not run.
+  "telegram;7.0.7;tarx;Telegram/Telegram;Telegram/Telegram;telegram-desktop;45e4bdbe9bdbc800916b81147210f912f5c72f069fdec6f9b201fe305d0d2d9c;;https://td.telegram.org/tlinux/tsetup.7.0.7.tar.xz;"
 )
 
 # Telegram v7.0.7 commit ee93b401 installs these four files from
 # InstallLauncher(). Our externalupdater.d policy intentionally makes that
 # function return before it writes anything, so bootstrap must publish the
-# exact upstream assets itself. Rows are source_url;sha256;XDG_DATA_HOME path.
+# exact upstream assets itself. Rows are source_url;sha256;path under
+# ~/.local/share, which is the location the contract declares.
 TELEGRAM_DESKTOP_ASSETS=(
   "https://raw.githubusercontent.com/telegramdesktop/tdesktop/ee93b401ced86ece3f2582fc2ca4da72dfc4f06a/Telegram/Resources/art/logo_256.png;3fb1400c7dc9bbc3b5cb3ffedcbf4a9b09c53e28b57a7ff33a8a6b9048864090;icons/hicolor/256x256/apps/org.telegram.desktop.png"
   "https://raw.githubusercontent.com/telegramdesktop/tdesktop/ee93b401ced86ece3f2582fc2ca4da72dfc4f06a/Telegram/Resources/icons/tray_monochrome.svg;a93380f2c7e6aae4d5fde8940020bd966e97ad8c4880f45c016edfef3f5193e1;icons/hicolor/symbolic/apps/org.telegram.desktop-symbolic.svg"
@@ -384,7 +388,7 @@ install_user_tools() {
 rldyour::ubuntu::install_telegram_update_policy() {
   local launcher="$HOME/.local/bin/telegram-desktop"
   local namespace="$HOME/.local/share/rldyour/telegram"
-  local policy_dir="${XDG_DATA_HOME:-$HOME/.local/share}/TelegramDesktop/externalupdater.d"
+  local policy_dir="$HOME/.local/share/TelegramDesktop/externalupdater.d"
   local policy="$policy_dir/macos-ubuntu-bootstrap"
   local marker="# Managed by macos-ubuntu-bootstrap: telegram-external-updater-v1"
   local resolved tmp
@@ -448,7 +452,7 @@ rldyour::ubuntu::install_telegram_update_policy() {
 rldyour::ubuntu::install_telegram_desktop_assets() {
   [ "$GUI_ENABLED" -eq 1 ] || return 0
 
-  local data_home="${XDG_DATA_HOME:-$HOME/.local/share}"
+  local data_home="$HOME/.local/share"
   local icons_root="$data_home/icons/hicolor"
   local row url expected relative target parent actual tmp
 
@@ -580,7 +584,7 @@ install_desktop_entries() {
 # disabled. Retire only our marker-owned legacy entry so the desktop file ID,
 # running App ID, icon identity, MIME handlers, and GNOME favorite all agree.
 rldyour::ubuntu::retire_telegram_legacy_managed_entry() {
-  local data_home="${XDG_DATA_HOME:-$HOME/.local/share}"
+  local data_home="$HOME/.local/share"
   local legacy="$data_home/applications/telegram.desktop"
   local marker backup_root backup_dir
 
@@ -852,6 +856,15 @@ ensure_pinned_source_tool() {
     aarch64|arm64) sha="$sha_arm64"; url="$url_arm64"; members="$members_arm64" ;;
     *) rldyour::log "error" "$name $version has no tracked artifact for $(uname -m)"; return 1 ;;
   esac
+  # An empty pair is a deliberate declaration that upstream publishes nothing
+  # for this architecture. Telegram is the only such row: it ships an x86_64
+  # portable build only, and the fields used to be filled with the x86_64 URL
+  # and digest -- so an arm64 desktop verified its SHA-256 happily and then
+  # installed a binary it cannot execute.
+  if [ -z "$url" ] || [ -z "$sha" ]; then
+    rldyour::log "info" "$name $version: upstream publishes no $(uname -m) build; skipped"
+    return 0
+  fi
 
   local destination parent
   destination="$HOME/.local/share/rldyour/$name/$version"

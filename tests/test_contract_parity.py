@@ -142,15 +142,31 @@ def test_user_tools_match_the_contract() -> None:
     for name, row in rows.items():
         spec = declared[name]
         assert row[1] == spec["version"], f"{name}: version drift ({row[1]} vs {spec['version']})"
-        # herdr uses per-arch sha256 dict; telegram uses a single archive_sha256
-        # (same hash for both arch slots in the bash array since the tarball is
-        # x86_64-only and the arm64 slot is a mirror for the parser).
+        # herdr publishes both architectures and uses a per-arch sha256 dict;
+        # telegram publishes x86_64 only and uses a single archive_sha256.
+        #
+        # This assertion used to REQUIRE the arm64 slot to repeat the x86_64
+        # digest for a single-architecture tool, which is how an arm64 desktop
+        # came to verify the SHA-256 of a binary it cannot execute. An
+        # architecture upstream does not publish must be declared absent.
         if "sha256" in spec:
             assert row[6] == spec["sha256"]["x86_64"], f"{name}: x64 SHA-256 drift"
             assert row[7] == spec["sha256"]["aarch64"], f"{name}: arm64 SHA-256 drift"
         elif "archive_sha256" in spec:
             assert row[6] == spec["archive_sha256"], f"{name}: archive SHA-256 drift"
-            assert row[7] == spec["archive_sha256"], f"{name}: archive SHA-256 (arm64 slot) drift"
+            architectures = spec.get("architectures", ["x86_64", "aarch64"])
+            if "aarch64" in architectures:
+                assert row[7] == spec["archive_sha256"], f"{name}: arm64 SHA-256 drift"
+            else:
+                assert row[7] == "", (
+                    f"{name}: contract declares {architectures} but the row fills "
+                    "the arm64 slot; an unpublished architecture must be empty"
+                )
+                assert row[9] == "", f"{name}: arm64 URL must be empty too"
+        if "archive_kind" in spec:
+            assert row[2] == spec["archive_kind"], (
+                f"{name}: archive kind drift ({row[2]} vs {spec['archive_kind']})"
+            )
 
 
 def _declared_debs() -> dict:

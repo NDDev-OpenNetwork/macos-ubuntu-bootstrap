@@ -107,6 +107,24 @@ All notable changes to this module will be documented in this file.
   repository path is charset-validated like the SSH destination was, and each
   local dirty state (unstaged, staged, untracked) now fails with its own reason
   instead of exiting silently.
+- **An arm64 desktop no longer installs an x86_64 Telegram.** The row repeated
+  the x86_64 URL and digest in the arm64 fields, so an arm64 device verified the
+  SHA-256 of a binary it cannot execute and then published a launcher for it.
+  Telegram publishes an x86_64 portable build only; that is now declared —
+  empty arm64 fields, `architectures: ["x86_64"]` in the contract — and the
+  installer reports the row as skipped there while verification stops requiring
+  it. The parity test that used to *require* the arm64 slot to repeat the
+  x86_64 digest was the reason the gap survived review; it now rejects a filled
+  slot for an architecture the contract says is unpublished, and no row other
+  than Telegram may declare one.
+- **The Telegram paths no longer split under `XDG_DATA_HOME`.** `install.sh`
+  consulted it for the updater policy, the icons and the legacy entry, while the
+  contract, `verify.sh` and `device_integrity` all declare
+  `${HOME}/.local/share`. With the variable set the feature landed half in one
+  place and half in the other, and every check looked at the wrong half. The
+  installer now uses the location the contract declares. The contract's
+  `archive_kind` for Telegram also said `tar0` while the installer used `tarx`;
+  parity now covers that field.
 - **Generated Telegram `userapp-*` launchers are retired.** GIO writes
   `userapp-<Name>-<6 chars>.desktop` whenever something picks a custom
   application for a scheme and registers it under `[Added Associations]`. Two
@@ -204,6 +222,10 @@ All notable changes to this module will be documented in this file.
   pointer, well-formed per-architecture digests, and every URL and digest
   present in `desktop.sh`. As written they would not have covered RustDesk at
   all.
+- The verifier is now held to the same Telegram icon digests as the contract.
+  The four digests live in four places and the parity check covered only
+  contract↔installer, so a version bump could have left verification gating on
+  the previous release's icons.
 - Telegram `userapp` retirement is covered end to end: a generated pair is
   retired while a `userapp` entry for another application survives, a
   hand-written lookalike is preserved and fails closed, the dry run changes

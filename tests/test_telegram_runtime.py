@@ -486,3 +486,93 @@ def test_userapp_retirement_runs_after_the_generated_sweep() -> None:
 def test_verifier_rejects_a_surviving_telegram_userapp_entry() -> None:
     verify = (ROOT / "scripts/ubuntu/verify.sh").read_text(encoding="utf-8")
     assert "userapp-*.desktop" in verify
+
+
+# ---------------- one source of truth for the pinned assets ----------------
+
+
+VERIFY = ROOT / "scripts/ubuntu/verify.sh"
+
+
+def _contract() -> dict:
+    return json.loads((ROOT / "config/rldyour-contract.json").read_text(encoding="utf-8"))
+
+
+def test_verifier_gates_on_the_same_icon_digests_as_the_contract() -> None:
+    """The four digests live in the contract, the installer, the verifier and a
+    test. The parity check covered only contract<->installer, so a version bump
+    could leave the verifier gating on the previous release's icons."""
+    desktop = _contract()["desktop_entries"]["telegram"]
+    verify = VERIFY.read_text(encoding="utf-8")
+    for asset in desktop["icon_assets"]:
+        assert asset["sha256"] in verify, (
+            f"verify.sh does not gate on {asset['target']}"
+        )
+        relative = asset["target"].split("${HOME}/", 1)[1]
+        assert relative in verify, f"verify.sh does not check {relative}"
+
+
+def test_telegram_paths_do_not_diverge_between_install_and_verify() -> None:
+    """install.sh consulted XDG_DATA_HOME for three Telegram paths while the
+    contract, verify.sh and device_integrity all declare ${HOME}/.local/share.
+    With XDG_DATA_HOME set the feature split in half: policy and icons landed
+    in one place, the launcher and every check looked in another."""
+    installer = INSTALL.read_text(encoding="utf-8")
+    assert "XDG_DATA_HOME" not in installer, (
+        "install.sh must use the location the contract declares"
+    )
+    contract_target = _contract()["user_tools"]["telegram"][
+        "external_updater_policy_target"
+    ]
+    assert contract_target.startswith("${HOME}/.local/share/")
+    # The installer composes the path from a directory and a filename, so check
+    # the two halves rather than the joined literal.
+    directory, _, filename = contract_target.split("${HOME}/", 1)[1].rpartition("/")
+    assert directory in installer, f"install.sh does not write into {directory}"
+    assert filename in installer
+    verify = VERIFY.read_text(encoding="utf-8")
+    assert directory in verify and filename in verify
+
+
+def test_telegram_declares_no_arm64_artifact() -> None:
+    """The row used to repeat the x86_64 URL and digest in the arm64 fields, so
+    an arm64 desktop verified the SHA-256 of a binary it cannot execute."""
+    installer = INSTALL.read_text(encoding="utf-8")
+    row = next(
+        line for line in installer.splitlines() if line.strip().startswith('"telegram;')
+    )
+    fields = row.strip().strip('"').split(";")
+    name, version, kind = fields[0], fields[1], fields[2]
+    sha_x64, sha_arm64, url_x64, url_arm64 = fields[6], fields[7], fields[8], fields[9]
+    assert name == "telegram" and kind == "tarx"
+    assert sha_x64 and url_x64
+    assert sha_arm64 == "" and url_arm64 == "", "arm64 must be declared absent, not faked"
+    assert version in url_x64
+
+
+def test_only_telegram_declares_a_missing_architecture() -> None:
+    """An empty pair is a deliberate 'upstream publishes nothing here'. Any
+    other row with one is a typo that would silently skip a required tool."""
+    import re
+
+    installer = INSTALL.read_text(encoding="utf-8")
+    for table in ("PINNED_SOURCE_TOOLS", "USER_TOOLS"):
+        block = re.search(rf"^{table}=\((.*?)^\)", installer, re.M | re.S)
+        assert block, f"{table} missing"
+        for line in block.group(1).splitlines():
+            line = line.strip()
+            if not line.startswith('"'):
+                continue
+            fields = line.strip('"').split(";")
+            incomplete = not fields[7] or not fields[9]
+            if incomplete:
+                assert fields[0] == "telegram", (
+                    f"{fields[0]} declares no arm64 artifact; only telegram may"
+                )
+
+
+def test_arm64_verification_does_not_require_telegram() -> None:
+    verify = VERIFY.read_text(encoding="utf-8")
+    assert "upstream publishes no $(uname -m) build" in verify
+    telegram_gate = verify.split("rldyour::require_cmd herdr required", 1)[1]
+    assert "x86_64|amd64)" in telegram_gate.split("esac", 1)[0]

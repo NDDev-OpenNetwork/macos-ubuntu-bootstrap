@@ -286,11 +286,20 @@ if [ "$PROFILE" != "server" ]; then
   # using the same managed-symlink + receipt contract as pinned source tools; a
   # failed install must not stay invisible.
   rldyour::require_cmd herdr required
-  rldyour::require_cmd telegram-desktop required
-  rldyour::ubuntu_verify::telegram_policy || {
-    rldyour::log "missing" "Telegram updater isolation and XCB launcher contract"
-    exit 1
-  }
+  # Telegram publishes an x86_64 portable build only, so an arm64 desktop
+  # legitimately has none and must not be failed for it.
+  case "$(uname -m)" in
+    x86_64|amd64)
+      rldyour::require_cmd telegram-desktop required
+      rldyour::ubuntu_verify::telegram_policy || {
+        rldyour::log "missing" "Telegram updater isolation and XCB launcher contract"
+        exit 1
+      }
+      ;;
+    *)
+      rldyour::log "info" "Telegram skipped: upstream publishes no $(uname -m) build"
+      ;;
+  esac
   # cmake-language-server ships in PYTHON_SOURCE_TOOLS but was never verified,
   # so a failed install stayed invisible on Ubuntu while macOS gated on it.
   rldyour::require_cmd cmake-language-server required

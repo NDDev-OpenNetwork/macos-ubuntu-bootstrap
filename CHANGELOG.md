@@ -42,6 +42,21 @@ All notable changes to this module will be documented in this file.
   repository path is charset-validated like the SSH destination was, and each
   local dirty state (unstaged, staged, untracked) now fails with its own reason
   instead of exiting silently.
+- **Generated Telegram `userapp-*` launchers are retired.** GIO writes
+  `userapp-<Name>-<6 chars>.desktop` whenever something picks a custom
+  application for a scheme and registers it under `[Added Associations]`. Two
+  survived the v3 migration on the estate's own desktop. They do *not* shadow
+  the default handler — `[Default Applications]` correctly names
+  `org.telegram.desktop.desktop` — but they invoke `telegram-desktop -- %u`
+  without the `env QT_QPA_PLATFORM=xcb` wrapper the managed entry exists for,
+  so a chooser, an enumerating caller or a later default reset can still start
+  Telegram in the Wayland mode that fails with `EGL_BAD_MATCH` on the NVIDIA
+  workstation. Bootstrap now retires only entries whose `Exec` is bound to the
+  managed launcher and whose shape matches GIO's exactly, backs them up
+  recoverably together with the original `mimeapps.list`, and removes just the
+  `[Added Associations]` lines left dangling by the retirement. A `userapp`
+  entry for any other application, and every other line and section of
+  `mimeapps.list`, is preserved byte for byte. Verification rejects a survivor.
 - **Ubuntu desktop customization reports what actually happened.** The composer
   ran four `step || warn` lines and then printed "desktop customization
   complete" unconditionally, so a desktop missing BrowserOS or still carrying
@@ -119,6 +134,10 @@ All notable changes to this module will be documented in this file.
   real shellcheck findings in `desktop.sh`, one of them the `&& ok || die`
   construct behind the skipped-Firefox-step defect. `EXCLUDED_PATHS` is empty on
   purpose.
+- Telegram `userapp` retirement is covered end to end: a generated pair is
+  retired while a `userapp` entry for another application survives, a
+  hand-written lookalike is preserved and fails closed, the dry run changes
+  nothing, and the ordering after the path-hashed sweep is asserted.
 - Desktop customization has its own offline test module: per-step failure
   injection proving later steps still run, required-versus-optional aggregation,
   skipped preconditions, the installer wiring, and a `bash -n` check over every

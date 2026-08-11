@@ -120,6 +120,14 @@ rldyour::ubuntu_verify::telegram_policy() {
       "$HOME/.local/share/dbus-1/services"/org.telegram.desktop._*.service; do
       [ ! -e "$candidate" ] && [ ! -L "$candidate" ] || return 1
     done
+    # GIO userapp entries bound to the Telegram launcher. They do not shadow
+    # the default handler, but they invoke it without the XCB wrapper the
+    # managed entry exists for, so a chooser or a default reset can still start
+    # Telegram in the failing Wayland mode.
+    for candidate in "$HOME/.local/share/applications"/userapp-*.desktop; do
+      [ -f "$candidate" ] || continue
+      grep -Eq "^Exec=($launcher|$resolved|telegram-desktop)( |$)" "$candidate" && return 1
+    done
     if command -v xdg-mime >/dev/null 2>&1; then
       [ "$(xdg-mime query default x-scheme-handler/tg)" = "$desktop_id" ] || return 1
       [ "$(xdg-mime query default x-scheme-handler/tonsite)" = "$desktop_id" ] || return 1

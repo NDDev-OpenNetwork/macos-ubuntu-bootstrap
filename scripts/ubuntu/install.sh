@@ -662,6 +662,107 @@ rldyour::ubuntu::retire_telegram_generated_integrations() {
   rldyour::log "ok" "retired generated Telegram integrations; backup: ${backup_dir}"
 }
 
+# Rewrite mimeapps.list, dropping only [Added Associations] lines whose
+# every handler was just retired. Kept as a named program so the shell
+# function below stays readable.
+RLDYOUR_PRUNE_ADDED_ASSOCIATIONS='import pathlib
+import sys
+
+source = pathlib.Path(sys.argv[1])
+retired = {path.name for path in pathlib.Path(sys.argv[2]).iterdir()}
+section = ""
+for line in source.read_text(encoding='\''utf-8'\'').splitlines(keepends=True):
+    stripped = line.strip()
+    if stripped.startswith('\''['\'') and stripped.endswith('\'']'\''):
+        section = stripped
+    elif section == '\''[Added Associations]'\'' and '\''='\'' in stripped:
+        handlers = [h for h in stripped.split('\''='\'', 1)[1].split('\'';'\'') if h]
+        if handlers and all(h in retired for h in handlers):
+            continue
+    sys.stdout.write(line)'
+
+# GIO writes userapp-<Name>-<6 chars>.desktop whenever something picks a custom
+# application for a scheme, and registers it under [Added Associations] in
+# mimeapps.list. Those entries invoke the launcher directly -- `telegram-desktop
+# -- %u` -- WITHOUT the `env QT_QPA_PLATFORM=xcb` wrapper the managed v3 entry
+# exists for. They do not shadow the default handler, so the common path stays
+# correct, but an application chooser, an enumerating caller, or a later default
+# reset can still start Telegram in the Wayland mode that fails with
+# EGL_BAD_MATCH on the estate's NVIDIA workstation. Retire only entries whose
+# Exec is bound to the managed launcher; anything else is preserved.
+rldyour::ubuntu::retire_telegram_userapp_entries() {
+  local launcher="$HOME/.local/bin/telegram-desktop" resolved candidate name
+  local applications="$HOME/.local/share/applications"
+  local mimeapps="${XDG_CONFIG_HOME:-$HOME/.config}/mimeapps.list"
+  local backup_root backup_dir tmp
+  local -a candidates=() retired=()
+
+  for candidate in "$applications"/userapp-*.desktop; do
+    [ -e "$candidate" ] || [ -L "$candidate" ] || continue
+    candidates+=("$candidate")
+  done
+  [ "${#candidates[@]}" -gt 0 ] || return 0
+
+  if [ ! -L "$launcher" ] || [ ! -x "$launcher" ]; then
+    rldyour::log "error" "managed Telegram launcher is unavailable during userapp migration"
+    return 1
+  fi
+  resolved="$(readlink -f -- "$launcher")" || return 1
+
+  for candidate in "${candidates[@]}"; do
+    name="$(basename "$candidate")"
+    # Not ours: a userapp entry for another application must survive intact.
+    if ! grep -Eq "^Exec=(${launcher}|${resolved}|telegram-desktop)( |$)" "$candidate" 2>/dev/null; then
+      continue
+    fi
+    if [ -L "$candidate" ] || [ ! -f "$candidate" ]; then
+      rldyour::log "error" "Telegram userapp entry is unsafe; preserved: ${candidate}"
+      return 1
+    fi
+    # Exact GIO shape. A hand-written file that merely looks similar is
+    # preserved rather than retired.
+    if [[ ! "$name" =~ ^userapp-.+-[A-Za-z0-9]{6}\.desktop$ ]] ||
+      ! grep -Fxq 'NoDisplay=true' "$candidate" ||
+      ! grep -Fxq 'Comment=Custom definition for Telegram Desktop' "$candidate"; then
+      rldyour::log "error" "Telegram userapp entry diverged from the generated shape; preserved: ${candidate}"
+      return 1
+    fi
+    retired+=("$candidate")
+  done
+  [ "${#retired[@]}" -gt 0 ] || return 0
+
+  if [ "$RLDYOUR_DRY_RUN" -eq 1 ]; then
+    rldyour::log "info" "[DRY-RUN] retire ${#retired[@]} generated Telegram userapp launcher(s) and their added associations"
+    return 0
+  fi
+
+  backup_root="$HOME/.local/share/rldyour/backups/telegram-integrations"
+  mkdir -p "$backup_root" || return 1
+  chmod 0700 "$backup_root" || return 1
+  backup_dir="$(mktemp -d "$backup_root/userapp.XXXXXX")" || return 1
+  for candidate in "${retired[@]}"; do
+    mv "$candidate" "$backup_dir/$(basename "$candidate")" || return 1
+  done
+
+  # Drop the now-dangling [Added Associations] lines that name exactly the
+  # files just retired. Every other line, section and ordering is preserved
+  # byte for byte: this file is owner-owned and only its dead references are
+  # ours to remove.
+  if [ -f "$mimeapps" ] && [ ! -L "$mimeapps" ]; then
+    cp -p "$mimeapps" "$backup_dir/mimeapps.list" || return 1
+    tmp="$(mktemp "${mimeapps}.tmp.XXXXXX")" || return 1
+    if ! python3 -c "$RLDYOUR_PRUNE_ADDED_ASSOCIATIONS" "$mimeapps" "$backup_dir" >"$tmp"; then
+      rm -f "$tmp"
+      rldyour::log "error" "could not rewrite ${mimeapps}; retired files are in ${backup_dir}"
+      return 1
+    fi
+    chmod --reference="$mimeapps" "$tmp" 2>/dev/null || chmod 0644 "$tmp"
+    mv -f "$tmp" "$mimeapps" || { rm -f "$tmp"; return 1; }
+  fi
+
+  rldyour::log "ok" "retired ${#retired[@]} generated Telegram userapp launcher(s); backup: ${backup_dir}"
+}
+
 # Make every normal desktop launch resolve to the managed Telegram entry. Only
 # an existing Telegram favorite is migrated; the bootstrap never adds a new
 # favorite or rewrites unrelated GNOME ordering.
@@ -1563,6 +1664,7 @@ main() {
     rldyour::ubuntu::configure_telegram_desktop_integration
     rldyour::ubuntu::retire_telegram_legacy_managed_entry
     rldyour::ubuntu::retire_telegram_generated_integrations
+    rldyour::ubuntu::retire_telegram_userapp_entries
     rldyour::ubuntu::configure_telegram_desktop_integration
     if [ "$user_tools_failed" -ne 0 ]; then
       rldyour::log "error" "one or more user tools remain unmanaged or divergent; all user-tool repairs were attempted"

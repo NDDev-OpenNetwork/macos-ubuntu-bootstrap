@@ -359,3 +359,130 @@ def test_divergent_generated_telegram_integration_is_preserved(
     assert result.returncode != 0
     assert "diverged; preserved" in result.stdout
     assert desktop.read_text(encoding="utf-8") == "user-owned\n"
+
+
+# --------------------- GIO userapp launchers (v3 migration) ---------------------
+#
+# GIO writes userapp-<Name>-<6 chars>.desktop when something picks a custom
+# application for a scheme. On the estate's own desktop two of these survived
+# the v3 migration: they sit in [Added Associations], so they do NOT shadow the
+# default handler, but they invoke `telegram-desktop -- %u` without the
+# `env QT_QPA_PLATFORM=xcb` wrapper the managed entry exists for.
+
+
+def _managed_launcher(home: Path) -> None:
+    binary = home / ".local/share/rldyour/telegram/7.0.7/Telegram/Telegram"
+    binary.parent.mkdir(parents=True, exist_ok=True)
+    binary.write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
+    binary.chmod(0o755)
+    launcher = home / ".local/bin/telegram-desktop"
+    launcher.parent.mkdir(parents=True, exist_ok=True)
+    launcher.symlink_to(binary)
+
+
+def _userapp(home: Path, suffix: str, *, exec_line: str, comment: str) -> Path:
+    applications = home / ".local/share/applications"
+    applications.mkdir(parents=True, exist_ok=True)
+    entry = applications / f"userapp-Telegram Desktop-{suffix}.desktop"
+    entry.write_text(
+        "[Desktop Entry]\nEncoding=UTF-8\nVersion=1.0\nType=Application\n"
+        f"NoDisplay=true\n{exec_line}\nName=Telegram Desktop\n{comment}\n",
+        encoding="utf-8",
+    )
+    return entry
+
+
+def _run_userapp_retirement(home: Path, *, dry_run: bool = False) -> subprocess.CompletedProcess[str]:
+    env = os.environ.copy()
+    env["HOME"] = str(home)
+    env["RLDYOUR_DRY_RUN"] = "1" if dry_run else "0"
+    env.pop("XDG_DATA_HOME", None)
+    env.pop("XDG_CONFIG_HOME", None)
+    return subprocess.run(
+        ["bash", "-c", 'source "$1"\nrldyour::ubuntu::retire_telegram_userapp_entries', "_", str(INSTALL)],
+        cwd=ROOT, env=env, text=True, capture_output=True, check=False,
+    )
+
+
+def test_generated_telegram_userapp_entries_are_retired_recoverably(tmp_path: Path) -> None:
+    _managed_launcher(tmp_path)
+    ours = _userapp(
+        tmp_path, "T5RGT3",
+        exec_line="Exec=telegram-desktop -- %u",
+        comment="Comment=Custom definition for Telegram Desktop",
+    )
+    foreign = tmp_path / ".local/share/applications/userapp-GIMP-AB12CD.desktop"
+    foreign.write_text(
+        "[Desktop Entry]\nType=Application\nNoDisplay=true\nExec=gimp %U\n"
+        "Name=GIMP\nComment=Custom definition for GIMP\n",
+        encoding="utf-8",
+    )
+    mimeapps = tmp_path / ".config/mimeapps.list"
+    mimeapps.parent.mkdir(parents=True, exist_ok=True)
+    mimeapps.write_text(
+        "[Default Applications]\n"
+        "x-scheme-handler/tg=org.telegram.desktop.desktop\n"
+        "text/html=google-chrome.desktop\n"
+        "\n"
+        "[Added Associations]\n"
+        "x-scheme-handler/tg=userapp-Telegram Desktop-T5RGT3.desktop;\n"
+        "image/png=userapp-GIMP-AB12CD.desktop;\n",
+        encoding="utf-8",
+    )
+
+    result = _run_userapp_retirement(tmp_path)
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert not ours.exists()
+    assert foreign.exists(), "a userapp entry for another application must survive"
+
+    remaining = mimeapps.read_text(encoding="utf-8")
+    assert "userapp-Telegram Desktop-T5RGT3.desktop" not in remaining
+    assert "image/png=userapp-GIMP-AB12CD.desktop;" in remaining
+    assert "x-scheme-handler/tg=org.telegram.desktop.desktop" in remaining
+    assert "text/html=google-chrome.desktop" in remaining
+
+    backups = list((tmp_path / ".local/share/rldyour/backups/telegram-integrations").glob("userapp.*"))
+    assert len(backups) == 1
+    names = {p.name for p in backups[0].iterdir()}
+    assert "userapp-Telegram Desktop-T5RGT3.desktop" in names
+    assert "mimeapps.list" in names, "the original mimeapps.list must be recoverable"
+
+
+def test_divergent_telegram_userapp_entry_is_preserved(tmp_path: Path) -> None:
+    """A hand-written entry that merely resembles the generated shape stays."""
+    _managed_launcher(tmp_path)
+    handmade = _userapp(
+        tmp_path, "T5RGT3",
+        exec_line="Exec=telegram-desktop -- %u",
+        comment="Comment=my own launcher",
+    )
+    result = _run_userapp_retirement(tmp_path)
+    assert result.returncode != 0
+    assert "diverged from the generated shape; preserved" in result.stdout
+    assert handmade.exists()
+
+
+def test_userapp_retirement_dry_run_changes_nothing(tmp_path: Path) -> None:
+    _managed_launcher(tmp_path)
+    ours = _userapp(
+        tmp_path, "T5RGT3",
+        exec_line="Exec=telegram-desktop -- %u",
+        comment="Comment=Custom definition for Telegram Desktop",
+    )
+    result = _run_userapp_retirement(tmp_path, dry_run=True)
+    assert result.returncode == 0, result.stderr
+    assert "[DRY-RUN] retire 1 generated Telegram userapp launcher" in result.stdout
+    assert ours.exists()
+
+
+def test_userapp_retirement_runs_after_the_generated_sweep() -> None:
+    source = INSTALL.read_text(encoding="utf-8")
+    main = source.split("main() {", 1)[1]
+    assert main.index("rldyour::ubuntu::retire_telegram_generated_integrations") < main.index(
+        "rldyour::ubuntu::retire_telegram_userapp_entries"
+    )
+
+
+def test_verifier_rejects_a_surviving_telegram_userapp_entry() -> None:
+    verify = (ROOT / "scripts/ubuntu/verify.sh").read_text(encoding="utf-8")
+    assert "userapp-*.desktop" in verify

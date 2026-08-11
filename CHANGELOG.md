@@ -25,6 +25,17 @@ All notable changes to this module will be documented in this file.
 
 ### Changed
 
+- **The codex harness now applies the unrestricted `full-auto` setup by
+  default.** The setup was `safe` and `full-auto` required the explicit owner
+  flag `RLDYOUR_CODEX_FULL_AUTO=1`; that gate is gone and the flag no longer
+  exists. This is a deliberate decision for an owner-controlled workstation, but
+  it is a security-relevant default and it shipped inside a commit titled
+  "close device reproducibility gaps" with no changelog entry, no `SECURITY.md`
+  note, and `.claude/CLAUDE.md` still instructing the old gated behaviour. It is
+  recorded here so the change reads as a decision rather than a side effect.
+  Re-running bootstrap reapplies the complete profile, including both
+  `config.toml` and `AGENTS.md`, so a stale safe instruction file cannot
+  contradict the runtime permissions.
 - ZCode remains in the catalogue but is explicitly `on-pause`; bootstrap does
   not install, start, verify, authenticate, remove, or adopt it.
 

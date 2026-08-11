@@ -401,6 +401,72 @@ def _user_tool_state(bin_dir: Path, home: Path) -> dict[str, dict[str, Any]]:
     return state
 
 
+def _owned_prefix(spec: dict[str, Any], home: Path) -> Path | None:
+    """Resolve the directory a harness's declared owner publishes into."""
+    default = spec.get("owned_prefix_default")
+    if not isinstance(default, str):
+        return None
+    override = os.environ.get(spec.get("owned_prefix_env", ""), "").strip()
+    raw = override or default
+    return _expand_home_path(raw, home).resolve(strict=False)
+
+
+def _harness_state(home: Path) -> dict[str, dict[str, Any]]:
+    """Record where each catalogued harness resolves on this device.
+
+    ``one-owner-per-harness`` was prose only. Nothing on a device could say
+    whether ``codex`` resolved to the target ``nddev-codex-app`` publishes or to
+    a second copy from a package-manager global, and nothing recorded that a
+    delegated on-pause harness was installed anyway. This records the observed
+    facts; the contract, not the receipt, decides what they mean.
+    """
+    contract = load_contract()
+    detection = contract.get("harnesses", {}).get("detection", {})
+    state: dict[str, dict[str, Any]] = {}
+    for name, spec in detection.items():
+        if name.startswith("_") or not isinstance(spec, dict):
+            continue
+        command = spec.get("command", name)
+        found = shutil.which(command)
+        entry: dict[str, Any] = {"present": str(bool(found))}
+        if found:
+            resolved = Path(found).resolve(strict=False)
+            entry["path"] = found
+            entry["resolved"] = str(resolved)
+            prefix = _owned_prefix(spec, home)
+            if prefix is not None:
+                entry["owned_prefix"] = str(prefix)
+                entry["inside_owned_prefix"] = str(
+                    resolved == prefix or prefix in resolved.parents
+                )
+        state[name] = entry
+    return state
+
+
+def _verify_harness_ownership(state: dict[str, Any]) -> list[str]:
+    """Return one drift line per harness that resolves outside its owner."""
+    contract = load_contract()
+    detection = contract.get("harnesses", {}).get("detection", {})
+    observed = state.get("harnesses", {})
+    drifts: list[str] = []
+    for name, spec in detection.items():
+        if name.startswith("_") or not isinstance(spec, dict):
+            continue
+        if spec.get("enforcement") != "owned-prefix":
+            # observe-only: a delegated on-pause harness is recorded, never
+            # acted on. Presence is evidence, not a failure.
+            continue
+        entry = observed.get(name, {})
+        if entry.get("present") != "True":
+            continue
+        if entry.get("inside_owned_prefix") != "True":
+            drifts.append(
+                f"{name}: resolves to {entry.get('resolved')} outside its owner's "
+                f"target {entry.get('owned_prefix')}"
+            )
+    return drifts
+
+
 def _desktop_entry_state(home: Path) -> dict[str, dict[str, Any]]:
     """Collect each declared desktop entry and its pinned icon assets."""
     contract = load_contract()
@@ -467,6 +533,7 @@ def collect_state(*, home: Path, profile: str) -> dict[str, Any]:
         "pinned_source_tools": _pinned_source_tool_versions(bin_dir),
         "user_tools": _user_tool_state(bin_dir, home),
         "desktop_entries": _desktop_entry_state(home),
+        "harnesses": _harness_state(home),
     }
 
 
@@ -649,6 +716,11 @@ def _verify_contract_versions(state: dict[str, Any], *, profile: str = "desktop"
                 is not True
             ):
                 drifts.append(f"{name}: external updater policy is absent or divergent")
+
+    # Harness ownership is profile-independent: the active harness set is
+    # installed on every profile, so this check sits outside the desktop-only
+    # block above.
+    drifts.extend(_verify_harness_ownership(state))
 
     if drifts:
         fail("device drifts from contract:\n  " + "\n  ".join(drifts))

@@ -88,6 +88,21 @@
       "module_commit": "a69d77f1c62b5e02cdd9b886c412a53cee92e24a",
       "default_setup": "full-auto"
     },
+    "detection": {
+      "_doc": "one-owner-per-harness (RVR-P1-004) was prose only: nothing on a device could tell whether a catalogued harness resolved to the target its declared owner publishes, or to a second copy from a package-manager global. Each entry below is a probe device_integrity records into the receipt. `owned-prefix` fails closed when the command resolves outside the owner's target; `observe-only` records presence without acting, which is what a delegated on-pause harness requires.",
+      "codex": {
+        "command": "codex",
+        "enforcement": "owned-prefix",
+        "owned_prefix_env": "RLDYOUR_CODEX_HOME",
+        "owned_prefix_default": "${HOME}/.codex",
+        "reason": "nddev-codex-app publishes its standalone CLI only under its own target; a codex resolving anywhere else is a second owner."
+      },
+      "zcode": {
+        "command": "zcode",
+        "enforcement": "observe-only",
+        "reason": "Delegated and on-pause. Bootstrap never installs, starts, verifies, removes, or adopts it, so presence is recorded as drift evidence and never acted on."
+      }
+    },
     "delegated": {
       "zcode": {
         "work_policy": "on-pause",

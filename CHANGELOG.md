@@ -28,6 +28,18 @@ All notable changes to this module will be documented in this file.
 - ZCode remains in the catalogue but is explicitly `on-pause`; bootstrap does
   not install, start, verify, authenticate, remove, or adopt it.
 
+### Added
+
+- **One-owner-per-harness is now checkable on a device, not only asserted in
+  prose.** `harnesses.detection` declares a probe per catalogued harness and
+  `device_integrity` records where each one actually resolves. `codex` is
+  enforced against the target its declared owner publishes
+  (`RLDYOUR_CODEX_HOME`, default `~/.codex`), so a second copy from a bun/npm
+  global — the exact shape the contract forbids — becomes a named drift instead
+  of an invisible one. `zcode` is `observe-only`: its presence is recorded as
+  evidence and never acted on, because bootstrap is forbidden from installing,
+  removing, or adopting a delegated on-pause harness.
+
 ### Fixed
 
 - **Remote execution now preserves the caller's argv, and a rejected gate no

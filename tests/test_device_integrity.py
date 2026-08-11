@@ -662,3 +662,107 @@ def _run_cli(*args: str) -> int:
         return di.main()
     finally:
         sys.argv = old
+
+
+# --------------------------- harness ownership ---------------------------
+#
+# one-owner-per-harness (RVR-P1-004) lived only in prose. Nothing on a device
+# could tell whether `codex` resolved to the target nddev-codex-app publishes
+# or to a second copy from a bun/npm global, and nothing recorded that the
+# delegated on-pause `zcode` was installed anyway.
+
+
+def _fake_harness(root: Path, name: str, target: Path) -> Path:
+    """Publish `name` on a fake PATH as a symlink to `target`."""
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
+    target.chmod(0o755)
+    bin_dir = root / "fakebin"
+    bin_dir.mkdir(exist_ok=True)
+    link = bin_dir / name
+    link.symlink_to(target)
+    return bin_dir
+
+
+def test_harness_detection_contract_declares_enforcement() -> None:
+    detection = di.load_contract()["harnesses"]["detection"]
+    assert detection["codex"]["enforcement"] == "owned-prefix"
+    assert detection["codex"]["owned_prefix_env"] == "RLDYOUR_CODEX_HOME"
+    assert detection["codex"]["owned_prefix_default"] == "${HOME}/.codex"
+    # A delegated, on-pause harness must never be enforced: bootstrap is
+    # forbidden from installing, removing or adopting it.
+    assert detection["zcode"]["enforcement"] == "observe-only"
+
+
+def test_codex_inside_its_owner_target_is_not_drift(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    owned = tmp_path / ".codex/packages/standalone/current/bin/codex"
+    bin_dir = _fake_harness(tmp_path, "codex", owned)
+    monkeypatch.setenv("PATH", str(bin_dir))
+    monkeypatch.delenv("RLDYOUR_CODEX_HOME", raising=False)
+
+    state = {"harnesses": di._harness_state(tmp_path)}
+    assert state["harnesses"]["codex"]["inside_owned_prefix"] == "True"
+    assert di._verify_harness_ownership(state) == []
+
+
+def test_codex_from_a_package_manager_global_is_drift(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The exact shape the contract forbids: a second owner publishing codex."""
+    stray = tmp_path / ".bun/install/global/node_modules/.bin/codex"
+    bin_dir = _fake_harness(tmp_path, "codex", stray)
+    monkeypatch.setenv("PATH", str(bin_dir))
+    monkeypatch.delenv("RLDYOUR_CODEX_HOME", raising=False)
+
+    state = {"harnesses": di._harness_state(tmp_path)}
+    assert state["harnesses"]["codex"]["inside_owned_prefix"] == "False"
+    drifts = di._verify_harness_ownership(state)
+    assert len(drifts) == 1
+    assert "outside its owner's target" in drifts[0]
+
+
+def test_codex_home_override_moves_the_owned_prefix(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    elsewhere = tmp_path / "opt/codex-home"
+    owned = elsewhere / "bin/codex"
+    bin_dir = _fake_harness(tmp_path, "codex", owned)
+    monkeypatch.setenv("PATH", str(bin_dir))
+    monkeypatch.setenv("RLDYOUR_CODEX_HOME", str(elsewhere))
+
+    state = {"harnesses": di._harness_state(tmp_path)}
+    assert state["harnesses"]["codex"]["owned_prefix"] == str(elsewhere)
+    assert di._verify_harness_ownership(state) == []
+
+
+def test_installed_zcode_is_recorded_but_never_enforced(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    installed = tmp_path / "opt/ZCode/zcode"
+    bin_dir = _fake_harness(tmp_path, "zcode", installed)
+    monkeypatch.setenv("PATH", str(bin_dir))
+
+    state = {"harnesses": di._harness_state(tmp_path)}
+    entry = state["harnesses"]["zcode"]
+    assert entry["present"] == "True"
+    assert entry["resolved"] == str(installed)
+    # Recorded as evidence, never acted on.
+    assert "owned_prefix" not in entry
+    assert di._verify_harness_ownership(state) == []
+
+
+def test_absent_harness_is_neither_recorded_nor_drift(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("PATH", str(tmp_path / "empty"))
+    state = {"harnesses": di._harness_state(tmp_path)}
+    assert state["harnesses"]["codex"] == {"present": "False"}
+    assert di._verify_harness_ownership(state) == []
+
+
+def test_receipt_carries_the_harness_inventory() -> None:
+    state = di.collect_state(home=Path.home(), profile="desktop")
+    assert "harnesses" in state
+    assert set(state["harnesses"]) == {"codex", "zcode"}

@@ -11,11 +11,16 @@ The bootstrap browser layer has one supported browser backend: CloakBrowser on
 - `com.rldyour.cloakbrowser` (launchd) or
   `rldyour-cloakbrowser.service` (systemd user) owns the persistent headless
   browser and its private `daemon-profile`.
+- On Linux the service pins `DBUS_SESSION_BUS_ADDRESS=disabled:`. The lingering
+  user manager may start before a graphical login, so the headless browser must
+  not activate desktop portal or keyring backends before the GUI exports its
+  display environment.
 - `cloakbrowser-cdp-health` requires the managed service PID and command line to
   match the fixed loopback address, port, and profile. It proves that PID owns
-  the listening socket and that its executable is the exact CloakBrowser binary
-  resolved during the verified install. It then validates the `/json/version`
-  discovery document and WebSocket endpoint.
+  the listening socket, that its executable is the exact CloakBrowser binary
+  resolved during the verified install, and that the Linux unit retains the
+  session-bus isolation. It then validates the `/json/version` discovery
+  document and WebSocket endpoint.
 
 The CDP listener must never be exposed beyond loopback. CDP grants full control
 over pages, cookies, storage, and browser-side JavaScript.

@@ -35,6 +35,7 @@ def test_policy_contract_exposes_only_two_active_providers() -> None:
         (ROOT / "config/rldyour-contract.json").read_text(encoding="utf-8")
     )
     browser = contract["browser_automation"]
+    assert browser["linux_service_dbus_address"] == "disabled:"
     assert browser["active_providers"] == ["playwright-cli", "chrome-devtools-mcp"]
     assert browser["webwright_status"] == "retired-fail-closed"
     assert browser["webwright_enabled"] is False

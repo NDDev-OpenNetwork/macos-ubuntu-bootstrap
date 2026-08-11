@@ -4,6 +4,7 @@
 - Date: 2026-07-10
 - Amended: 2026-07-10 (Webwright retirement and exact runtime receipts)
 - Amended: 2026-08-04 (ADR 0008 introduces the desktop-builds profile, relaxing the "desktop never installs Docker" invariant for local development)
+- Amended: 2026-08-06 (isolate the persistent Linux headless browser from the graphical session D-Bus)
 
 ## Context
 
@@ -34,6 +35,10 @@ All browser automation crosses one fail-closed boundary:
 - CloakBrowser is mandatory on every profile.
 - A managed service owns `http://127.0.0.1:9222`; it is never exposed on a
   non-loopback address.
+- The Linux systemd-user service keeps its pre-login/linger availability but
+  pins `DBUS_SESSION_BUS_ADDRESS=disabled:`. Headless Chromium must not activate
+  desktop portal or keyring backends before a graphical session has exported
+  `DISPLAY`/`WAYLAND_DISPLAY`; the live health gate enforces this unit contract.
 - Chrome DevTools MCP and Playwright CLI are the only active providers. Their
   wrappers reject alternate executables, endpoints, configuration files,
   auto-started stock browsers, and Playwright arbitrary code/file execution.

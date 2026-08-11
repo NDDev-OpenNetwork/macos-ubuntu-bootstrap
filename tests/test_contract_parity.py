@@ -55,6 +55,15 @@ def test_apt_cloak_runtime_matches_contract() -> None:
     )
 
 
+def test_host_build_packages_are_profile_isolated() -> None:
+    code = _parse_bash_array(UBUNTU_INSTALL, "APT_DESKTOP_BUILD_PACKAGES")
+    assert code == set(CONTRACT["ubuntu_apt_packages"]["desktop_build"])
+    profiles = CONTRACT["ubuntu_apt_packages"]["profiles"]
+    assert "desktop_build" in profiles["desktop"]
+    assert "desktop_build" in profiles["desktop-builds"]
+    assert "desktop_build" not in profiles["server"]
+
+
 def test_apt_profiles_reference_valid_groups() -> None:
     """Every profile must reference only groups that exist in the contract."""
     groups = {k for k in CONTRACT["ubuntu_apt_packages"] if not k.startswith("_") and k != "profiles"}
@@ -175,5 +184,4 @@ def test_browseros_desktop_sh_uses_versioned_url_and_sha() -> None:
     assert "cdn.browseros.com" not in desktop_sh, (
         "desktop.sh must not reference the volatile CDN latest pointer"
     )
-
 

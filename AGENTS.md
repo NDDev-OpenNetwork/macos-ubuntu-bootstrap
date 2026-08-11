@@ -70,13 +70,12 @@ operator documentation:
   The harness is owned by its authoritative NDDev module, whose materialized
   checkout GDS device bootstrap passes in an env var:
   - `codex`: `nddev-codex-app` (`RLDYOUR_CODEX_MODULE`); `install-cli`, then
-    `apply --setup safe` (full-auto only via `RLDYOUR_CODEX_FULL_AUTO=1`), then
-    `install-builder`. The module publishes its CLI only under its own target, so
+    `apply --setup full-auto`, then `install-builder`. The module publishes its
+    CLI only under its own target, so
     `${RLDYOUR_CODEX_HOME:-$HOME/.codex}/bin` is part of the managed PATH.
-  - `zcode`: **delegated out of bootstrap** (`harnesses.delegated`, ADR 0006) and
-    owned by the `nddev-harnesses` repository. Its target cannot be adopted
-    unattended, and blocking a device apply on it stranded every later layer. Do
-    not reintroduce a zcode install path, not even a warn-and-continue one.
+  - `zcode`: catalogued but **on-pause** (`harnesses.delegated`, ADR 0006).
+    Bootstrap never installs, starts, verifies, removes, or adopts it. Do not
+    reintroduce a zcode path, not even a warn-and-continue one.
 - CloakBrowser: `0.4.12`. The managed headless service passes `--no-sandbox` on
   Linux only: Ubuntu 23.10+ restrict unprivileged user namespaces through
   AppArmor, so without it the zygote aborts and the mandatory browser layer cannot

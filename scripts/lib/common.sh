@@ -489,16 +489,15 @@ rldyour::_validate_harness_module() {
 
 # Delegate the Codex harness to nddev-codex-app. The module installs the pinned
 # official Codex CLI standalone release, switches its setup catalog, and installs
-# the nddev-builder marketplace. The safe setup is the default; the unrestricted
-# full-auto setup is selected only by the explicit owner flag
-# RLDYOUR_CODEX_FULL_AUTO=1. install-builder runs AFTER the current-catalog
-# install. RLDYOUR_DRY_RUN is respected: a dry run only logs the exact planned
-# module commands and performs no install.
+# the nddev-builder marketplace. This owner-controlled workstation always uses
+# the unrestricted full-auto setup. install-builder runs AFTER the current-
+# catalog install. RLDYOUR_DRY_RUN is respected: a dry run only logs the exact
+# planned module commands and performs no install.
 rldyour::install_codex_harness() {
   local module=${RLDYOUR_CODEX_MODULE:-}
   local entry="cli-tools/nddev_codex.py"
   local target="${RLDYOUR_CODEX_HOME:-$HOME/.codex}"
-  local setup="safe" status
+  local setup="full-auto" status
 
   rldyour::_validate_harness_module "codex" "$module" "$entry"
   status=$?
@@ -510,10 +509,6 @@ rldyour::install_codex_harness() {
     return 1
   fi
 
-  if [ "${RLDYOUR_CODEX_FULL_AUTO:-0}" -eq 1 ]; then
-    setup="full-auto"
-    rldyour::log "warn" "codex full-auto setup selected by explicit owner flag RLDYOUR_CODEX_FULL_AUTO=1"
-  fi
   rldyour::section "Delegate codex harness to nddev-codex-app (setup: ${setup})"
   # The module owns the standalone Codex CLI artifact under its explicit target;
   # never install codex via a bun/npm global. install-cli installs the pinned
@@ -1091,6 +1086,9 @@ else:
     exec_lines = re.findall(r"^ExecStart=(.+)$", text, re.MULTILINE)
     if len(exec_lines) != 1:
         raise SystemExit("managed service has an ambiguous ExecStart")
+    environment_lines = re.findall(r"^Environment=(.+)$", text, re.MULTILINE)
+    if environment_lines != ["DBUS_SESSION_BUS_ADDRESS=disabled:"]:
+        raise SystemExit("managed systemd service must disable the session D-Bus")
     arguments = shlex.split(exec_lines[0])
     fingerprint = "linux"
 if len(hashes) != 1 or not isinstance(arguments, list) or not arguments:
@@ -1898,6 +1896,11 @@ Description=rldyour CloakBrowser headless CDP endpoint
 After=default.target
 
 [Service]
+# The lingering user manager starts this persistent headless browser before a
+# graphical login. Keep it off the desktop session bus: Chromium probes
+# xdg-desktop-portal during startup, which would otherwise activate GUI portal
+# backends before DISPLAY/WAYLAND_DISPLAY exist and poison the later session.
+Environment=DBUS_SESSION_BUS_ADDRESS=disabled:
 ExecStart="${service_binary}" --headless=new --remote-debugging-address=127.0.0.1 --remote-debugging-port=${port} "--user-data-dir=${profile}" --no-first-run --no-default-browser-check --fingerprint-platform=${fp} --no-sandbox
 Restart=always
 RestartSec=3

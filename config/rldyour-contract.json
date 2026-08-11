@@ -66,6 +66,16 @@
       }
     }
   },
+  "remote_execution": {
+    "client_profiles": ["desktop"],
+    "executor_profile": "server",
+    "transport": "openssh-exact-head",
+    "entrypoint": "scripts/remote-exec.sh",
+    "workspace_transfer": "forbidden",
+    "dirty_worktree": "forbidden",
+    "remote_head_match": "required",
+    "credentials": "owner-managed-ssh-agent"
+  },
   "harnesses": {
     "policy": "one-owner-per-harness",
     "active": [
@@ -76,13 +86,14 @@
       "module_path_env": "RLDYOUR_CODEX_MODULE",
       "module_repo": "https://github.com/NDDev-it-com/nddev-codex-app.git",
       "module_commit": "a69d77f1c62b5e02cdd9b886c412a53cee92e24a",
-      "default_setup": "safe"
+      "default_setup": "full-auto"
     },
     "delegated": {
       "zcode": {
+        "work_policy": "on-pause",
         "owner_repo": "nddev-harnesses",
         "owner_module": "modules/nddev-zcode-app",
-        "reason": "The ZCode desktop app creates and owns ~/.zcode on first launch. Its installer fails closed on an unstamped target and requires an explicit --adopt-unmanaged, which no unattended bootstrap may pass on the owner's behalf. Bootstrap therefore declares zcode out of scope and never blocks a device apply on it; nddev-harnesses installs it through its own lifecycle."
+        "reason": "ZCode remains catalogued but its global work-policy is on-pause. Bootstrap never installs, starts, verifies, removes, or adopts it; any installed copy is preserved until a separate approved device plan changes that state."
       }
     }
   },
@@ -200,6 +211,7 @@
     "provider": "cloakbrowser",
     "cloakbrowser": "0.4.12",
     "cdp_endpoint": "http://127.0.0.1:9222",
+    "linux_service_dbus_address": "disabled:",
     "fallback_allowed": false,
     "chrome_devtools_mcp": "1.6.0",
     "playwright_cli": "0.1.17",
@@ -283,6 +295,10 @@
         "Telegram/Telegram"
       ],
       "bin_target": "${HOME}/.local/bin/telegram-desktop",
+      "version_probe": "presence-only",
+      "auto_update": "disabled-by-externalupdater.d",
+      "external_updater_policy_target": "${HOME}/.local/share/TelegramDesktop/externalupdater.d/macos-ubuntu-bootstrap",
+      "external_updater_policy_marker": "# Managed by macos-ubuntu-bootstrap: telegram-external-updater-v1",
       "managed_receipt": "ubuntu-runtime-v1",
       "os": [
         "linux"
@@ -307,11 +323,39 @@
       ]
     },
     "telegram": {
-      "source": "templates/desktop/telegram.desktop",
-      "target": "${HOME}/.local/share/applications/telegram.desktop",
-      "icon": "telegram",
+      "source": "templates/desktop/org.telegram.desktop.desktop",
+      "target": "${HOME}/.local/share/applications/org.telegram.desktop.desktop",
+      "icon": "org.telegram.desktop",
+      "upstream_source_commit": "ee93b401ced86ece3f2582fc2ca4da72dfc4f06a",
+      "upstream_desktop_entry": "https://github.com/telegramdesktop/tdesktop/blob/v7.0.7/lib/xdg/org.telegram.desktop.desktop",
+      "icon_assets": [
+        {
+          "source_url": "https://raw.githubusercontent.com/telegramdesktop/tdesktop/ee93b401ced86ece3f2582fc2ca4da72dfc4f06a/Telegram/Resources/art/logo_256.png",
+          "target": "${HOME}/.local/share/icons/hicolor/256x256/apps/org.telegram.desktop.png",
+          "sha256": "3fb1400c7dc9bbc3b5cb3ffedcbf4a9b09c53e28b57a7ff33a8a6b9048864090"
+        },
+        {
+          "source_url": "https://raw.githubusercontent.com/telegramdesktop/tdesktop/ee93b401ced86ece3f2582fc2ca4da72dfc4f06a/Telegram/Resources/icons/tray_monochrome.svg",
+          "target": "${HOME}/.local/share/icons/hicolor/symbolic/apps/org.telegram.desktop-symbolic.svg",
+          "sha256": "a93380f2c7e6aae4d5fde8940020bd966e97ad8c4880f45c016edfef3f5193e1"
+        },
+        {
+          "source_url": "https://raw.githubusercontent.com/telegramdesktop/tdesktop/ee93b401ced86ece3f2582fc2ca4da72dfc4f06a/Telegram/Resources/icons/tray_monochrome_attention.svg",
+          "target": "${HOME}/.local/share/icons/hicolor/symbolic/apps/org.telegram.desktop-attention-symbolic.svg",
+          "sha256": "2b67ee19839dbbb9f57f2d7433fd6dc1059634d6d081c5e4c422c14f53fcfcc7"
+        },
+        {
+          "source_url": "https://raw.githubusercontent.com/telegramdesktop/tdesktop/ee93b401ced86ece3f2582fc2ca4da72dfc4f06a/Telegram/Resources/icons/tray_monochrome_mute.svg",
+          "target": "${HOME}/.local/share/icons/hicolor/symbolic/apps/org.telegram.desktop-mute-symbolic.svg",
+          "sha256": "efa1439bd60b58db7b755f5d21be854ea686a0e1e2f1aa6e43bf35c083ee72fc"
+        }
+      ],
       "categories": "Network;InstantMessaging;",
       "wm_class": "TelegramDesktop",
+      "launch_environment": {
+        "QT_QPA_PLATFORM": "xcb"
+      },
+      "dbus_activatable": false,
       "profiles": [
         "desktop"
       ],
@@ -321,9 +365,8 @@
     }
   },
   "ubuntu_apt_packages": {
-    "_doc": "apt packages installed by scripts/ubuntu/install.sh::install_apt_baseline. The baseline (terminal, LSP, CLI tools, and build-essential for local C/Rust/Go compilation) and the cloak_runtime (Chromium support libraries for the mandatory CloakBrowser) are installed on ALL profiles — the terminal/LSP/browser layers are mandatory per ADR 0004. desktop_apps (BrowserOS, deskflow, happ) are installed only in the desktop/desktop-builds+gui profile via scripts/ubuntu/desktop.sh. The zcode desktop app is delegated to nddev-harnesses and not installed here.",
+    "_doc": "apt packages installed by scripts/ubuntu/install.sh::install_apt_baseline. The terminal/LSP baseline and cloak_runtime are installed on all profiles. desktop_build adds the host compiler only to desktop profiles; server remains container-execution-only. desktop_apps are installed only for GUI desktop profiles.",
     "baseline": [
-      "build-essential",
       "ca-certificates",
       "curl",
       "gpg",
@@ -355,6 +398,9 @@
       "httpie",
       "miller",
       "software-properties-common"
+    ],
+    "desktop_build": [
+      "build-essential"
     ],
     "cloak_runtime": [
       "libnss3",
@@ -410,6 +456,13 @@
     "profiles": {
       "desktop": [
         "baseline",
+        "desktop_build",
+        "cloak_runtime",
+        "desktop_apps"
+      ],
+      "desktop-builds": [
+        "baseline",
+        "desktop_build",
         "cloak_runtime",
         "desktop_apps"
       ],

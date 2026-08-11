@@ -33,6 +33,12 @@ Node, Python, Go, and Rust are tool hosts, and the macOS clangd provider arrives
 in Homebrew's LLVM distribution; those supporting binaries do not authorize
 local project builds (see [ADR 0005](docs/adr/0005-go-and-rust-language-server-hosts.md)).
 
+A plain desktop may delegate builds and tests to an independently provisioned
+`server` with `scripts/remote-exec.sh`. Both checkouts must be clean and point
+at the same exact commit. The handoff never copies a dirty worktree or
+credentials, so the lightweight source/LSP profile remains reproducible
+([ADR 0009](docs/adr/0009-exact-head-remote-execution.md)).
+
 Go, Rust, and Dart are **desktop and desktop-builds only**. They back `gopls`, `rust-analyzer`, and
 the Dart analysis server over the estate's sources. The server profile is
 `container-execution-only`, so it receives no host toolchain — project builds and

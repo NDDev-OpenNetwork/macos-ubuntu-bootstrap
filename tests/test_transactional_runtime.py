@@ -452,7 +452,7 @@ def test_harness_delegation_logs_exact_codex_commands_in_dry_run(
         f"install-cli --target {codex_home}" in result.stdout
         or "install-cli" in result.stdout
     )
-    assert "apply --setup safe" in result.stdout
+    assert "apply --setup full-auto" in result.stdout
     assert "install-builder" in result.stdout
 
 
@@ -1130,6 +1130,7 @@ def test_cloak_health_accepts_restored_prior_binary_with_managed_provenance(
         "# Managed by macos-ubuntu-bootstrap: browser-stack-v1\n"
         f"# rldyour-binary-sha256={prior_sha256}\n"
         "[Service]\n"
+        "Environment=DBUS_SESSION_BUS_ADDRESS=disabled:\n"
         f'ExecStart="{prior_binary}" --headless=new '
         "--remote-debugging-address=127.0.0.1 --remote-debugging-port=9222 "
         f'"--user-data-dir={profile}" --no-first-run --no-default-browser-check '
@@ -1175,6 +1176,26 @@ def test_cloak_health_accepts_restored_prior_binary_with_managed_provenance(
         },
     )
     assert health.returncode == 0, health.stdout + health.stderr
+
+    unit.write_text(
+        unit.read_text(encoding="utf-8").replace(
+            "Environment=DBUS_SESSION_BUS_ADDRESS=disabled:\n", ""
+        ),
+        encoding="utf-8",
+    )
+    health_without_isolation = subprocess.run(
+        [str(home / ".local/bin/cloakbrowser-cdp-health")],
+        check=False,
+        capture_output=True,
+        text=True,
+        env={
+            **os.environ,
+            "HOME": str(home),
+            "PATH": f"{fake_bin}:{os.environ['PATH']}",
+        },
+    )
+    assert health_without_isolation.returncode != 0
+    assert "managed service provenance is invalid" in health_without_isolation.stderr
 
 
 def test_browser_wrappers_reject_privacy_bypasses_and_ignore_global_remote(

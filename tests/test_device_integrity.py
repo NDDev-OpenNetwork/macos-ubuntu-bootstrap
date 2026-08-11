@@ -180,6 +180,11 @@ def test_verify_contract_versions_passes_when_state_matches() -> None:
             name: {
                 "installed_version": spec["version"],
                 "declared_version": spec["version"],
+                **(
+                    {"external_updater_policy_valid": True}
+                    if spec.get("external_updater_policy_target")
+                    else {}
+                ),
             }
             for name, spec in contract.get("user_tools", {}).items()
         },
@@ -241,6 +246,32 @@ def test_verify_contract_versions_detects_user_tool_drift() -> None:
     }
     with pytest.raises(di.IntegrityError, match=f"{name}: installed 0.0.0"):
         di._verify_contract_versions(state)
+
+
+def test_telegram_presence_probe_never_executes_the_gui(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    bin_dir = tmp_path / ".local/bin"
+    bin_dir.mkdir(parents=True)
+    for name in ("herdr", "telegram-desktop"):
+        binary = bin_dir / name
+        binary.write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
+        binary.chmod(0o755)
+
+    calls: list[str] = []
+
+    def fake_run_version(binary: Path, flag: str) -> str:
+        calls.append(binary.name)
+        assert flag == "--version"
+        return "herdr 0.7.5"
+
+    monkeypatch.setattr(di.shutil, "which", lambda name: str(bin_dir / name))
+    monkeypatch.setattr(di, "_run_version", fake_run_version)
+    state = di._user_tool_state(bin_dir, tmp_path)
+
+    assert calls == ["herdr"]
+    assert state["telegram"]["raw"] == "presence-only"
+    assert state["telegram"]["installed_version"] == "7.0.7"
 
 
 # ----------------------------- profile awareness -----------------------------
@@ -368,6 +399,41 @@ def test_desktop_template_exists() -> None:
     text = template.read_text(encoding="utf-8")
     assert "Exec=ptyxis" in text, "desktop template missing Ptyxis Exec line"
     assert "desktop-entry-herdr-v1" in text, "desktop template missing managed marker"
+
+
+def test_telegram_runtime_and_launcher_policies_are_explicit() -> None:
+    contract = di.load_contract()
+    runtime = contract["user_tools"]["telegram"]
+    desktop = contract["desktop_entries"]["telegram"]
+    template = ROOT / desktop["source"]
+    text = template.read_text(encoding="utf-8")
+
+    assert runtime["auto_update"] == "disabled-by-externalupdater.d"
+    assert runtime["version_probe"] == "presence-only"
+    assert runtime["external_updater_policy_target"].endswith(
+        "/TelegramDesktop/externalupdater.d/macos-ubuntu-bootstrap"
+    )
+    assert desktop["launch_environment"] == {"QT_QPA_PLATFORM": "xcb"}
+    assert desktop["dbus_activatable"] is False
+    assert desktop["icon"] == "org.telegram.desktop"
+    assert desktop["target"].endswith(
+        "/applications/org.telegram.desktop.desktop"
+    )
+    assert desktop["upstream_source_commit"] == (
+        "ee93b401ced86ece3f2582fc2ca4da72dfc4f06a"
+    )
+    assert len(desktop["icon_assets"]) == 4
+    assert desktop["icon_assets"][0]["target"].endswith(
+        "/hicolor/256x256/apps/org.telegram.desktop.png"
+    )
+    assert desktop["icon_assets"][0]["sha256"] == (
+        "3fb1400c7dc9bbc3b5cb3ffedcbf4a9b09c53e28b57a7ff33a8a6b9048864090"
+    )
+    assert "desktop-entry-telegram-v3" in text
+    assert "Exec=env QT_QPA_PLATFORM=xcb telegram-desktop -- %U" in text
+    assert "Icon=org.telegram.desktop" in text
+    assert "DBusActivatable=false" in text
+    assert "MimeType=x-scheme-handler/tg;x-scheme-handler/tonsite;" in text
 
 
 # ----------------------------- build / verify CLI -----------------------------

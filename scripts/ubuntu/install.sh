@@ -87,10 +87,12 @@ CARAPACE_SHA256_X64="35ab52bfe7bdd8296d90c3687660bde80497599badde840ab615d2f421f
 CARAPACE_SHA256_ARM64="b2456cb09d77004db87de2567d6d7588a61ceb4724522c463e2b1c1f87b4d4b9"
 
 APT_SOURCE_PACKAGES=(
-  build-essential ca-certificates curl gpg gnupg git jq python3 python3-venv
+  ca-certificates curl gpg gnupg git jq python3 python3-venv
   shellcheck shfmt clangd zsh unzip xz-utils wget zip lsb-release yamllint
   fd-find bat fzf zoxide tmux btop duf hexyl gh ripgrep httpie miller
 )
+
+APT_DESKTOP_BUILD_PACKAGES=(build-essential)
 
 # Runtime libraries/fonts from the CloakBrowser v0.4.12 upstream Linux image.
 # They support the mandatory downloaded Chromium binary; they are not a stock
@@ -194,11 +196,22 @@ PINNED_SOURCE_TOOLS=(
 # trusting the live manifest at install time.
 USER_TOOLS=(
   "herdr;0.7.5;raw;herdr;herdr;herdr;3dc83288073e4c2d3c679a30e7be97bcca9141c6fd17dbbb9219142e95c59253;32e763a1499a6b694b1d708e4f062b743be1da9f34fcfa4d212d6db6fe09a8b9;https://github.com/herdrdev/herdr/releases/download/v0.7.5/herdr-linux-x86_64;https://github.com/herdrdev/herdr/releases/download/v0.7.5/herdr-linux-aarch64"
-  # Telegram Desktop official portable build. The tsetup tarball contains
-  # Telegram/Telegram (the binary) and Telegram/Updater (a self-updater that
-  # breaks reproducibility — only the binary is published, not the updater).
+  # Telegram Desktop official portable build. Only Telegram/Telegram is
+  # published. The binary also has an internal updater, disabled separately by
+  # install_telegram_update_policy so it cannot mutate this receipt-bound tree.
   # x86_64-only: Telegram does not publish an arm64 Linux portable build.
   "telegram;7.0.7;tarx;Telegram/Telegram;Telegram/Telegram;telegram-desktop;45e4bdbe9bdbc800916b81147210f912f5c72f069fdec6f9b201fe305d0d2d9c;45e4bdbe9bdbc800916b81147210f912f5c72f069fdec6f9b201fe305d0d2d9c;https://td.telegram.org/tlinux/tsetup.7.0.7.tar.xz;https://td.telegram.org/tlinux/tsetup.7.0.7.tar.xz"
+)
+
+# Telegram v7.0.7 commit ee93b401 installs these four files from
+# InstallLauncher(). Our externalupdater.d policy intentionally makes that
+# function return before it writes anything, so bootstrap must publish the
+# exact upstream assets itself. Rows are source_url;sha256;XDG_DATA_HOME path.
+TELEGRAM_DESKTOP_ASSETS=(
+  "https://raw.githubusercontent.com/telegramdesktop/tdesktop/ee93b401ced86ece3f2582fc2ca4da72dfc4f06a/Telegram/Resources/art/logo_256.png;3fb1400c7dc9bbc3b5cb3ffedcbf4a9b09c53e28b57a7ff33a8a6b9048864090;icons/hicolor/256x256/apps/org.telegram.desktop.png"
+  "https://raw.githubusercontent.com/telegramdesktop/tdesktop/ee93b401ced86ece3f2582fc2ca4da72dfc4f06a/Telegram/Resources/icons/tray_monochrome.svg;a93380f2c7e6aae4d5fde8940020bd966e97ad8c4880f45c016edfef3f5193e1;icons/hicolor/symbolic/apps/org.telegram.desktop-symbolic.svg"
+  "https://raw.githubusercontent.com/telegramdesktop/tdesktop/ee93b401ced86ece3f2582fc2ca4da72dfc4f06a/Telegram/Resources/icons/tray_monochrome_attention.svg;2b67ee19839dbbb9f57f2d7433fd6dc1059634d6d081c5e4c422c14f53fcfcc7;icons/hicolor/symbolic/apps/org.telegram.desktop-attention-symbolic.svg"
+  "https://raw.githubusercontent.com/telegramdesktop/tdesktop/ee93b401ced86ece3f2582fc2ca4da72dfc4f06a/Telegram/Resources/icons/tray_monochrome_mute.svg;efa1439bd60b58db7b755f5d21be854ea686a0e1e2f1aa6e43bf35c083ee72fc;icons/hicolor/symbolic/apps/org.telegram.desktop-mute-symbolic.svg"
 )
 
 
@@ -265,10 +278,9 @@ install_apt_baseline() {
   rldyour::ubuntu::as_root apt-get update
   apt_install software-properties-common \
     "${APT_SOURCE_PACKAGES[@]}" "${APT_CLOAK_RUNTIME_PACKAGES[@]}"
-  # The server profile is a container-execution host: project builds/tests run
-  # inside Docker, never on the host. It therefore installs no host build
-  # toolchain (build-essential, pkg-config, language SDKs). Docker Engine is
-  # provisioned separately by scripts/ubuntu/server.sh.
+  if [ "$PROFILE" != "server" ]; then
+    apt_install "${APT_DESKTOP_BUILD_PACKAGES[@]}"
+  fi
 }
 
 ensure_node_link() {
@@ -340,16 +352,201 @@ install_pinned_source_tools() {
 # operator-chosen desktop conveniences (herdr). Reusing ensure_pinned_source_tool
 # keeps the receipt, SHA-256 verification, and managed-symlink contract uniform.
 install_user_tools() {
-  local row
+  local row failed=0
   for row in "${USER_TOOLS[@]}"; do
-    ensure_pinned_source_tool "$row" || return 1
+    if ! ensure_pinned_source_tool "$row"; then
+      failed=1
+    fi
   done
+  return "$failed"
 }
 
-# Install declarative .desktop entries from templates/desktop/. Each entry is a
-# static file copied verbatim (no templating), mirroring how terminal configs
-# are installed: create when absent, ok when identical, keep+warn when the user
-# has edited it. Idempotent and safe under dry-run.
+# Telegram's official Linux binary scans <working-dir>/externalupdater.d at
+# startup and disables its internal updater when a file contains the exact
+# executable path. Publish both the stable launcher and its receipt-bound real
+# path: Telegram may derive cExeDir/cExeName from either side of the symlink.
+# This also disables Telegram's self-generated, path-hashed desktop/D-Bus files;
+# the repository-owned .desktop entry below is the only launcher contract.
+rldyour::ubuntu::install_telegram_update_policy() {
+  local launcher="$HOME/.local/bin/telegram-desktop"
+  local namespace="$HOME/.local/share/rldyour/telegram"
+  local policy_dir="${XDG_DATA_HOME:-$HOME/.local/share}/TelegramDesktop/externalupdater.d"
+  local policy="$policy_dir/macos-ubuntu-bootstrap"
+  local marker="# Managed by macos-ubuntu-bootstrap: telegram-external-updater-v1"
+  local resolved tmp
+
+  if [ "$RLDYOUR_DRY_RUN" -eq 1 ]; then
+    rldyour::log "info" "[DRY-RUN] install Telegram external-updater policy: ${policy}"
+    return 0
+  fi
+
+  if [ ! -L "$launcher" ] || [ ! -x "$launcher" ]; then
+    rldyour::log "error" "managed Telegram launcher is missing or not a symlink: ${launcher}"
+    return 1
+  fi
+  case "$(readlink "$launcher")" in
+    "$namespace"/*) ;;
+    *)
+      rldyour::log "error" "Telegram launcher escaped its managed namespace: ${launcher}"
+      return 1
+      ;;
+  esac
+  resolved="$(readlink -f -- "$launcher")" || return 1
+  [ -x "$resolved" ] || {
+    rldyour::log "error" "managed Telegram binary is unavailable: ${resolved}"
+    return 1
+  }
+
+  if [ -L "$policy_dir" ] || { [ -e "$policy_dir" ] && [ ! -d "$policy_dir" ]; }; then
+    rldyour::log "error" "Telegram updater-policy directory is unsafe; preserved: ${policy_dir}"
+    return 1
+  fi
+  if [ -L "$policy" ] || { [ -e "$policy" ] && [ ! -f "$policy" ]; }; then
+    rldyour::log "error" "Telegram updater policy is not a regular file; preserved: ${policy}"
+    return 1
+  fi
+  if [ -f "$policy" ] && ! grep -Fxq "$marker" "$policy"; then
+    rldyour::log "error" "unmanaged Telegram updater policy differs; preserved: ${policy}"
+    return 1
+  fi
+
+  mkdir -p "$policy_dir" || return 1
+  tmp="$(mktemp "${policy}.tmp.XXXXXX")" || return 1
+  if ! printf '%s\n%s\n%s\n' "$marker" "$launcher" "$resolved" >"$tmp"; then
+    rm -f "$tmp"
+    return 1
+  fi
+  chmod 0644 "$tmp" || { rm -f "$tmp"; return 1; }
+  if [ -f "$policy" ] && cmp -s "$tmp" "$policy"; then
+    rm -f "$tmp"
+    rldyour::log "ok" "Telegram external-updater policy already current"
+    return 0
+  fi
+  mv -f "$tmp" "$policy" || { rm -f "$tmp"; return 1; }
+  rldyour::log "ok" "installed Telegram external-updater policy: ${policy}"
+}
+
+# Install the application and symbolic tray icons that Telegram normally
+# publishes from InstallLauncher(). The updater-disabled build deliberately
+# skips that function, so each upstream asset is pinned to the v7.0.7 source
+# commit and verified before atomic publication. Divergent local icons are
+# preserved and fail closed instead of being overwritten.
+rldyour::ubuntu::install_telegram_desktop_assets() {
+  [ "$GUI_ENABLED" -eq 1 ] || return 0
+
+  local data_home="${XDG_DATA_HOME:-$HOME/.local/share}"
+  local icons_root="$data_home/icons/hicolor"
+  local row url expected relative target parent actual tmp
+
+  for row in "${TELEGRAM_DESKTOP_ASSETS[@]}"; do
+    IFS=';' read -r url expected relative <<<"$row"
+    target="$data_home/$relative"
+    parent="$(dirname "$target")"
+
+    if [ -L "$target" ] || { [ -e "$target" ] && [ ! -f "$target" ]; }; then
+      rldyour::log "error" "Telegram desktop asset is not a regular file; preserved: ${target}"
+      return 1
+    fi
+    if [ -f "$target" ]; then
+      actual="$(rldyour::sha256_file "$target")" || return 1
+      if [ "$actual" != "$expected" ]; then
+        rldyour::log "error" "Telegram desktop asset diverged; preserved: ${target}"
+        return 1
+      fi
+      if [ "$RLDYOUR_DRY_RUN" -eq 0 ]; then
+        chmod 0644 "$target" || return 1
+      fi
+      rldyour::log "ok" "$(basename "$target") already matches Telegram v7.0.7"
+      continue
+    fi
+
+    if [ "$RLDYOUR_DRY_RUN" -eq 1 ]; then
+      rldyour::log "info" "[DRY-RUN] install pinned Telegram desktop asset: ${target}"
+      continue
+    fi
+    if [ -L "$parent" ] || { [ -e "$parent" ] && [ ! -d "$parent" ]; }; then
+      rldyour::log "error" "Telegram desktop asset directory is unsafe; preserved: ${parent}"
+      return 1
+    fi
+    mkdir -p "$parent" || return 1
+    [ -d "$parent" ] && [ ! -L "$parent" ] || return 1
+    tmp="$(mktemp "${target}.tmp.XXXXXX")" || return 1
+    if ! rldyour::download_verified_file "$url" "$expected" "$tmp"; then
+      rm -f "$tmp"
+      return 1
+    fi
+    chmod 0644 "$tmp" || { rm -f "$tmp"; return 1; }
+    mv -f "$tmp" "$target" || { rm -f "$tmp"; return 1; }
+    rldyour::log "ok" "installed pinned Telegram desktop asset: ${target}"
+  done
+
+  if [ "$RLDYOUR_DRY_RUN" -eq 0 ]; then
+    # Icon-theme implementations watch the top-level theme mtime. Rebuild the
+    # GTK cache when available so GNOME observes the repair immediately.
+    touch "$icons_root" || return 1
+    if command -v gtk-update-icon-cache >/dev/null 2>&1; then
+      gtk-update-icon-cache --force --ignore-theme-index "$icons_root" >/dev/null || return 1
+    fi
+  fi
+}
+
+# Install one marker-owned desktop entry atomically. A matching managed marker
+# authorizes an update (with a recoverable backup); unmarked/user-owned files
+# are preserved. This lets repairs migrate Telegram's v1/v2 launcher to the
+# upstream-aligned XCB v3 contract instead of keeping a broken managed file.
+rldyour::ubuntu::install_desktop_entry() {
+  local src=$1 dest=$2 source_marker dest_marker source_owner dest_owner
+  local backup_root backup tmp
+
+  if [ ! -f "$src" ] || [ -L "$src" ]; then
+    rldyour::log "error" "desktop entry template is missing or unsafe: ${src}"
+    return 1
+  fi
+  source_marker="$(grep -E '^# Managed by macos-ubuntu-bootstrap: desktop-entry-[a-z0-9-]+-v[0-9]+$' "$src" || true)"
+  [ "$(printf '%s\n' "$source_marker" | grep -c .)" -eq 1 ] || {
+    rldyour::log "error" "desktop entry template has no unique managed marker: ${src}"
+    return 1
+  }
+
+  if [ -L "$dest" ] || { [ -e "$dest" ] && [ ! -f "$dest" ]; }; then
+    rldyour::log "error" "desktop entry target is not a regular file; preserved: ${dest}"
+    return 1
+  fi
+  if [ ! -e "$dest" ]; then
+    rldyour::install_config_template "$src" "$dest"
+    return
+  fi
+  if cmp -s "$src" "$dest"; then
+    rldyour::log "ok" "$(basename "$dest") already current"
+    return 0
+  fi
+
+  dest_marker="$(grep -E '^# Managed by macos-ubuntu-bootstrap: desktop-entry-[a-z0-9-]+-v[0-9]+$' "$dest" || true)"
+  source_owner="$(printf '%s' "$source_marker" | sed -E 's/-v[0-9]+$//')"
+  dest_owner="$(printf '%s' "$dest_marker" | sed -E 's/-v[0-9]+$//')"
+  if [ -z "$dest_marker" ] || [ "$dest_owner" != "$source_owner" ]; then
+    rldyour::log "warn" "$(basename "$dest") is user-owned or divergent -- kept as-is; template: $src"
+    return 0
+  fi
+  if [ "$RLDYOUR_DRY_RUN" -eq 1 ]; then
+    rldyour::log "info" "[DRY-RUN] update managed desktop entry: ${dest}"
+    return 0
+  fi
+
+  backup_root="$HOME/.local/share/rldyour/backups/desktop-entries"
+  mkdir -p "$backup_root" || return 1
+  chmod 0700 "$backup_root" || return 1
+  backup="$(mktemp "$backup_root/$(basename "$dest").XXXXXX")" || return 1
+  cp -p "$dest" "$backup" || { rm -f "$backup"; return 1; }
+  tmp="$(mktemp "${dest}.tmp.XXXXXX")" || return 1
+  cp "$src" "$tmp" || { rm -f "$tmp"; return 1; }
+  chmod 0644 "$tmp" || { rm -f "$tmp"; return 1; }
+  mv -f "$tmp" "$dest" || { rm -f "$tmp"; return 1; }
+  rldyour::log "ok" "updated managed $(basename "$dest"); backup: ${backup}"
+}
+
+# Install declarative .desktop entries from templates/desktop/. Files are
+# copied verbatim (no templating) through the marker-aware update contract.
 install_desktop_entries() {
   [ "$GUI_ENABLED" -eq 1 ] || {
     rldyour::log "info" "desktop entries skipped: gui disabled (profile=$PROFILE)"
@@ -360,8 +557,171 @@ install_desktop_entries() {
   local entry
   for entry in "$entries_dir"/*.desktop; do
     [ -f "$entry" ] || continue
-    rldyour::install_config_template "$entry" "$target_dir/$(basename "$entry")"
+    rldyour::ubuntu::install_desktop_entry "$entry" "$target_dir/$(basename "$entry")"
   done
+}
+
+# v1/v2 used the generic telegram.desktop filename, while Telegram itself sets
+# QGuiApplication::desktopFileName to org.telegram.desktop when the updater is
+# disabled. Retire only our marker-owned legacy entry so the desktop file ID,
+# running App ID, icon identity, MIME handlers, and GNOME favorite all agree.
+rldyour::ubuntu::retire_telegram_legacy_managed_entry() {
+  local data_home="${XDG_DATA_HOME:-$HOME/.local/share}"
+  local legacy="$data_home/applications/telegram.desktop"
+  local marker backup_root backup_dir
+
+  [ -e "$legacy" ] || [ -L "$legacy" ] || return 0
+  if [ -L "$legacy" ] || [ ! -f "$legacy" ]; then
+    rldyour::log "error" "legacy Telegram desktop entry is unsafe; preserved: ${legacy}"
+    return 1
+  fi
+  marker="$(grep -E '^# Managed by macos-ubuntu-bootstrap: desktop-entry-telegram-v[0-9]+$' "$legacy" || true)"
+  if [ "$(printf '%s\n' "$marker" | grep -c .)" -ne 1 ]; then
+    rldyour::log "error" "legacy Telegram desktop entry is user-owned or divergent; preserved: ${legacy}"
+    return 1
+  fi
+  if [ "$RLDYOUR_DRY_RUN" -eq 1 ]; then
+    rldyour::log "info" "[DRY-RUN] retire managed legacy Telegram desktop entry: ${legacy}"
+    return 0
+  fi
+
+  backup_root="$HOME/.local/share/rldyour/backups/desktop-entries"
+  mkdir -p "$backup_root" || return 1
+  chmod 0700 "$backup_root" || return 1
+  backup_dir="$(mktemp -d "$backup_root/retired-telegram.XXXXXX")" || return 1
+  mv "$legacy" "$backup_dir/telegram.desktop" || return 1
+  rldyour::log "ok" "retired managed legacy Telegram launcher; backup: ${backup_dir}/telegram.desktop"
+}
+
+# With its updater enabled Telegram writes a path-hashed .desktop file and a
+# matching D-Bus activation service. Those stale files bypass the managed XCB
+# launcher even after externalupdater.d is installed. Retire only files that
+# match Telegram's exact generated naming/content contract; anything divergent
+# is preserved and fails closed. Every moved file remains recoverable.
+rldyour::ubuntu::retire_telegram_generated_integrations() {
+  local launcher="$HOME/.local/bin/telegram-desktop" resolved candidate basename
+  local expected_name backup_root="" backup_dir=""
+  local -a candidates=()
+
+  for candidate in \
+    "$HOME/.local/share/applications"/org.telegram.desktop._*.desktop \
+    "$HOME/.local/share/dbus-1/services"/org.telegram.desktop._*.service; do
+    [ -e "$candidate" ] || [ -L "$candidate" ] || continue
+    candidates+=("$candidate")
+  done
+  [ "${#candidates[@]}" -gt 0 ] || return 0
+
+  # A fresh plan has neither an installed launcher nor generated integrations.
+  # Discover candidates first so read-only planning never requires state that
+  # the corresponding apply has not created yet. If a candidate does exist,
+  # its provenance remains bound to the exact managed launcher below.
+  if [ ! -L "$launcher" ] || [ ! -x "$launcher" ]; then
+    rldyour::log "error" "managed Telegram launcher is unavailable during integration migration"
+    return 1
+  fi
+  resolved="$(readlink -f -- "$launcher")" || return 1
+
+  for candidate in "${candidates[@]}"; do
+    basename="$(basename "$candidate")"
+    if [[ ! "$basename" =~ ^org\.telegram\.desktop\._[0-9a-f]{32}\.(desktop|service)$ ]] ||
+      [ -L "$candidate" ] || [ ! -f "$candidate" ]; then
+      rldyour::log "error" "Telegram integration candidate is unsafe or unrecognized; preserved: ${candidate}"
+      return 1
+    fi
+    case "$basename" in
+      *.desktop)
+        if ! grep -Fxq 'DBusActivatable=true' "$candidate" ||
+          { ! grep -Fxq "TryExec=${launcher}" "$candidate" &&
+            ! grep -Fxq "TryExec=${resolved}" "$candidate"; } ||
+          { ! grep -Fxq "Exec=${launcher} -- %U" "$candidate" &&
+            ! grep -Fxq "Exec=${resolved} -- %U" "$candidate"; }; then
+          rldyour::log "error" "generated Telegram desktop entry diverged; preserved: ${candidate}"
+          return 1
+        fi
+        ;;
+      *.service)
+        expected_name="${basename%.service}"
+        if ! grep -Fxq "Name=${expected_name}" "$candidate" ||
+          { ! grep -Fxq "Exec=${launcher}" "$candidate" &&
+            ! grep -Fxq "Exec=${resolved}" "$candidate"; }; then
+          rldyour::log "error" "generated Telegram D-Bus service diverged; preserved: ${candidate}"
+          return 1
+        fi
+        ;;
+    esac
+  done
+
+  if [ "$RLDYOUR_DRY_RUN" -eq 1 ]; then
+    rldyour::log "info" "[DRY-RUN] retire ${#candidates[@]} generated Telegram desktop/D-Bus integration file(s)"
+    return 0
+  fi
+  backup_root="$HOME/.local/share/rldyour/backups/telegram-integrations"
+  mkdir -p "$backup_root" || return 1
+  chmod 0700 "$backup_root" || return 1
+  backup_dir="$(mktemp -d "$backup_root/generated.XXXXXX")" || return 1
+  for candidate in "${candidates[@]}"; do
+    mv "$candidate" "$backup_dir/$(basename "$candidate")" || return 1
+  done
+  rldyour::log "ok" "retired generated Telegram integrations; backup: ${backup_dir}"
+}
+
+# Make every normal desktop launch resolve to the managed Telegram entry. Only
+# an existing Telegram favorite is migrated; the bootstrap never adds a new
+# favorite or rewrites unrelated GNOME ordering.
+rldyour::ubuntu::configure_telegram_desktop_integration() {
+  [ "$GUI_ENABLED" -eq 1 ] || return 0
+  local desktop_id="org.telegram.desktop.desktop"
+  if [ "$RLDYOUR_DRY_RUN" -eq 1 ]; then
+    rldyour::log "info" "[DRY-RUN] refresh Telegram MIME handlers and migrate its GNOME favorite to ${desktop_id}"
+    return 0
+  fi
+
+  if command -v update-desktop-database >/dev/null 2>&1; then
+    update-desktop-database "$HOME/.local/share/applications" || return 1
+  fi
+  if command -v gdbus >/dev/null 2>&1; then
+    gdbus call --session --dest org.freedesktop.DBus \
+      --object-path /org/freedesktop/DBus \
+      --method org.freedesktop.DBus.ReloadConfig >/dev/null 2>&1 ||
+      rldyour::log "warn" "session D-Bus config could not be reloaded; it will refresh at next login"
+  fi
+  if command -v xdg-mime >/dev/null 2>&1; then
+    xdg-mime default "$desktop_id" x-scheme-handler/tg || return 1
+    xdg-mime default "$desktop_id" x-scheme-handler/tonsite || return 1
+  fi
+
+  local favorites migrated
+  if ! command -v gsettings >/dev/null 2>&1 ||
+    ! favorites="$(gsettings get org.gnome.shell favorite-apps 2>/dev/null)"; then
+    rldyour::log "warn" "GNOME favorites unavailable; Telegram launcher was installed without changing favorites"
+    return 0
+  fi
+  migrated="$(python3 - "$favorites" <<'PY'
+import ast
+import re
+import sys
+
+raw = sys.argv[1]
+if raw.startswith("@as "):
+    raw = raw[4:]
+values = ast.literal_eval(raw)
+if not isinstance(values, list) or not all(isinstance(value, str) for value in values):
+    raise SystemExit("favorite-apps is not a string array")
+result = []
+for value in values:
+    if value == "telegram.desktop" or re.fullmatch(
+        r"org\.telegram\.desktop\._[0-9a-f]+\.desktop", value
+    ):
+        value = "org.telegram.desktop.desktop"
+    if value not in result:
+        result.append(value)
+print(repr(result))
+PY
+)" || return 1
+  if [ "$migrated" != "$favorites" ]; then
+    gsettings set org.gnome.shell favorite-apps "$migrated" || return 1
+    rldyour::log "ok" "migrated Telegram favorite to ${desktop_id}"
+  fi
 }
 
 
@@ -1151,6 +1511,7 @@ verify_apply() {
 }
 
 main() {
+  local user_tools_failed=0
   if [ "${1:-}" = "--help" ]; then
     usage
     exit 0
@@ -1183,11 +1544,33 @@ main() {
   [ "$SKIP_LSPS" -eq 1 ] || install_bun_lsps
   [ "$SKIP_LSPS" -eq 1 ] || install_compiled_language_hosts
 
+  # This layer is mandatory on every profile and must precede independently
+  # optional/user-owned tools. A preserved unmanaged desktop convenience may
+  # still make the apply fail, but can no longer strand the CDP/portal repair.
+  rldyour::install_browser_providers
+
   # User-selected desktop tools (herdr, telegram) and .desktop launchers. Desktop
-  # and desktop-builds profiles only — these are operator conveniences.
+  # and desktop-builds profiles only — these are operator conveniences. Attempt
+  # every declared tool before surfacing an aggregate failure so an unmanaged
+  # herdr cannot prevent Telegram's independent repair/migration.
   if [ "$PROFILE" != "server" ]; then
-    install_user_tools
+    if ! install_user_tools; then
+      user_tools_failed=1
+    fi
+    rldyour::ubuntu::install_telegram_update_policy
+    rldyour::ubuntu::install_telegram_desktop_assets
     install_desktop_entries
+    # GNOME drops a favorite as soon as its desktop file disappears. Migrate
+    # the favorite while every recognized old ID still resolves, then retire
+    # the legacy/generated files and refresh the desktop database once more.
+    rldyour::ubuntu::configure_telegram_desktop_integration
+    rldyour::ubuntu::retire_telegram_legacy_managed_entry
+    rldyour::ubuntu::retire_telegram_generated_integrations
+    rldyour::ubuntu::configure_telegram_desktop_integration
+    if [ "$user_tools_failed" -ne 0 ]; then
+      rldyour::log "error" "one or more user tools remain unmanaged or divergent; all user-tool repairs were attempted"
+      return 1
+    fi
   fi
 
   install_gui_apps
@@ -1197,9 +1580,6 @@ main() {
   # Docker is already installed on server profiles; on desktop it preflights an
   # already-present Docker (it never installs Docker itself).
   install_open_design_layer
-
-  # Mandatory on desktop, no-GUI desktop, and headless server profiles.
-  rldyour::install_browser_providers
 
   # The harness layer runs LAST of the installing layers, and deliberately so.
   # It delegates to a separate module whose own fail-closed guards depend on local

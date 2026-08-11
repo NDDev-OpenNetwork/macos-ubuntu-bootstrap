@@ -27,6 +27,17 @@ macOS supports only the desktop profile. Ubuntu requires an explicit
 or Docker role from Linux alone. Desktop, desktop-builds, and server are roles;
 `--no-gui` removes only the GUI overlay and does not change the execution policy.
 
+To pair a source/LSP-only desktop with a build server, provision both profiles
+independently and put the same reviewed commit in both checkouts:
+
+```bash
+bash scripts/remote-exec.sh --host developer@build-host \
+  --remote-repo /srv/work/project -- just check
+```
+
+Both worktrees must be clean and their exact HEAD must match. The adapter never
+copies source or credentials and never repairs a remote checkout implicitly.
+
 Apply mode validates the real target. Ubuntu apply is supported only on exact
 Ubuntu releases `24.04` and `26.04`.
 
@@ -118,9 +129,18 @@ Both desktop platforms receive:
 - managed AI CLIs;
 - the mandatory fail-closed browser layer;
 - an optional platform-specific GUI overlay;
-- on Ubuntu desktop, user-selected CLI tools (herdr `0.7.5`, a terminal
-  workspace manager for AI coding agents) installed as managed, SHA-256-verified
-  binaries with `.desktop` launchers. Declared in the contract under `user_tools`.
+- on Ubuntu desktop, user-selected tools (herdr `0.7.5` and Telegram Desktop
+  `7.0.7`) installed as managed, SHA-256-verified binaries with `.desktop`
+  launchers. Telegram's internal updater is disabled by a managed
+  `externalupdater.d` policy so it cannot mutate the receipt-bound binary, and
+  its Qt launcher uses XCB/XWayland on the estate's NVIDIA Wayland workstation.
+  That policy also disables Telegram's built-in `InstallLauncher()`, so
+  bootstrap publishes the upstream `org.telegram.desktop.desktop` identity and
+  SHA-256-pinned application/symbolic tray icons from the matching source
+  commit. It migrates an existing GNOME favorite before backing up and retiring
+  recognized old launchers, then assigns both `tg://` and `tonsite://` to the
+  canonical entry. User-owned divergent files are preserved and fail closed.
+  These are declared in the contract under `user_tools` and `desktop_entries`.
 
 Desktop manifests intentionally exclude Docker, project build orchestration,
 language SDKs used as project runtimes, and local project test/runtime
@@ -190,10 +210,11 @@ scanners, and browser stack behind it. zcode is now declared
 `harnesses.delegated` in the contract and installed by the **nddev-harnesses**
 repository through its own lifecycle. Neither verifier requires `zcode`.
 
-The codex setup defaults to the read-only `safe` profile; the unrestricted
-`full-auto` profile is selected only by the explicit owner flag
-`RLDYOUR_CODEX_FULL_AUTO=1`. `RLDYOUR_DRY_RUN` is respected: a codex dry run only
-logs the exact planned module commands.
+The codex setup uses the unrestricted `full-auto` profile on this
+owner-controlled workstation. Re-running bootstrap reapplies the complete
+profile, including both `config.toml` and `AGENTS.md`, so a stale safe instruction
+file cannot contradict the runtime permissions. `RLDYOUR_DRY_RUN` is respected:
+a codex dry run only logs the exact planned module commands.
 
 The codex harness stays update-locked: both `DISABLE_AUTOUPDATER=1` and
 `DISABLE_UPDATES=1` are exported by the managed shell drop-in so the module's
@@ -213,8 +234,12 @@ Browser automation is a required platform layer, not an optional desktop app.
 
 CloakBrowser is installed in an isolated environment. launchd on macOS or a
 systemd user service on Ubuntu owns the persistent headless process and its
-managed profile. `cloakbrowser-cdp-health` validates process ownership, command
-line, loopback binding, discovery response, and WebSocket endpoint.
+managed profile. The Ubuntu service explicitly uses
+`DBUS_SESSION_BUS_ADDRESS=disabled:` so a lingering user manager can start the
+headless endpoint before login without activating GUI portal/keyring services
+before GNOME exports its display environment. `cloakbrowser-cdp-health`
+validates that isolation together with process ownership, command line,
+loopback binding, discovery response, and WebSocket endpoint.
 
 The only active providers are Chrome DevTools MCP and Playwright CLI. Their
 wrappers run that health check before browser actions and reject:
@@ -507,4 +532,3 @@ sudo usermod -aG docker $USER         # docker group (desktop-builds/server)
 
 # SSH keys, Claude CLI, git identity — see "What is NOT installed" section
 ```
-

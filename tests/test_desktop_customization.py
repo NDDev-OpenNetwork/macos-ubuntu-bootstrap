@@ -440,3 +440,55 @@ def test_macos_gui_failure_still_fails_the_run() -> None:
     main = source.split("main() {", 1)[1]
     report = main.index('if [ "$GUI_LAYER_FAILED" -ne 0 ]')
     assert "return 1" in main[report : report + 300]
+
+
+# ------------------- the minimum-version gate must actually gate -------------------
+#
+# rldyour::require_cmd_min_version is used only by macos/verify.sh, for node,
+# uv, bun, starship, atuin, carapace and dart. It returned 0 -- "skipping
+# numeric check" -- whenever it could not parse a version, and it discarded
+# stderr while doing so. The Ubuntu code documents that `dart --version` printed
+# to stderr on older SDKs and reads both streams for that reason, so the macOS
+# gate could pass Dart without ever comparing its version.
+
+COMMON = ROOT / "scripts/lib/common.sh"
+
+
+def _min_version(tool: Path, minimum: str = "1.0") -> subprocess.CompletedProcess[str]:
+    return subprocess.run(
+        ["bash", "-c",
+         f'source "{COMMON}"\nrldyour::require_cmd_min_version {tool.name} {minimum} --version'],
+        capture_output=True, text=True, check=False,
+        env={**os.environ, "PATH": f"{tool.parent}{os.pathsep}{os.environ['PATH']}"},
+    )
+
+
+def _tool(tmp_path: Path, name: str, body: str) -> Path:
+    tool = tmp_path / name
+    tool.write_text(f"#!/bin/sh\n{body}", encoding="utf-8")
+    tool.chmod(0o755)
+    return tool
+
+
+def test_min_version_accepts_a_current_version(tmp_path: Path) -> None:
+    assert _min_version(_tool(tmp_path, "good", 'echo "1.2.3"\n')).returncode == 0
+
+
+def test_min_version_rejects_an_old_version(tmp_path: Path) -> None:
+    assert _min_version(_tool(tmp_path, "old", 'echo "0.9.0"\n')).returncode != 0
+
+
+def test_min_version_reads_a_version_reported_on_stderr(tmp_path: Path) -> None:
+    """The exact shape of `dart --version` on older SDKs."""
+    tool = _tool(tmp_path, "stderrtool", 'echo "Dart SDK version: 3.12.2" >&2\n')
+    result = _min_version(tool)
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert "3.12.2" in result.stdout
+
+
+def test_min_version_fails_closed_when_no_version_can_be_read(tmp_path: Path) -> None:
+    """It used to return 0 here, so a broken binary satisfied the gate."""
+    result = _min_version(_tool(tmp_path, "silent", "exit 0\n"))
+    assert result.returncode != 0, "an unreadable version must not pass a version gate"
+    assert "could not detect version" in result.stdout
+    assert "skipping numeric check" not in result.stdout

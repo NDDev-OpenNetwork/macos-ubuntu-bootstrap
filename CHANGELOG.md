@@ -163,6 +163,17 @@ All notable changes to this module will be documented in this file.
   `[Added Associations]` lines left dangling by the retirement. A `userapp`
   entry for any other application, and every other line and section of
   `mimeapps.list`, is preserved byte for byte. Verification rejects a survivor.
+- **The macOS minimum-version gate no longer passes a version it could not
+  read.** `rldyour::require_cmd_min_version` returned success — "skipping
+  numeric check" — whenever its parse produced nothing, and it discarded
+  `stderr` while parsing. It is used only by `macos/verify.sh`, for `node`,
+  `uv`, `bun`, `starship`, `atuin`, `carapace` and `dart`. The Ubuntu code
+  documents that `dart --version` printed to stderr on older SDKs and reads both
+  streams for that reason, so on macOS a Dart answering only on stderr satisfied
+  a version gate without its version ever being compared, and any binary that
+  could not report a version passed too. It now falls back to the combined
+  output and fails closed when neither yields one, matching the exact
+  comparisons the Ubuntu verifier already used for the same invariant.
 - **One unavailable macOS cask no longer takes the mandatory layers down with
   it.** `install_gui_apps` looped `ensure_cask` bare under `set -euo pipefail`,
   and `ensure_cask` ends in `brew install --cask`. A single failing cask — a

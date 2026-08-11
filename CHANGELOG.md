@@ -30,6 +30,20 @@ All notable changes to this module will be documented in this file.
   repository path is charset-validated like the SSH destination was, and each
   local dirty state (unstaged, staged, untracked) now fails with its own reason
   instead of exiting silently.
+- **Replacing the device receipt is now a transaction, and an unverifiable
+  receipt is no longer consumed silently.** `build` decided ownership from the
+  receipt's `schema` and `owner` alone — never its canonical form, payload
+  digest, mode, or symlink status — and then renamed the active receipt to
+  `.bak` *before* collecting state and before opening the replacement. A
+  failure in collection or in the write therefore left the device with no
+  active receipt and no rollback, and a tampered-but-owned receipt was
+  overwritten rather than preserved as evidence. Replacement now validates full
+  self-integrity through `load_receipt`, collects state first, publishes
+  through a same-directory temporary file with `fsync` + `os.replace` + parent
+  `fsync`, and writes the backup only once a valid replacement is in place. A
+  symlink at the receipt path is refused outright. `build --replace-invalid` is
+  the explicit escape hatch for a genuinely corrupt receipt and retains the
+  unverifiable copy as `<name>.rejected.N`.
 - **Persistent Linux CloakBrowser no longer poisons the desktop portal before
   login.** The systemd-user unit now pins
   `DBUS_SESSION_BUS_ADDRESS=disabled:`, preserving the mandatory pre-login CDP
@@ -62,6 +76,13 @@ All notable changes to this module will be documented in this file.
 
 ### Tests
 
+- Device-receipt replacement is covered by fault injection: an edited payload,
+  a non-canonical body, a symlink, a group-writable mode, a failing
+  `collect_state`, and a failing `os.replace` must each leave the previous
+  active receipt byte-for-byte intact and leave no temporary file behind. The
+  three tests that exercised the old schema-and-owner helper were removed with
+  it — they asserted the behaviour of a function that no longer guarded
+  anything.
 - Remote execution is now covered by a protocol test rather than a source scan.
   A deterministic harness reproduces OpenSSH's join-and-parse behaviour and
   asserts byte-exact argv round trips for empty arguments, whitespace, quotes,

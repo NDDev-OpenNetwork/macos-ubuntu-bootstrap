@@ -34,6 +34,7 @@ import shutil
 import stat
 import subprocess
 import sys
+import tempfile
 from pathlib import Path
 from typing import Any, NoReturn
 
@@ -478,6 +479,53 @@ def payload_with_integrity(state: dict[str, Any]) -> dict[str, Any]:
     return result
 
 
+def write_file_atomically(path: Path, payload: bytes, *, mode: int = 0o600) -> None:
+    """Publish bytes so the destination is never absent, partial, or stale.
+
+    A temporary file in the same directory is written, flushed and fsynced,
+    then renamed over the destination; the parent directory is fsynced so the
+    rename survives a crash. Any failure before the rename leaves the previous
+    destination byte-for-byte intact — which is the property a backup-first
+    replacement cannot offer, because it vacates the active path first.
+    """
+    parent = path.parent
+    descriptor, temporary_name = tempfile.mkstemp(
+        dir=parent, prefix=f".{path.name}.", suffix=".tmp"
+    )
+    temporary = Path(temporary_name)
+    try:
+        with os.fdopen(descriptor, "wb") as handle:
+            handle.write(payload)
+            handle.flush()
+            os.fsync(handle.fileno())
+        os.chmod(temporary, mode)
+        os.replace(temporary, path)
+    except BaseException:
+        temporary.unlink(missing_ok=True)
+        raise
+    directory = os.open(parent, os.O_RDONLY)
+    try:
+        os.fsync(directory)
+    finally:
+        os.close(directory)
+
+
+def retain_rejected_receipt(path: Path) -> Path:
+    """Copy an unverifiable receipt aside without vacating the active path.
+
+    Mirrors how the browser layer keeps a rejected managed tree outside the
+    active namespace: a receipt that fails self-integrity is evidence, so it is
+    preserved under its own name rather than deleted or silently overwritten.
+    """
+    data = path.read_bytes()
+    for index in range(1, 100):
+        candidate = path.with_name(f"{path.name}.rejected.{index}")
+        if not candidate.exists():
+            write_file_atomically(candidate, data)
+            return candidate
+    fail(f"too many retained rejected receipts beside {path}; clean them up first")
+
+
 def load_receipt(path: Path, *, metadata_only: bool = False) -> dict[str, Any]:
     regular_owned(path)
     try:
@@ -631,6 +679,14 @@ def build_parser() -> argparse.ArgumentParser:
             "then RLDYOUR_LOCAL_EXECUTION_POLICY, then desktop"
         ),
     )
+    build.add_argument(
+        "--replace-invalid",
+        action="store_true",
+        help=(
+            "replace a receipt that fails self-integrity, retaining the "
+            "unverifiable copy beside it as <name>.rejected.N"
+        ),
+    )
 
     verify = subparsers.add_parser(
         "verify", help="verify the device matches its receipt and the contract"
@@ -653,26 +709,37 @@ def main() -> int:
             profile = _resolve_build_profile(getattr(args, "profile", None))
             output: Path = args.output
             output.parent.mkdir(parents=True, exist_ok=True)
+            superseded: bytes | None = None
             if output.exists() or output.is_symlink():
-                # build replaces a stale receipt: validate the old one's
-                # metadata first, then atomically swap. This mirrors the
-                # metadata-only gate the browser receipt uses before an
-                # in-place replacement.
-                if not _is_our_receipt(output):
-                    fail(f"refusing to overwrite unmanaged receipt: {output}")
-                backup = output.with_suffix(".json.bak")
-                output.rename(backup)
+                # A symlink at the receipt path is an attack shape rather than
+                # corruption, so it is refused outright and --replace-invalid
+                # does not apply to it.
+                if output.is_symlink():
+                    fail(f"refusing to overwrite a symlinked receipt: {output}")
+                # Validate the full self-integrity of the receipt being
+                # replaced, not merely its schema and owner: a receipt whose
+                # canonical form or payload digest no longer matches is
+                # evidence of tampering, and quietly replacing it destroys
+                # exactly the evidence this tool exists to preserve.
+                try:
+                    load_receipt(output, metadata_only=True)
+                except IntegrityError:
+                    if not args.replace_invalid:
+                        raise
+                    rejected = retain_rejected_receipt(output)
+                    print(f"retained rejected receipt: {rejected}", file=sys.stderr)
+                else:
+                    superseded = output.read_bytes()
+            # Collect before publishing. The previous order renamed the active
+            # receipt out of the way first, so any failure in collection or in
+            # the write left the device with no active receipt at all and no
+            # rollback.
             state = collect_state(home=Path.home(), profile=profile)
-            flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL
-            descriptor = os.open(output, flags, 0o600)
-            try:
-                with os.fdopen(descriptor, "wb") as handle:
-                    handle.write(canonical_bytes(payload_with_integrity(state)))
-                    handle.flush()
-                    os.fsync(handle.fileno())
-            except BaseException:
-                output.unlink(missing_ok=True)
-                raise
+            write_file_atomically(output, canonical_bytes(payload_with_integrity(state)))
+            # The backup is written only once a valid replacement is in place,
+            # so the active path is never the thing that goes missing.
+            if superseded is not None:
+                write_file_atomically(output.with_suffix(".json.bak"), superseded)
             print(output)
             return 0
 
@@ -703,19 +770,6 @@ def main() -> int:
         else:
             print(f"device-integrity: NOT_PROVEN: {exc}", file=sys.stderr)
         return 1
-
-
-def _is_our_receipt(path: Path) -> bool:
-    """Return True if ``path`` is one of our receipts (correct schema/owner)."""
-    try:
-        data = json.loads(path.read_bytes())
-        return (
-            isinstance(data, dict)
-            and data.get("schema") == SCHEMA
-            and data.get("owner") == OWNER
-        )
-    except (OSError, json.JSONDecodeError):
-        return False
 
 
 if __name__ == "__main__":

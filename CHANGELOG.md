@@ -13,6 +13,29 @@ All notable changes to this module will be documented in this file.
 
 ### Removed
 
+- **The duplicated agent context is gone.** Four hand-maintained layers
+  described this repository — `AGENTS.md`, `.claude/CLAUDE.md`, 23 Serena
+  memories and a compiled GDS projection — and they had drifted apart: the
+  Claude file did not know the `desktop-builds` profile two releases after it
+  shipped, named the server execution policy with a retired token in one
+  paragraph and the current one in another, and still instructed the codex
+  `safe` setup months after that gate was removed; the memory index claimed
+  three tracked memories when there were 23.
+
+  The 23 memories held roughly forty lines of fact inside seventeen hundred
+  lines of identical scaffolding. Every fact was checked against the sources
+  before deletion and every one was already recorded in a code comment, a
+  changelog entry or an ADR — including the two that looked unique (why
+  `terraform-ls`/`helm-ls` stay macOS-only, why `jdtls` and
+  `kotlin-language-server` were removed). One of them was simply wrong: it
+  described a cmux integration for two harnesses this module had already
+  stopped installing.
+
+  `.claude/CLAUDE.md` is now an import of `AGENTS.md` plus a short delta
+  (241 → 35 lines), the memory corpus is one pointer that carries no pins and no
+  policy (1741 → 44 lines), and `AGENTS.md` replaced its pin catalogue with the
+  contract and the reasoning the contract cannot express. Agent context overall:
+  2295 → 383 lines, with no invariant deleted that lacked an executable owner.
 - **BrowserOS is no longer part of the standard desktop set.** Google Chrome
   replaces it as the estate's standard browser, by owner decision. Bootstrap no
   longer declares, installs or verifies BrowserOS — and deliberately does not
@@ -210,6 +233,15 @@ All notable changes to this module will be documented in this file.
 
 ### Tests
 
+- `tests/test_agent_context.py` holds the collapsed shape: the Claude file must
+  import the guide and stay a delta, neither surface may copy a pin the contract
+  owns, no surface may name a retired profile or policy, and the memory corpus
+  may not regrow. It also turns the hosted-runner rule from prose into a gate —
+  and immediately found that three callers accepted a `runner` input without
+  passing it (`codeql`, `dependency-review`, `scorecard`), which the earlier
+  eight-caller fix had missed. The two callers whose reusable genuinely exposes
+  no such input now record that exemption next to the call, and the test pins
+  the exemption list so a pin bump has to re-justify it.
 - `scripts/ci/lint.sh` discovers every owned shell script instead of carrying a
   hand-maintained list. The list had silently skipped `scripts/ubuntu/desktop.sh`
   since the day it was added, and would have skipped `scripts/remote-exec.sh`

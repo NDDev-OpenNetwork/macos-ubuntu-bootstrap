@@ -27,6 +27,14 @@ When prose and implementation disagree, verify the scripts and contract, then
 update the affected documentation in the same change. Do not invent a second
 policy source.
 
+This file is the only guide. `.claude/CLAUDE.md` imports it and carries a short
+delta; `.serena/memories/` holds one pointer and no policy. That shape is held
+by `tests/test_agent_context.py`, which fails if the Claude file grows back into
+a specification, if either surface copies a pin the contract owns, or if the
+memory corpus regrows. Prefer making a rule checkable over writing it down
+twice: a rule that can be tested belongs in a test, a decision belongs in an
+ADR, a version belongs in the contract.
+
 ## Contract `2.6.1`
 
 Ubuntu profile selection is always explicit. Never infer server/rootful Docker
@@ -62,60 +70,51 @@ toolchain: `install_compiled_language_hosts` returns early there.
 
 ## Managed Versions
 
-These values must match both platform installers, the contract, tests, and
-operator documentation:
+**Every exact version and digest lives in `config/rldyour-contract.json`.** It
+is the only place they are correct, parity with the installers is enforced by
+`tests/test_contract_parity.py`, and a copy in prose is a copy that goes stale.
+Read the contract; do not read a version here.
 
-- Active harness set (one owner per harness, RVR-P1-004): `codex`.
-  Bootstrap installs no AI CLI inline and never through a bun/npm global path.
-  The harness is owned by its authoritative NDDev module, whose materialized
-  checkout GDS device bootstrap passes in an env var:
-  - `codex`: `nddev-codex-app` (`RLDYOUR_CODEX_MODULE`); `install-cli`, then
-    `apply --setup full-auto`, then `install-builder`. The module publishes its
-    CLI only under its own target, so
-    `${RLDYOUR_CODEX_HOME:-$HOME/.codex}/bin` is part of the managed PATH.
-  - `zcode`: catalogued but **on-pause** (`harnesses.delegated`, ADR 0006).
-    Bootstrap never installs, starts, verifies, removes, or adopts it. Do not
-    reintroduce a zcode path, not even a warn-and-continue one.
-- CloakBrowser: `0.4.12`. The managed headless service passes `--no-sandbox` on
-  Linux only: Ubuntu 23.10+ restrict unprivileged user namespaces through
-  AppArmor, so without it the zygote aborts and the mandatory browser layer cannot
-  start at all. macOS keeps its sandbox and the flag must never appear there. Do
-  not relax `kernel.apparmor_restrict_unprivileged_userns` instead.
-- Chrome DevTools MCP: `1.6.0`
-- Playwright CLI: `0.1.17`
-- Webwright: retired fail-closed; publish only the exact disabled wrapper
-- Ubuntu Node.js/uv/Bun: `24.18.0` / `0.11.30` / `1.3.14`, immutable assets
-  with tracked architecture hashes
-- Ubuntu pinned source tools (desktop-only, `PINNED_SOURCE_TOOLS` table, one
-  generic installer, tracked per-architecture SHA-256 + runtime receipts):
-  gitleaks `8.30.1`, osv-scanner `2.4.0`, actionlint `1.7.12`, hadolint
-  `2.15.1`, markdown-oxide `0.25.12`, delta `0.19.2`, yq `4.53.3`, ast-grep
-  `0.45.0`. Adding a tool means adding a row; there is no second install path.
-  Ubuntu uses markdown-oxide where macOS uses marksman (marksman's formula
-  depends on `dotnet@9`). ast-grep's deprecated `sg` shim is never published.
-- Ubuntu Go `1.26.5`, Rust `1.97.1`, and Dart SDK `3.12.2`, desktop-only
-  language-server hosts, tracked architecture hashes. One combined Rust archive
-  carries rustc, cargo, rust-std, clippy, rustfmt, and rust-analyzer. One Dart SDK
-  archive carries both `dart language-server` and `dart mcp-server`; both
-  verifiers gate on the exact/floor version *and* on the mcp-server subcommand
-  responding, because an SDK that resolves but cannot serve MCP is the defect
-  ADR 0006 exists to prevent. The Dart tree is permission-normalized before
-  publication (its zip stores `0775` directories, which umask cannot fix), and its
-  telemetry is disabled through the SDK's own switch and then proven by reading
-  `reporting=0` back. gopls `v0.23.0` is pinned by module version and verified
-  through the Go checksum database — it publishes no prebuilt archive, so it
-  carries no tracked archive hash (ADR 0005).
+What the contract cannot express is the reasoning, so only that is recorded:
 
-Use current, source-backed facts before changing a dependency. Preserve exact
-pins and integrity checks unless the change intentionally updates the contract.
-Never reintroduce mutable, unauthenticated remote installer execution or
-unfrozen dependency resolution. The Node browser providers use
-`templates/browser/provider/bun.lock`; CloakBrowser uses its tracked `uv.lock`.
-The codex harness owns its standalone artifacts inside its module; never
-reintroduce an inline AI-CLI bundle or a bun/npm global install.
+- **One owner per harness (RVR-P1-004).** The active set is `codex`, installed
+  by its authoritative NDDev module, never inline and never through a bun/npm
+  global. This is now checkable rather than asserted: `harnesses.detection`
+  makes `device_integrity` report a `codex` resolving outside its module's
+  target as drift. `zcode` is catalogued but **on-pause** — bootstrap never
+  installs, starts, verifies, removes or adopts it, and an installed copy is
+  recorded as evidence only.
+- **The codex module is applied with its unrestricted `full-auto` setup.** This
+  is an owner-controlled workstation and the profile is chosen deliberately.
+  Anyone hardening a device that is not owner-controlled must revisit it first
+  (`SECURITY.md`).
+- **CloakBrowser passes `--no-sandbox` on Linux only.** Ubuntu 23.10+ restrict
+  unprivileged user namespaces through AppArmor, so without it the zygote aborts
+  and the mandatory browser layer cannot start at all. macOS keeps its sandbox
+  and the flag must never appear there. Do not relax
+  `kernel.apparmor_restrict_unprivileged_userns` instead: that re-enables
+  unprivileged user namespaces for every process on the host to fix one browser.
+- **Go, Rust and Dart are language-server hosts, not build authorization**
+  (ADR 0005, ADR 0006). Desktop and desktop-builds only;
+  `install_compiled_language_hosts` returns early on the server profile, which
+  stays `container-execution-only`. The Flutter SDK is deliberately absent: its
+  `bin/cache` self-populates and would mutate a receipt-verified tree.
+- **Google Chrome is pinned by signing key, not by version.** Pinning a browser
+  to an old build is a security liability, and the pin would be fiction anyway
+  because the vendor's repository moves the package underneath it. The key
+  fingerprint is verified before the repository is trusted.
+- **An architecture upstream does not publish is declared absent, never faked.**
+  Telegram ships x86_64 only; its arm64 fields are empty and the row is skipped
+  there. Filling them with the x86_64 values made an arm64 device verify the
+  digest of a binary it cannot execute.
+- **Adding a pinned tool means adding a row.** `PINNED_SOURCE_TOOLS`,
+  `USER_TOOLS` and `DESKTOP_DEBS` each have exactly one installer. A second
+  install path is how one entry quietly stops being verified.
 
-The codex harness stays update-locked: `DISABLE_AUTOUPDATER=1` and
-`DISABLE_UPDATES=1` keep the codex module's standalone binary from drifting.
+Use current, source-backed facts before changing a dependency, and confirm a
+digest by downloading the artifact rather than copying a release note. Never
+reintroduce mutable, unauthenticated installer execution or unfrozen dependency
+resolution.
 
 ## Non-Negotiable Browser Boundary
 
@@ -303,11 +302,11 @@ Docker runtime evidence that was not actually produced.
   default setup first, because configuration attachment is atomic and forcing
   default setup onto a repository with an active advanced setup fails the whole
   attachment.
-- This repository is public, so `pull_request` executes untrusted fork code.
-  Every caller of a `ci-workflows` reusable that exposes a `runner` input must
-  pass `runner: ubuntu-latest` explicitly and keep it. Several of those
-  reusables default `runner` to the estate's self-hosted `amsterdam` label, and
-  a default belongs to the pinned commit — so dropping the explicit value would
-  let a routine Dependabot pin bump route fork PRs onto trusted private
-  infrastructure with no diff here to review. When reviewing a pin bump, diff
-  the reusable's `inputs.runner.default` between the old and new commit.
+- This repository is public, so `pull_request` executes untrusted fork code and
+  must never reach the estate's self-hosted runners. Every `ci-workflows` caller
+  that exposes a `runner` input passes `runner: ubuntu-latest`; the default
+  belongs to the pinned commit, not to this repository, so inheriting it would
+  let a routine pin bump move fork PRs onto trusted infrastructure with no diff
+  here to review. `tests/test_agent_context.py` enforces this, including the two
+  callers whose reusable exposes no such input — their exemption is written next
+  to the call and re-checked when the pin moves.

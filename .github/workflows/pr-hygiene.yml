@@ -19,6 +19,8 @@ jobs:
       pull-requests: write # labeler + stale jobs comment/label PRs
       issues: write # stale job manages issues
     uses: NDDev-it-com/ci-workflows/.github/workflows/pr-hygiene.yml@7f69c724923d06b2c2057c5a6ad341c37f1a8995 # 0.13.3
+    # This reusable exposes no `runner` input at the pinned commit; the
+    # hosted-runner rule therefore does not apply here. Re-check on a pin bump.
     with:
       # The reusable commitlint job (wagoid v6.2.1) fails with EISDIR here; keep
       # pr-title/labeler/stale and re-enable once ci-workflows fixes commitlint.

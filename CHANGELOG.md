@@ -18,6 +18,18 @@ All notable changes to this module will be documented in this file.
 
 ### Fixed
 
+- **Remote execution now preserves the caller's argv, and a rejected gate no
+  longer lets a second command through.** OpenSSH transmits no argv array: the
+  client joins the remote-command arguments with single spaces and the remote
+  login shell parses the result. `scripts/remote-exec.sh` passed `"$@"` straight
+  to `ssh`, so an argument containing whitespace was re-split and an argument
+  containing `;` started an independent remote command — one that ran even when
+  the clean-worktree or exact-HEAD check had already aborted the requested one,
+  contradicting ADR 0009. Every field is now quoted exactly once in POSIX
+  single-quote form, so the remote parse restores the original argv. The remote
+  repository path is charset-validated like the SSH destination was, and each
+  local dirty state (unstaged, staged, untracked) now fails with its own reason
+  instead of exiting silently.
 - **Persistent Linux CloakBrowser no longer poisons the desktop portal before
   login.** The systemd-user unit now pins
   `DBUS_SESSION_BUS_ADDRESS=disabled:`, preserving the mandatory pre-login CDP
@@ -50,6 +62,14 @@ All notable changes to this module will be documented in this file.
 
 ### Tests
 
+- Remote execution is now covered by a protocol test rather than a source scan.
+  A deterministic harness reproduces OpenSSH's join-and-parse behaviour and
+  asserts byte-exact argv round trips for empty arguments, whitespace, quotes,
+  `$()`, backticks, `;`, `|`, `&`, newlines, tabs, globs, leading dashes,
+  backslashes and Unicode; a second layer proves the same properties against a
+  real `sshd` on loopback and self-skips only where no OpenSSH server exists.
+  The previous "the source contains no `eval`" assertion could not observe the
+  defect at all, because the evaluation happened in the remote shell.
 - The browser contract, static bootstrap checks, installed-runtime verifier,
   and live health wrapper now require the Linux session-bus isolation; a
   managed unit missing it fails closed.

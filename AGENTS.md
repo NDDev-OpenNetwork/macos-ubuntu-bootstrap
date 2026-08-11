@@ -266,6 +266,15 @@ bash scripts/ci/validate.sh
 python3 -m pytest
 ```
 
+**macOS verification is on-pause.** The estate has no Apple Silicon target
+available, so no macOS claim in this repository is currently backed by a run.
+The platform is still supported and its code is still maintained — two defects
+were fixed there on 2026-08-12 — but those fixes are argued from shell semantics
+and covered by static tests, not proven. Treat any macOS statement as unverified
+until a target exists, and never present a plan-mode run or a static test as
+runtime evidence for it. The hosted CI lane stays: plan mode and shellcheck on
+`macos-latest` are the only macOS signal there is, and they are cheap.
+
 Use platform verification on real targets when platform behavior changes:
 
 ```bash
@@ -317,9 +326,19 @@ Docker runtime evidence that was not actually produced.
   attachment.
 - This repository is public, so `pull_request` executes untrusted fork code and
   must never reach the estate's self-hosted runners. Every `ci-workflows` caller
-  that exposes a `runner` input passes `runner: ubuntu-latest`; the default
-  belongs to the pinned commit, not to this repository, so inheriting it would
-  let a routine pin bump move fork PRs onto trusted infrastructure with no diff
-  here to review. `tests/test_agent_context.py` enforces this, including the two
-  callers whose reusable exposes no such input — their exemption is written next
-  to the call and re-checked when the pin moves.
+  that exposes a `runner` input passes an explicit GitHub-hosted label, and
+  `tests/test_agent_context.py` rejects any other value.
+
+  The estate's self-hosted label is `github-actions`. That name is the reason
+  the check asserts the *value* and not merely that the key is present: a
+  `runner: github-actions` reads like a hosted runner in a diff and would pass
+  a presence check unnoticed.
+
+  Verified 2026-08-12 against `ci-workflows`: at the pinned commit and on its
+  `main`, all 44 reusables that declare a `runner` default use a hosted label,
+  so nothing is currently defaulting to self-hosted. The explicit value is
+  therefore defence against a future change, not a live exposure — and it stays,
+  because the default belongs to the pinned commit rather than to this
+  repository and Dependabot bumps that pin weekly with no diff here to review.
+  Two callers expose no `runner` input at all; their exemption is written next
+  to the call and the test pins the list so a bump has to re-justify it.

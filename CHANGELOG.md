@@ -53,6 +53,25 @@ All notable changes to this module will be documented in this file.
 
 ### Changed
 
+- **The hosted-runner rule now checks the value, not the key.** The estate's
+  self-hosted label is `github-actions`, which reads like a GitHub-hosted runner
+  in a diff — a presence-only check would have passed `runner: github-actions`
+  without comment. `tests/test_agent_context.py` now rejects any label outside
+  the hosted set, and catching that exact camouflage is verified.
+
+  The rule's recorded justification was also restated against current facts.
+  It claimed "39 of 46 reusables default `runner` to the estate's self-hosted
+  `amsterdam` label"; checked on 2026-08-12, all 44 reusables on `ci-workflows`
+  that declare a default use a hosted label, both at the pinned commit and on
+  `main`. Nothing is currently defaulting to self-hosted, so the explicit value
+  is defence against a future change rather than a live exposure — and it stays,
+  because the default belongs to the pinned commit and Dependabot bumps that pin
+  weekly with no diff here to review.
+- **macOS verification is explicitly on-pause.** No macOS claim in this
+  repository is currently backed by a run: the estate has no Apple Silicon
+  target. The platform stays supported and its code stays maintained, but a
+  macOS statement is to be read as unverified until a target exists. The hosted
+  plan-mode and shellcheck lane remains, being the only macOS signal available.
 - **The codex harness now applies the unrestricted `full-auto` setup by
   default.** The setup was `safe` and `full-auto` required the explicit owner
   flag `RLDYOUR_CODEX_FULL_AUTO=1`; that gate is gone and the flag no longer

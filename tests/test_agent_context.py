@@ -83,8 +83,19 @@ def test_the_memory_corpus_stays_small_and_self_describing() -> None:
 EXEMPTION = "exposes no `runner` input"
 
 
-def _reusable_callers() -> list[tuple[Path, bool, bool, bool]]:
-    """(workflow, has a `with:` block, names `runner`, documented as exempt).
+# GitHub-hosted labels. Anything else is self-hosted, and the estate's
+# self-hosted label is `github-actions` -- a name that reads like a hosted
+# runner in a diff, which is exactly why the value is checked and not just the
+# key's presence.
+HOSTED_RUNNERS = {
+    "ubuntu-latest", "ubuntu-24.04", "ubuntu-22.04",
+    "macos-latest", "macos-15", "macos-14",
+    "windows-latest", "windows-2022",
+}
+
+
+def _reusable_callers() -> list[tuple[Path, bool, bool, bool, str]]:
+    """(workflow, has `with:`, names `runner`, exempt, the runner value).
 
     Parsed line-wise on purpose: the locked test environment carries no YAML
     reader, and pulling one in for a lint would be a supply-chain change for a
@@ -98,6 +109,7 @@ def _reusable_callers() -> list[tuple[Path, bool, bool, bool]]:
                 continue
             indent = len(line) - len(line.lstrip())
             has_with = names_runner = exempt = False
+            runner_value = ""
             for follower in lines[index + 1 :]:
                 if follower.strip() and (len(follower) - len(follower.lstrip())) < indent:
                     break  # left the job
@@ -108,7 +120,8 @@ def _reusable_callers() -> list[tuple[Path, bool, bool, bool]]:
                     has_with = True
                 elif has_with and stripped.startswith("runner:"):
                     names_runner = True
-            callers.append((path, has_with, names_runner, exempt))
+                    runner_value = stripped.split(":", 1)[1].strip().strip("'\"")
+            callers.append((path, has_with, names_runner, exempt, runner_value))
     return callers
 
 
@@ -125,7 +138,7 @@ def test_every_reusable_caller_that_can_name_a_runner_does() -> None:
     assert callers, "no ci-workflows callers found"
     missing = [
         path.name
-        for path, has_with, names_runner, exempt in callers
+        for path, has_with, names_runner, exempt, _value in callers
         if has_with and not names_runner and not exempt
     ]
     assert missing == [], (
@@ -135,7 +148,17 @@ def test_every_reusable_caller_that_can_name_a_runner_does() -> None:
     # An exemption is a claim about the pinned commit and must be re-checked
     # when the pin moves, so it is recorded next to the call rather than
     # remembered.
-    exempted = [path.name for path, _w, _r, exempt in callers if exempt]
+    self_hosted = [
+        (path.name, value)
+        for path, _w, names_runner, _e, value in callers
+        if names_runner and value not in HOSTED_RUNNERS
+    ]
+    assert self_hosted == [], (
+        f"these callers name a non-hosted runner: {self_hosted}. The estate's "
+        "self-hosted label is `github-actions`, which looks hosted; fork PRs "
+        "must never land on it."
+    )
+    exempted = [path.name for path, _w, _r, exempt, _v in callers if exempt]
     assert exempted == ["cross-platform.yml", "pr-hygiene.yml"], (
         f"the exemption list changed: {exempted}. Verify against the reusable's "
         "inputs at the pinned commit before accepting it."

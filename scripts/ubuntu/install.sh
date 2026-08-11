@@ -87,6 +87,7 @@ APT_SOURCE_PACKAGES=(
   ca-certificates curl gpg gnupg git jq python3 python3-venv
   shellcheck shfmt clangd zsh unzip xz-utils wget zip lsb-release yamllint
   fd-find bat fzf zoxide tmux btop duf hexyl gh ripgrep httpie miller
+  wl-clipboard libsecret-tools
 )
 
 APT_DESKTOP_BUILD_PACKAGES=(build-essential)

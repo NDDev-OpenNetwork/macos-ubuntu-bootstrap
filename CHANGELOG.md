@@ -30,6 +30,24 @@ All notable changes to this module will be documented in this file.
 
 ### Added
 
+- **Google Chrome is provisioned by the bootstrap.** It is the estate's daily
+  browser and the default `http`/`https` handler on the Ubuntu desktop, but it
+  was installed by hand and appeared nowhere in the contract. It is now a
+  required desktop step with a deliberate exception recorded in the contract:
+  `version_policy: tracks-stable-channel` rather than a SHA-256, because
+  pinning a browser to an old build trades a real security liability for a
+  reproducibility gain the estate does not need. Supply-chain control is the
+  signing key instead — primary fingerprint
+  `EB4C1BFD4F042F6DDDCCEC917721F63BD38B4796`, confirmed against two independent
+  sources and verified before the repository is trusted, the same gate the
+  Docker source already used. An apt source that another tool already wrote for
+  the same repository is preserved rather than duplicated (two sources make apt
+  ambiguous, and the vendor's own cron re-enables its file after a distro
+  upgrade), and `/etc/default/google-chrome` is set to `repo_add_once=false` so
+  the package's postinst never adds a competing one. Strict verification
+  requires Chrome to be installed and its source to be signed by that exact key.
+- `wl-clipboard` and `libsecret-tools` join the apt baseline. Both were already
+  relied on by the live desktop and declared nowhere.
 - **One-owner-per-harness is now checkable on a device, not only asserted in
   prose.** `harnesses.detection` declares a probe per catalogued harness and
   `device_integrity` records where each one actually resolves. `codex` is

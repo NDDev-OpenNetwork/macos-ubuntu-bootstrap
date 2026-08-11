@@ -152,6 +152,14 @@ rldyour::ubuntu_verify::desktop_outcomes() {
       failed=1
     fi
 
+    if dpkg-query -W -f='${Status}' google-chrome-stable 2>/dev/null |
+      command grep -q "install ok installed"; then
+      rldyour::log "ok" "Google Chrome installed"
+    else
+      rldyour::log "missing" "Google Chrome is declared in desktop_apps but not installed"
+      failed=1
+    fi
+
     if dpkg -l firefox 2>/dev/null | command grep -q '^ii'; then
       rldyour::log "missing" "apt Firefox is still present; the desktop layer must remove it"
       failed=1
@@ -166,6 +174,29 @@ rldyour::ubuntu_verify::desktop_outcomes() {
       failed=1
     else
       rldyour::log "ok" "snap Firefox absent"
+    fi
+  fi
+
+  # Two repository paths are in the wild for the same product: Google's own
+  # cron writes `linux/chrome/deb`, while a source created through Ubuntu's
+  # repolib tooling uses `linux/chrome-stable/deb`. Match the common prefix so
+  # either is recognised. The `|| true` is load-bearing: grep exits 1 when it
+  # finds nothing, and under `set -o pipefail` that would abort the whole
+  # verifier on any device without Chrome.
+  local chrome_source chrome_keyring chrome_primary
+  chrome_source="$(command grep -rlF 'dl.google.com/linux/chrome' \
+    /etc/apt/sources.list /etc/apt/sources.list.d/ 2>/dev/null | head -1 || true)"
+  if [ -n "$chrome_source" ]; then
+    chrome_keyring="$(command sed -n -E 's/^[[:space:]]*Signed-By:[[:space:]]*//p; s/.*\[[^]]*signed-by=([^] ]+).*/\1/p' \
+      "$chrome_source" | head -1)"
+    chrome_primary="$(gpg --batch --show-keys --with-colons "$chrome_keyring" 2>/dev/null |
+      awk -F: '$1 == "pub" { c++; a = 1; next } $1 == "fpr" && a { f = toupper($10); a = 0 }
+               END { if (c == 1 && f != "") print f }')"
+    if [ "$chrome_primary" = "EB4C1BFD4F042F6DDDCCEC917721F63BD38B4796" ]; then
+      rldyour::log "ok" "Chrome apt source signed by the verified Google key"
+    else
+      rldyour::log "missing" "Chrome apt source is not signed by the verified Google key: ${chrome_source}"
+      failed=1
     fi
   fi
 

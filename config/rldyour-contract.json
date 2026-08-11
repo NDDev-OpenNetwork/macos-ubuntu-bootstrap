@@ -394,7 +394,9 @@
       "ripgrep",
       "httpie",
       "miller",
-      "software-properties-common"
+      "software-properties-common",
+      "wl-clipboard",
+      "libsecret-tools"
     ],
     "desktop_build": [
       "build-essential"
@@ -446,6 +448,23 @@
         "deb_version": "148.0.7966.97",
         "url": "https://github.com/browseros-ai/BrowserOS/releases/download/v0.47.18/BrowserOS_v0.47.18_amd64.deb",
         "sha256": "bfdda9be19ab0ec69602156a5c8aba3bd163351ca89539ecfda2761596b4dc7b"
+      },
+      {
+        "_doc": "Google Chrome is the estate's daily browser and the default handler for http/https on the Ubuntu desktop. It is the one deliberate exception to the pin-everything rule: `version_policy` tracks the stable channel rather than a SHA-256, because pinning a browser to an old build trades a real security liability for a reproducibility gain the estate does not need here. Supply-chain control comes from the signing key instead -- the primary fingerprint below is verified before the source is trusted, and it was confirmed against two independent sources (dl.google.com/linux/linux_signing_key.pub and the key embedded in the package's own /etc/cron.daily/google-chrome).",
+        "name": "google-chrome-stable",
+        "version_policy": "tracks-stable-channel",
+        "apt_source": {
+          "uri": "https://dl.google.com/linux/chrome/deb/",
+          "suites": "stable",
+          "components": "main",
+          "architectures": "amd64",
+          "key_url": "https://dl.google.com/linux/linux_signing_key.pub",
+          "key_fingerprint": "EB4C1BFD4F042F6DDDCCEC917721F63BD38B4796",
+          "managed_keyring": "/etc/apt/keyrings/rldyour-google-chrome.asc",
+          "managed_source": "/etc/apt/sources.list.d/rldyour-google-chrome.sources",
+          "vendor_repo_add_once": "false",
+          "vendor_source_policy": "preserve-when-key-verifies"
+        }
       },
       "deskflow",
       "happ"

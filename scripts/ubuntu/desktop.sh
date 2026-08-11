@@ -12,7 +12,8 @@
 #   1. GNOME dock: move to bottom, centered, macOS-style.
 #   2. Keyboard: add Russian layout with Alt+Shift toggle.
 #   3. BrowserOS: install the open-source agentic browser (.deb).
-#   4. Firefox: remove the stock snap+apt Firefox completely.
+#   4. Google Chrome: install from the fingerprint-verified signed apt source.
+#   5. Firefox: remove the stock snap+apt Firefox completely.
 #
 # Server profile (headless) skips this entirely.
 # ------------------------------------------------------------
@@ -29,6 +30,19 @@ BROWSEROS_DEB_URL="https://github.com/browseros-ai/BrowserOS/releases/download/v
 BROWSEROS_DEB_SHA256="bfdda9be19ab0ec69602156a5c8aba3bd163351ca89539ecfda2761596b4dc7b"
 BROWSEROS_DEB_TMP="/tmp/BrowserOS.deb"
 
+# Google Chrome. Deliberately NOT pinned to a SHA-256: pinning a browser to an
+# old build is a security liability, not a reproducibility gain, so the supply
+# chain is controlled by the signing key instead. This primary fingerprint was
+# confirmed against two independent sources -- the published
+# dl.google.com/linux/linux_signing_key.pub and the key embedded in the
+# package's own /etc/cron.daily/google-chrome.
+CHROME_KEY_URL="https://dl.google.com/linux/linux_signing_key.pub"
+CHROME_KEY_FINGERPRINT="EB4C1BFD4F042F6DDDCCEC917721F63BD38B4796"
+CHROME_REPO_URI="https://dl.google.com/linux/chrome/deb/"
+CHROME_MANAGED_KEYRING="/etc/apt/keyrings/rldyour-google-chrome.asc"
+CHROME_MANAGED_SOURCE="/etc/apt/sources.list.d/rldyour-google-chrome.sources"
+CHROME_DEFAULTS_FILE="/etc/default/google-chrome"
+
 # ----------------------------- helpers -----------------------------
 info() { printf '\033[1;34m==> %s\033[0m\n' "$*"; }
 ok()   { printf '\033[1;32m  \u2713 %s\033[0m\n' "$*"; }
@@ -40,7 +54,7 @@ die()  { printf '\033[1;31m  \u2717 %s\033[0m\n' "$*" >&2; exit 1; }
 # the Firefox removal is a declared policy; the dock and keyboard layout are
 # cosmetic and legitimately unavailable on a session without the dash-to-dock
 # extension or xkb data. Required failures make the run fail.
-REQUIRED_STEPS=(browseros firefox_removal)
+REQUIRED_STEPS=(browseros google_chrome firefox_removal)
 OPTIONAL_STEPS=(gnome_dock russian_layout)
 
 # Populated by nddev::_record; read by the aggregate report.
@@ -78,7 +92,7 @@ nddev::desktop_configure() {
   command -v localectl >/dev/null || die "localectl missing (needs systemd)"
 
   if [ "${RLDYOUR_DRY_RUN:-1}" -eq 1 ]; then
-    rldyour::log "info" "[DRY-RUN] desktop customization: GNOME dock bottom, Russian layout, BrowserOS install, Firefox removal"
+    rldyour::log "info" "[DRY-RUN] desktop customization: GNOME dock bottom, Russian layout, BrowserOS install, Google Chrome install, Firefox removal"
     return 0
   fi
 
@@ -90,6 +104,7 @@ nddev::desktop_configure() {
   nddev::_step gnome_dock nddev::_gnome_dock_bottom
   nddev::_step russian_layout nddev::_russian_keyboard_layout
   nddev::_step browseros nddev::_install_browseros
+  nddev::_step google_chrome nddev::_install_google_chrome
   nddev::_step firefox_removal nddev::_remove_firefox
 
   # Report the real outcome. Announcing "complete" unconditionally is what let
@@ -251,6 +266,129 @@ nddev::_install_browseros() {
   fi
   warn "BrowserOS installation failed"
   return 1
+}
+
+# ----------------------------- Google Chrome -----------------------------
+
+# Return 0 when $1 is a keyring whose single primary key matches the expected
+# Chrome signing fingerprint. Mirrors the Docker key gate in server.sh: exactly
+# one primary key, exact fingerprint, no trust-on-first-use.
+nddev::_chrome_keyring_verifies() {
+  local keyring=$1 primary
+  [ -f "$keyring" ] || return 1
+  primary="$(gpg --batch --show-keys --with-colons "$keyring" 2>/dev/null |
+    awk -F: '
+      $1 == "pub" { primary_count++; awaiting=1; next }
+      $1 == "fpr" && awaiting { fpr = toupper($10); awaiting = 0 }
+      END {
+        if (primary_count != 1 || fpr == "") exit 1
+        print fpr
+      }
+    ')" || return 1
+  [ "$primary" = "$CHROME_KEY_FINGERPRINT" ]
+}
+
+# Find an apt source already pointing at the Chrome repository, whatever wrote
+# it. Prints its path, or nothing.
+nddev::_chrome_existing_source() {
+  local file
+  for file in /etc/apt/sources.list /etc/apt/sources.list.d/*.list \
+    /etc/apt/sources.list.d/*.sources; do
+    [ -f "$file" ] || continue
+    # Google's cron writes `linux/chrome/deb`; a source created through
+    # Ubuntu's repolib tooling uses `linux/chrome-stable/deb`. Either is the
+    # same product and must not be duplicated.
+    if command grep -qF 'dl.google.com/linux/chrome' "$file"; then
+      printf '%s\n' "$file"
+      return 0
+    fi
+  done
+  return 1
+}
+
+# Extract the Signed-By keyring a source file names.
+nddev::_chrome_source_keyring() {
+  local file=$1
+  command sed -n -E 's/^[[:space:]]*Signed-By:[[:space:]]*//p; s/.*\[[^]]*signed-by=([^] ]+).*/\1/p' \
+    "$file" | head -1
+}
+
+nddev::_install_google_chrome() {
+  info "Installing Google Chrome (signed apt source, stable channel)"
+  local existing keyring tmp_key tmp_source
+
+  if [ "$(dpkg --print-architecture 2>/dev/null)" != "amd64" ]; then
+    warn "Google publishes no Linux build for this architecture"
+    nddev::_record google_chrome skipped
+    return 0
+  fi
+
+  # An existing source for the same repository -- typically written by Chrome's
+  # own installer -- is preserved rather than duplicated. Two sources for one
+  # repository make apt ambiguous, and the vendor's cron re-enables its own file
+  # after a distro upgrade, so competing with it would never converge. What must
+  # hold either way is the key.
+  if existing="$(nddev::_chrome_existing_source)"; then
+    keyring="$(nddev::_chrome_source_keyring "$existing")"
+    if [ -z "$keyring" ]; then
+      warn "existing Chrome apt source names no Signed-By keyring: $existing"
+      return 1
+    fi
+    if ! nddev::_chrome_keyring_verifies "$keyring"; then
+      warn "existing Chrome apt source is signed by an unverified key: $keyring"
+      return 1
+    fi
+    ok "existing Chrome apt source verified against $CHROME_KEY_FINGERPRINT"
+  else
+    nddev::_sudo_refresh
+    tmp_key="$(mktemp)"
+    if ! curl --proto '=https' --tlsv1.2 --fail --silent --show-error --location \
+      "$CHROME_KEY_URL" --output "$tmp_key"; then
+      rm -f "$tmp_key"
+      warn "could not download the Chrome signing key"
+      return 1
+    fi
+    if ! nddev::_chrome_keyring_verifies "$tmp_key"; then
+      rm -f "$tmp_key"
+      warn "Chrome signing key fingerprint verification failed"
+      return 1
+    fi
+    tmp_source="$(mktemp)"
+    cat >"$tmp_source" <<EOF
+# Managed by macos-ubuntu-bootstrap: desktop-app-google-chrome-v1
+Types: deb
+URIs: ${CHROME_REPO_URI}
+Suites: stable
+Components: main
+Architectures: amd64
+Signed-By: ${CHROME_MANAGED_KEYRING}
+EOF
+    # Stop the package's postinst from adding a second, competing source. This
+    # is the vendor's own documented switch, the same shape as Telegram's
+    # externalupdater.d: work with the supported mechanism, never around it.
+    sudo install -d -m 0755 /etc/apt/keyrings /etc/default
+    printf 'repo_add_once="false"\nrepo_reenable_on_distupgrade="true"\n' |
+      sudo tee "$CHROME_DEFAULTS_FILE" >/dev/null
+    sudo install -m 0644 "$tmp_key" "$CHROME_MANAGED_KEYRING"
+    sudo install -m 0644 "$tmp_source" "$CHROME_MANAGED_SOURCE"
+    rm -f "$tmp_key" "$tmp_source"
+    ok "installed managed Chrome apt source verified against $CHROME_KEY_FINGERPRINT"
+    sudo apt-get update -qq || true
+  fi
+
+  if dpkg-query -W -f='${Status}' google-chrome-stable 2>/dev/null |
+    command grep -q "install ok installed"; then
+    ok "Google Chrome already installed"
+    return 0
+  fi
+
+  nddev::_sudo_refresh
+  sudo env DEBIAN_FRONTEND=noninteractive apt-get install -y \
+    --no-install-recommends google-chrome-stable || {
+    warn "Google Chrome installation failed"
+    return 1
+  }
+  ok "Google Chrome installed"
 }
 
 # ----------------------------- Firefox removal -----------------------------

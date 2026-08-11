@@ -165,3 +165,127 @@ def test_discovered_script_passes_syntax_check(script: str) -> None:
         ["bash", "-n", str(ROOT / script)], capture_output=True, text=True, check=False
     )
     assert result.returncode == 0, result.stderr
+
+
+# ----------------------------- Google Chrome -----------------------------
+#
+# Chrome is the one desktop app deliberately not pinned to a SHA-256: pinning a
+# browser to an old build is a security liability. Supply-chain control comes
+# from the signing key, so the fingerprint gate is the thing worth testing.
+
+CHROME_FINGERPRINT = "EB4C1BFD4F042F6DDDCCEC917721F63BD38B4796"
+CONTRACT = ROOT / "config/rldyour-contract.json"
+
+
+def _chrome_contract() -> dict:
+    import json
+
+    apps = json.loads(CONTRACT.read_text(encoding="utf-8"))["ubuntu_apt_packages"][
+        "desktop_apps"
+    ]
+    for entry in apps:
+        if isinstance(entry, dict) and entry.get("name") == "google-chrome-stable":
+            return entry
+    raise AssertionError("google-chrome-stable is not declared in desktop_apps")
+
+
+def test_contract_declares_chrome_as_key_verified_not_version_pinned() -> None:
+    chrome = _chrome_contract()
+    assert chrome["version_policy"] == "tracks-stable-channel"
+    source = chrome["apt_source"]
+    assert source["key_fingerprint"] == CHROME_FINGERPRINT
+    assert source["key_url"].startswith("https://dl.google.com/")
+    assert source["vendor_repo_add_once"] == "false"
+    assert source["vendor_source_policy"] == "preserve-when-key-verifies"
+
+
+def test_installer_pins_the_same_fingerprint_as_the_contract() -> None:
+    source = DESKTOP.read_text(encoding="utf-8")
+    assert f'CHROME_KEY_FINGERPRINT="{CHROME_FINGERPRINT}"' in source
+    verify = (ROOT / "scripts/ubuntu/verify.sh").read_text(encoding="utf-8")
+    assert CHROME_FINGERPRINT in verify, "the verifier must gate on the same key"
+
+
+def test_chrome_is_a_required_desktop_step() -> None:
+    source = DESKTOP.read_text(encoding="utf-8")
+    assert "REQUIRED_STEPS=(browseros google_chrome firefox_removal)" in source
+    body = source.split("nddev::desktop_configure() {", 1)[1]
+    assert body.index("nddev::_step browseros") < body.index("nddev::_step google_chrome")
+
+
+def _extract(function: str, path: Path) -> str:
+    lines = path.read_text(encoding="utf-8").splitlines(keepends=True)
+    out, inside = [], False
+    for line in lines:
+        if line.startswith(f"{function}()"):
+            inside = True
+        if inside:
+            out.append(line)
+            if line.rstrip() == "}":
+                break
+    assert out, f"{function} not found in {path}"
+    return "".join(out)
+
+
+def test_chrome_key_gate_rejects_a_foreign_key(tmp_path: Path) -> None:
+    """A key that is not Google's must never satisfy the gate."""
+    gnupg = tmp_path / "gnupg"
+    gnupg.mkdir(mode=0o700)
+    batch = tmp_path / "batch"
+    batch.write_text(
+        "%no-protection\nKey-Type: eddsa\nKey-Curve: ed25519\n"
+        "Name-Real: Not Google\nName-Email: nobody@example.invalid\n%commit\n",
+        encoding="utf-8",
+    )
+    generated = subprocess.run(
+        ["gpg", "--batch", "--homedir", str(gnupg), "--gen-key", str(batch)],
+        capture_output=True, text=True, check=False,
+    )
+    if generated.returncode != 0:
+        pytest.skip(f"gpg could not generate a test key: {generated.stderr[:200]}")
+    foreign = tmp_path / "foreign.asc"
+    exported = subprocess.run(
+        ["gpg", "--batch", "--homedir", str(gnupg), "--armor", "--export"],
+        capture_output=True, check=False,
+    )
+    foreign.write_bytes(exported.stdout)
+
+    gate = _extract("nddev::_chrome_keyring_verifies", DESKTOP)
+    result = subprocess.run(
+        ["bash", "-c",
+         f'CHROME_KEY_FINGERPRINT="{CHROME_FINGERPRINT}"\n{gate}\n'
+         f'nddev::_chrome_keyring_verifies "$1"', "_", str(foreign)],
+        capture_output=True, text=True, check=False,
+    )
+    assert result.returncode != 0, "a foreign signing key was accepted"
+
+
+def test_chrome_key_gate_rejects_a_missing_keyring(tmp_path: Path) -> None:
+    gate = _extract("nddev::_chrome_keyring_verifies", DESKTOP)
+    result = subprocess.run(
+        ["bash", "-c",
+         f'CHROME_KEY_FINGERPRINT="{CHROME_FINGERPRINT}"\n{gate}\n'
+         f'nddev::_chrome_keyring_verifies "$1"', "_", str(tmp_path / "absent.asc")],
+        capture_output=True, text=True, check=False,
+    )
+    assert result.returncode != 0
+
+
+def test_verifier_survives_a_device_without_any_chrome_source() -> None:
+    """grep exits 1 when it finds nothing; under `set -o pipefail` an unguarded
+    command substitution would abort the whole verifier on such a device."""
+    verify = (ROOT / "scripts/ubuntu/verify.sh").read_text(encoding="utf-8")
+    block = verify.split("chrome_source=", 1)[1].split("\n\n", 1)[0]
+    assert "|| true" in block, "the Chrome source lookup must not abort under pipefail"
+
+
+def test_both_google_repository_paths_are_recognised() -> None:
+    """Google's cron writes linux/chrome/deb; repolib writes
+    linux/chrome-stable/deb. Matching only the former left a real device's
+    source invisible to both the installer and the verifier."""
+    for path in (DESKTOP, ROOT / "scripts/ubuntu/verify.sh"):
+        text = path.read_text(encoding="utf-8")
+        assert "'dl.google.com/linux/chrome'" in text, path.name
+        assert "dl.google.com/linux/chrome/deb'" not in text, (
+            f"{path.name} still matches only the cron path"
+        )

@@ -96,15 +96,27 @@ container_exec_dev() {
 
 start_systemd_container() {
   CONTAINER_NAME="rldyour-evidence-${GITHUB_RUN_ID:-local}-${RANDOM}"
+  local image="rldyour-evidence-systemd:24.04"
+  docker build --tag "$image" - <<'DOCKERFILE'
+FROM ubuntu:24.04
+ENV DEBIAN_FRONTEND=noninteractive
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends ca-certificates curl dbus-user-session sudo systemd systemd-sysv \
+ && apt-get clean \
+ && rm -rf /var/lib/apt/lists/* \
+ && useradd -m -s /bin/bash dev \
+ && printf 'dev ALL=(ALL) NOPASSWD:ALL\n' >/etc/sudoers.d/dev \
+ && chmod 0440 /etc/sudoers.d/dev
+STOPSIGNAL SIGRTMIN+3
+CMD ["/sbin/init"]
+DOCKERFILE
   docker run --detach --privileged --cgroupns=host \
     --name "$CONTAINER_NAME" \
     --tmpfs /tmp --tmpfs /run --tmpfs /run/lock \
     --volume /sys/fs/cgroup:/sys/fs/cgroup:rw \
     --volume "$REPO_ROOT:/repo:ro" \
-    ubuntu:24.04 /sbin/init
+    "$image"
   trap 'docker rm --force "$CONTAINER_NAME" >/dev/null 2>&1 || true' EXIT
-  docker exec "$CONTAINER_NAME" bash -lc \
-    'export DEBIAN_FRONTEND=noninteractive; apt-get update; apt-get install -y --no-install-recommends sudo ca-certificates curl systemd systemd-sysv dbus-user-session; useradd -m -s /bin/bash dev; printf "dev ALL=(ALL) NOPASSWD:ALL\n" >/etc/sudoers.d/dev; chmod 0440 /etc/sudoers.d/dev'
   docker exec "$CONTAINER_NAME" systemctl is-system-running --wait || \
     docker exec "$CONTAINER_NAME" systemctl --failed
 }

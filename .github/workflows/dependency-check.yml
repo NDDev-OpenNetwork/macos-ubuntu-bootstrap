@@ -51,7 +51,7 @@ jobs:
           for marker in (
               "rldyour::install_vendor_ai_clis",
               "RLDYOUR_CODEX_VERSION",
-              "RLDYOUR_CODEX_PACKAGE_SHA512",
+              "RLDYOUR_CODEX_SHA512",
               "RLDYOUR_CLAUDE_INSTALLER_SHA256",
               "RLDYOUR_GROK_INSTALLER_SHA256",
               "rldyour::download_verified_file",

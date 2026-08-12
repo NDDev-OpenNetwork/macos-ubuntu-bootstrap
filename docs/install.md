@@ -287,7 +287,7 @@ app versions.
 GUI mode installs the desktop font support used by the terminal environment and
 then runs `scripts/ubuntu/desktop.sh`, which owns desktop customization: the
 GNOME dock moved to the bottom and centered, the Russian keyboard layout,
-the BrowserOS install, and the complete removal of the stock snap and apt
+the Google Chrome install, the optional RustDesk install, and the complete removal of the stock snap and apt
 Firefox. No harness desktop app is installed by bootstrap: the codex harness is
 owned by its GDS module, and the ZCode desktop app is installed by
 `nddev-harnesses`. ChatGPT, Codex, and cmux have no supported Linux desktop

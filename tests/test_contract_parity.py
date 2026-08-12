@@ -12,6 +12,7 @@ from __future__ import annotations
 import json
 import re
 from pathlib import Path
+from urllib.parse import urlparse
 
 ROOT = Path(__file__).resolve().parents[1]
 CONTRACT = json.loads((ROOT / "config/rldyour-contract.json").read_text(encoding="utf-8"))
@@ -142,46 +143,98 @@ def test_user_tools_match_the_contract() -> None:
     for name, row in rows.items():
         spec = declared[name]
         assert row[1] == spec["version"], f"{name}: version drift ({row[1]} vs {spec['version']})"
-        # herdr uses per-arch sha256 dict; telegram uses a single archive_sha256
-        # (same hash for both arch slots in the bash array since the tarball is
-        # x86_64-only and the arm64 slot is a mirror for the parser).
+        # herdr publishes both architectures and uses a per-arch sha256 dict;
+        # telegram publishes x86_64 only and uses a single archive_sha256.
+        #
+        # This assertion used to REQUIRE the arm64 slot to repeat the x86_64
+        # digest for a single-architecture tool, which is how an arm64 desktop
+        # came to verify the SHA-256 of a binary it cannot execute. An
+        # architecture upstream does not publish must be declared absent.
         if "sha256" in spec:
             assert row[6] == spec["sha256"]["x86_64"], f"{name}: x64 SHA-256 drift"
             assert row[7] == spec["sha256"]["aarch64"], f"{name}: arm64 SHA-256 drift"
         elif "archive_sha256" in spec:
             assert row[6] == spec["archive_sha256"], f"{name}: archive SHA-256 drift"
-            assert row[7] == spec["archive_sha256"], f"{name}: archive SHA-256 (arm64 slot) drift"
+            architectures = spec.get("architectures", ["x86_64", "aarch64"])
+            if "aarch64" in architectures:
+                assert row[7] == spec["archive_sha256"], f"{name}: arm64 SHA-256 drift"
+            else:
+                assert row[7] == "", (
+                    f"{name}: contract declares {architectures} but the row fills "
+                    "the arm64 slot; an unpublished architecture must be empty"
+                )
+                assert row[9] == "", f"{name}: arm64 URL must be empty too"
+        if "archive_kind" in spec:
+            assert row[2] == spec["archive_kind"], (
+                f"{name}: archive kind drift ({row[2]} vs {spec['archive_kind']})"
+            )
 
 
-def test_browseros_deb_url_and_sha_in_contract() -> None:
-    """BrowserOS .deb must be versioned (not CDN latest) with a pinned SHA-256."""
-    desktop_apps = CONTRACT["ubuntu_apt_packages"]["desktop_apps"]
-    browseros = next(app for app in desktop_apps if isinstance(app, dict) and app.get("name") == "browseros")
-    assert "version" in browseros, "browseros desktop_app missing version"
-    assert "sha256" in browseros, "browseros desktop_app missing sha256"
-    assert "github.com" in browseros["url"], (
-        f"browseros URL must be a versioned GitHub release, not CDN latest: {browseros['url']}"
-    )
-    assert browseros["sha256"] != "", "browseros sha256 must not be empty"
+def _declared_debs() -> dict:
+    """Every desktop_apps entry distributed as a pinned .deb."""
+    return {
+        app["name"]: app
+        for app in CONTRACT["ubuntu_apt_packages"]["desktop_apps"]
+        if isinstance(app, dict) and "sha256" in app
+    }
 
 
-def test_browseros_desktop_sh_uses_versioned_url_and_sha() -> None:
-    """desktop.sh must download BrowserOS from the versioned GitHub URL with SHA-256 verification."""
+def test_every_declared_deb_is_versioned_and_digest_pinned() -> None:
+    """Generalised from a BrowserOS-only check: the guard must cover every
+    .deb application, or the next one added silently escapes it."""
+    debs = _declared_debs()
+    assert debs, "no .deb applications declared"
+    for name, app in debs.items():
+        assert "version" in app, f"{name}: missing version"
+        assert isinstance(app["sha256"], dict), f"{name}: digest must be per-architecture"
+        assert isinstance(app["url"], dict), f"{name}: url must be per-architecture"
+        assert set(app["url"]) == set(app["sha256"]), f"{name}: url/digest arches disagree"
+        for arch, url in app["url"].items():
+            # Compare the parsed host, never a substring: `github.com` appears
+            # in https://github.com.attacker.example/ and in any query string,
+            # so a substring test would admit exactly the artifact this guard
+            # exists to reject. CodeQL flagged the earlier version as
+            # py/incomplete-url-substring-sanitization, correctly.
+            parsed = urlparse(url)
+            assert parsed.scheme == "https", f"{name}/{arch} is not https: {url}"
+            assert parsed.hostname == "github.com", (
+                f"{name}/{arch} must be a versioned GitHub release, not {parsed.hostname}: {url}"
+            )
+            assert "/latest/" not in parsed.path, (
+                f"{name}/{arch} uses a volatile latest pointer"
+            )
+            assert app["version"] in url, (
+                f"{name}/{arch} URL does not carry the declared version {app['version']}"
+            )
+            assert re.fullmatch(r"[0-9a-f]{64}", app["sha256"][arch]), (
+                f"{name}/{arch}: malformed digest"
+            )
+
+
+def test_desktop_sh_downloads_every_declared_deb_verified() -> None:
     desktop_sh = (ROOT / "scripts/ubuntu/desktop.sh").read_text(encoding="utf-8")
-    browseros = next(
-        app for app in CONTRACT["ubuntu_apt_packages"]["desktop_apps"]
-        if isinstance(app, dict) and app.get("name") == "browseros"
-    )
-    assert browseros["url"] in desktop_sh, (
-        f"desktop.sh missing versioned BrowserOS URL: {browseros['url']}"
-    )
-    assert browseros["sha256"] in desktop_sh, (
-        "desktop.sh missing BrowserOS SHA-256 constant"
-    )
+    for name, app in _declared_debs().items():
+        for arch, url in app["url"].items():
+            assert url in desktop_sh, f"desktop.sh missing {name}/{arch} URL"
+            assert app["sha256"][arch] in desktop_sh, f"desktop.sh missing {name}/{arch} digest"
     assert "download_verified_file" in desktop_sh, (
-        "desktop.sh must use rldyour::download_verified_file, not bare wget"
+        "desktop.sh must use rldyour::download_verified_file, not a bare download"
     )
     assert "cdn.browseros.com" not in desktop_sh, (
         "desktop.sh must not reference the volatile CDN latest pointer"
     )
 
+
+def test_the_release_host_check_rejects_a_lookalike_domain() -> None:
+    """A substring test admitted `github.com.attacker.example`; the parsed-host
+    test must not. Verified directly rather than trusted."""
+    for hostile in (
+        "https://github.com.attacker.example/o/r/releases/download/1.0/a.deb",
+        "https://attacker.example/x?ref=github.com",
+        "http://github.com/o/r/releases/download/1.0/a.deb",
+    ):
+        parsed = urlparse(hostile)
+        assert not (parsed.scheme == "https" and parsed.hostname == "github.com"), hostile
+    good = "https://github.com/o/r/releases/download/1.0/a.deb"
+    parsed = urlparse(good)
+    assert parsed.scheme == "https" and parsed.hostname == "github.com"

@@ -182,16 +182,33 @@ ensure_cask() {
   rldyour::run brew install --cask "$cask"
 }
 
+# Set when a cask could not be installed. Reported at the end of main.
+GUI_LAYER_FAILED=0
+
 install_gui_apps() {
   if [ "$GUI_ENABLED" -ne 1 ]; then
     rldyour::log "info" "GUI apps disabled by --no-gui"
     return 0
   fi
   rldyour::section "Install verified macOS GUI applications"
-  local cask
+  local cask failed=0
+  # Attempt every cask, then report. This loop used to call ensure_cask bare
+  # under `set -e`, so one unavailable cask -- a Homebrew rename, a notarization
+  # change, a network blip -- aborted the whole script and stranded every layer
+  # behind it: the language servers, the MANDATORY browser layer, the harness
+  # layer and verification. That is the same failure this repository already
+  # fixed twice on Ubuntu; the optional layer must never be able to take the
+  # required ones down with it.
   for cask in "${GUI_CASKS[@]}"; do
-    ensure_cask "$cask"
+    if ! ensure_cask "$cask"; then
+      rldyour::log "error" "cask failed: ${cask}"
+      failed=$((failed + 1))
+    fi
   done
+  if [ "$failed" -gt 0 ]; then
+    GUI_LAYER_FAILED=$failed
+    rldyour::log "error" "${failed} GUI cask(s) failed; later layers were still attempted"
+  fi
   rldyour::log "info" "ChatGPT and Codex are installed as separate supported OpenAI desktop applications."
   rldyour::log "info" "ZCode is owned by the nddev-harnesses repository, not by this bootstrap; see scripts/auth-handoff.sh."
 }
@@ -294,6 +311,10 @@ main() {
   # delegates to a module whose fail-closed guards depend on local state this
   # repository does not own, and an abort there must not strand the layers behind it.
   [ "$SKIP_AI" -eq 1 ] || install_ai_runtimes
+  if [ "$GUI_LAYER_FAILED" -ne 0 ]; then
+    rldyour::log "error" "${GUI_LAYER_FAILED} GUI cask(s) failed; every other layer was still attempted"
+    return 1
+  fi
   verify_apply
   rldyour::log "info" "Run 'bash scripts/auth-handoff.sh' for user-controlled sign-in steps."
 }

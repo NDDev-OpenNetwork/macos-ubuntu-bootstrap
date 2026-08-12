@@ -11,13 +11,261 @@ All notable changes to this module will be documented in this file.
   clean local and remote worktrees at the same exact Git commit and transfers
   neither workspace files nor credentials.
 
+### Removed
+
+- **The duplicated agent context is gone.** Four hand-maintained layers
+  described this repository — `AGENTS.md`, `.claude/CLAUDE.md`, 23 Serena
+  memories and a compiled GDS projection — and they had drifted apart: the
+  Claude file did not know the `desktop-builds` profile two releases after it
+  shipped, named the server execution policy with a retired token in one
+  paragraph and the current one in another, and still instructed the codex
+  `safe` setup months after that gate was removed; the memory index claimed
+  three tracked memories when there were 23.
+
+  The 23 memories held roughly forty lines of fact inside seventeen hundred
+  lines of identical scaffolding. Every fact was checked against the sources
+  before deletion and every one was already recorded in a code comment, a
+  changelog entry or an ADR — including the two that looked unique (why
+  `terraform-ls`/`helm-ls` stay macOS-only, why `jdtls` and
+  `kotlin-language-server` were removed). One of them was simply wrong: it
+  described a cmux integration for two harnesses this module had already
+  stopped installing.
+
+  `.claude/CLAUDE.md` is now an import of `AGENTS.md` plus a short delta
+  (241 → 35 lines), the memory corpus is one pointer that carries no pins and no
+  policy (1741 → 44 lines), and `AGENTS.md` replaced its pin catalogue with the
+  contract and the reasoning the contract cannot express. Agent context overall:
+  2295 → 383 lines, with no invariant deleted that lacked an executable owner.
+- **BrowserOS is no longer part of the standard desktop set.** Google Chrome
+  replaces it as the estate's standard browser, by owner decision. Bootstrap no
+  longer declares, installs or verifies BrowserOS — and deliberately does not
+  remove an existing installation either: it stopped provisioning the
+  application, which is not the same as owning its removal.
+- **The Open Design layer is gone.** `scripts/ubuntu/open-design.sh`, the
+  `--install-open-design` flag, the `RLDYOUR_INSTALL_OPEN_DESIGN` env var, the
+  `install_open_design_layer` step and the `open_design` contract block are all
+  removed by owner decision. It was the module's only mutable supply chain — a
+  `--depth 1` clone of a default branch that was never checked out to an
+  approved commit, plus `ghcr.io/nexu-io/od:latest` — handed to a reachable
+  Docker daemon, and its result was reported as available regardless of pull,
+  health or receipt failure. Deleting the layer resolves both of those rather
+  than hardening a workload the estate does not want provisioned.
+
 ### Changed
 
+- **The hosted-runner rule is re-grounded on the runner platform's own threat
+  model, and the gate now checks the value rather than the key.** Its previous
+  justification claimed "39 of 46 reusables default `runner` to the estate's
+  self-hosted `amsterdam` label". Checked on 2026-08-12: of 54 workflow files in
+  `ci-workflows`, 44 declare a `runner` default and every one is hosted, both at
+  the pinned commit and on `main`. Nothing defaults to self-hosted.
+
+  The rule is not this repository's preference. `modules/github-actions` — the
+  estate's disposable one-job Incus/KVM runner platform — lists as a
+  non-negotiable control that there is to be **no public/fork code on a trusted
+  runner group**, and its cache plane grants public and fork jobs no credential
+  precisely because they are "retained on GitHub-hosted capacity". This
+  repository is public, so routing a job onto that fleet would break the
+  platform's contract, not merely a convention written here.
+
+  Correcting a fact this file previously stated: the fleet's labels are not
+  `standard` and `amsterdam`. `standard` came from
+  `config/code-quality-routing.yaml`, where it is the GitHub Code Quality
+  runner *type*, a different resource class that file names explicitly. The
+  fleet publishes scale-set classes `nddev-linux-fast`,
+  `nddev-linux-standard`, `nddev-linux-integration` and `nddev-linux-release`;
+  `amsterdam` is retired. Two properties make the allowlist the only workable
+  gate: that set changes, and a job requesting a label no runner advertises
+  does not fail — it queues indefinitely, so a wrong value is a hang rather
+  than a red check. All five values above are verified rejected.
+
+  The gate covers both ways onto a runner: the `runner` input of a reusable
+  caller, and a job's own `runs-on` — including one driven by a matrix, whose
+  values are resolved and checked individually. The reusable-caller check alone
+  would not have seen a job selecting `runs-on: standard`. Every value in the
+  repository is hosted today; nothing had been enforcing that.
+
+  It asserts the value against an allowlist of hosted labels. The fleet's
+  labels are `standard` (the organization default) and the legacy `amsterdam`,
+  behind the `nddev-linux-standard` and `nddev-linux-integration` scale sets;
+  `runner: standard` reads like nothing at all in a diff, so a denylist of known
+  self-hosted names would not survive the next label. Catching a camouflaged
+  value is covered by a test.
+
+- **macOS verification is explicitly on-pause.** No macOS claim in this
+  repository is currently backed by a run: the estate has no Apple Silicon
+  target. The platform stays supported and its code stays maintained, but a
+  macOS statement is to be read as unverified until a target exists. The hosted
+  plan-mode and shellcheck lane remains, being the only macOS signal available.
+- **The codex harness now applies the unrestricted `full-auto` setup by
+  default.** The setup was `safe` and `full-auto` required the explicit owner
+  flag `RLDYOUR_CODEX_FULL_AUTO=1`; that gate is gone and the flag no longer
+  exists. This is a deliberate decision for an owner-controlled workstation, but
+  it is a security-relevant default and it shipped inside a commit titled
+  "close device reproducibility gaps" with no changelog entry, no `SECURITY.md`
+  note, and `.claude/CLAUDE.md` still instructing the old gated behaviour. It is
+  recorded here so the change reads as a decision rather than a side effect.
+  Re-running bootstrap reapplies the complete profile, including both
+  `config.toml` and `AGENTS.md`, so a stale safe instruction file cannot
+  contradict the runtime permissions.
 - ZCode remains in the catalogue but is explicitly `on-pause`; bootstrap does
   not install, start, verify, authenticate, remove, or adopt it.
 
+### Added
+
+- **Google Chrome is provisioned by the bootstrap.** It is the estate's daily
+  browser and the default `http`/`https` handler on the Ubuntu desktop, but it
+  was installed by hand and appeared nowhere in the contract. It is now a
+  required desktop step with a deliberate exception recorded in the contract:
+  `version_policy: tracks-stable-channel` rather than a SHA-256, because
+  pinning a browser to an old build trades a real security liability for a
+  reproducibility gain the estate does not need. Supply-chain control is the
+  signing key instead — primary fingerprint
+  `EB4C1BFD4F042F6DDDCCEC917721F63BD38B4796`, confirmed against two independent
+  sources and verified before the repository is trusted, the same gate the
+  Docker source already used. An apt source that another tool already wrote for
+  the same repository is preserved rather than duplicated (two sources make apt
+  ambiguous, and the vendor's own cron re-enables its file after a distro
+  upgrade), and `/etc/default/google-chrome` is set to `repo_add_once=false` so
+  the package's postinst never adds a competing one. Strict verification
+  requires Chrome to be installed and its source to be signed by that exact key.
+- **`just` `1.58.0` and `age` `1.3.1` are pinned upstream artifacts.** Both were
+  installed by hand and declared nowhere. Ubuntu ships `just` 1.45.0 and `age`
+  1.2.1; a justfile written against a newer feature fails on the distribution
+  build, and for a cryptographic tool the current release is the one to carry,
+  so both follow the existing pinned-artifact contract rather than apt. The
+  `just` digests were confirmed by download *and* matched against upstream's
+  published `SHA256SUMS`. `age` ships `age-inspect` and `age-plugin-batchpass`
+  in the same archive; only the two commands the estate uses are linked, so the
+  managed PATH stays exactly what the contract declares. The table's comment now
+  says what it is — pinned upstream CLI artifacts — instead of "source-analysis
+  tools", which had not described `delta`, `yq` or `ast-grep` for some time.
+- **RustDesk `1.4.9` is provisioned as an optional application.** It is
+  installed by default, but `requirement: optional` in the contract and
+  membership of `OPTIONAL_STEPS` mean its absence or a failed install is
+  reported and never fails the desktop layer. `.deb` applications go through a
+  single table-driven installer rather than a bespoke function each; a row may
+  declare an arm64 pair or omit it, a half-declared architecture is rejected by
+  a test, and an absent one makes the step report `skipped` rather than fail a
+  device that cannot have the application at all.
+- `wl-clipboard` and `libsecret-tools` join the apt baseline. Both were already
+  relied on by the live desktop and declared nowhere.
+- **One-owner-per-harness is now checkable on a device, not only asserted in
+  prose.** `harnesses.detection` declares a probe per catalogued harness and
+  `device_integrity` records where each one actually resolves. `codex` is
+  enforced against the target its declared owner publishes
+  (`RLDYOUR_CODEX_HOME`, default `~/.codex`), so a second copy from a bun/npm
+  global — the exact shape the contract forbids — becomes a named drift instead
+  of an invisible one. `zcode` is `observe-only`: its presence is recorded as
+  evidence and never acted on, because bootstrap is forbidden from installing,
+  removing, or adopting a delegated on-pause harness.
+
 ### Fixed
 
+- **Remote execution now preserves the caller's argv, and a rejected gate no
+  longer lets a second command through.** OpenSSH transmits no argv array: the
+  client joins the remote-command arguments with single spaces and the remote
+  login shell parses the result. `scripts/remote-exec.sh` passed `"$@"` straight
+  to `ssh`, so an argument containing whitespace was re-split and an argument
+  containing `;` started an independent remote command — one that ran even when
+  the clean-worktree or exact-HEAD check had already aborted the requested one,
+  contradicting ADR 0009. Every field is now quoted exactly once in POSIX
+  single-quote form, so the remote parse restores the original argv. The remote
+  repository path is charset-validated like the SSH destination was, and each
+  local dirty state (unstaged, staged, untracked) now fails with its own reason
+  instead of exiting silently.
+- **An arm64 desktop no longer installs an x86_64 Telegram.** The row repeated
+  the x86_64 URL and digest in the arm64 fields, so an arm64 device verified the
+  SHA-256 of a binary it cannot execute and then published a launcher for it.
+  Telegram publishes an x86_64 portable build only; that is now declared —
+  empty arm64 fields, `architectures: ["x86_64"]` in the contract — and the
+  installer reports the row as skipped there while verification stops requiring
+  it. The parity test that used to *require* the arm64 slot to repeat the
+  x86_64 digest was the reason the gap survived review; it now rejects a filled
+  slot for an architecture the contract says is unpublished, and no row other
+  than Telegram may declare one.
+- **The Telegram paths no longer split under `XDG_DATA_HOME`.** `install.sh`
+  consulted it for the updater policy, the icons and the legacy entry, while the
+  contract, `verify.sh` and `device_integrity` all declare
+  `${HOME}/.local/share`. With the variable set the feature landed half in one
+  place and half in the other, and every check looked at the wrong half. The
+  installer now uses the location the contract declares. The contract's
+  `archive_kind` for Telegram also said `tar0` while the installer used `tarx`;
+  parity now covers that field.
+- **Generated Telegram `userapp-*` launchers are retired.** GIO writes
+  `userapp-<Name>-<6 chars>.desktop` whenever something picks a custom
+  application for a scheme and registers it under `[Added Associations]`. Two
+  survived the v3 migration on the estate's own desktop. They do *not* shadow
+  the default handler — `[Default Applications]` correctly names
+  `org.telegram.desktop.desktop` — but they invoke `telegram-desktop -- %u`
+  without the `env QT_QPA_PLATFORM=xcb` wrapper the managed entry exists for,
+  so a chooser, an enumerating caller or a later default reset can still start
+  Telegram in the Wayland mode that fails with `EGL_BAD_MATCH` on the NVIDIA
+  workstation. Bootstrap now retires only entries whose `Exec` is bound to the
+  managed launcher and whose shape matches GIO's exactly, backs them up
+  recoverably together with the original `mimeapps.list`, and removes just the
+  `[Added Associations]` lines left dangling by the retirement. A `userapp`
+  entry for any other application, and every other line and section of
+  `mimeapps.list`, is preserved byte for byte. Verification rejects a survivor.
+- **The macOS minimum-version gate no longer passes a version it could not
+  read.** `rldyour::require_cmd_min_version` returned success — "skipping
+  numeric check" — whenever its parse produced nothing, and it discarded
+  `stderr` while parsing. It is used only by `macos/verify.sh`, for `node`,
+  `uv`, `bun`, `starship`, `atuin`, `carapace` and `dart`. The Ubuntu code
+  documents that `dart --version` printed to stderr on older SDKs and reads both
+  streams for that reason, so on macOS a Dart answering only on stderr satisfied
+  a version gate without its version ever being compared, and any binary that
+  could not report a version passed too. It now falls back to the combined
+  output and fails closed when neither yields one, matching the exact
+  comparisons the Ubuntu verifier already used for the same invariant.
+- **One unavailable macOS cask no longer takes the mandatory layers down with
+  it.** `install_gui_apps` looped `ensure_cask` bare under `set -euo pipefail`,
+  and `ensure_cask` ends in `brew install --cask`. A single failing cask — a
+  Homebrew rename, a notarization change, a network blip — therefore aborted the
+  whole script, and because the GUI layer runs *before* the browser layer it
+  took the language servers, the **mandatory CloakBrowser layer**, the harness
+  layer and verification with it. This is the same failure the Ubuntu side had
+  already fixed twice. Every cask is now attempted, failures are counted, and
+  the result is reported at the end of `main` — so an optional layer can still
+  fail the run but can no longer strand the required ones.
+- **Ubuntu desktop customization reports what actually happened.** The composer
+  ran four `step || warn` lines and then printed "desktop customization
+  complete" unconditionally, so a desktop missing BrowserOS or still carrying
+  Firefox reported a successful apply. One of those steps did not even warn:
+  `_install_browseros` ended in `die`, which is `exit 1`, and `exit` inside a
+  function on the left of `||` terminates the whole script — a failed BrowserOS
+  install silently skipped the Firefox removal that was supposed to be
+  independent of it. Steps now return instead of exiting, each outcome is
+  recorded as ok/skipped/failed, and the run fails when a *required* step
+  (BrowserOS, Firefox removal) failed while cosmetic ones (dock, keyboard) only
+  warn. `install.sh` surfaces that result at the end of `main`, so the layer can
+  neither report false success nor strand the layers behind it.
+- **The Russian layout is now applied where a GNOME session reads it.**
+  `_russian_keyboard_layout` set only the system X11 keymap through `localectl`,
+  which a Wayland session ignores. The estate's own desktop showed
+  `X11 Layout: us` while the layout that worked had been added by hand in GNOME
+  Settings — a fresh device would have had no Russian layout at all. Bootstrap
+  now also appends `('xkb', 'ru')` to `org.gnome.desktop.input-sources`,
+  preserving the owner's existing entries and order, and verification probes
+  that list rather than `localectl`.
+- **Strict Ubuntu verification checks the desktop outcomes.** BrowserOS
+  installed and Firefox absent (snap and apt) are now required on a GUI desktop;
+  the keyboard layout is reported. The block previously deferred to "desktop.sh
+  reports its own result" — while desktop.sh reported success unconditionally.
+- **Replacing the device receipt is now a transaction, and an unverifiable
+  receipt is no longer consumed silently.** `build` decided ownership from the
+  receipt's `schema` and `owner` alone — never its canonical form, payload
+  digest, mode, or symlink status — and then renamed the active receipt to
+  `.bak` *before* collecting state and before opening the replacement. A
+  failure in collection or in the write therefore left the device with no
+  active receipt and no rollback, and a tampered-but-owned receipt was
+  overwritten rather than preserved as evidence. Replacement now validates full
+  self-integrity through `load_receipt`, collects state first, publishes
+  through a same-directory temporary file with `fsync` + `os.replace` + parent
+  `fsync`, and writes the backup only once a valid replacement is in place. A
+  symlink at the receipt path is refused outright. `build --replace-invalid` is
+  the explicit escape hatch for a genuinely corrupt receipt and retains the
+  unverifiable copy as `<name>.rejected.N`.
 - **Persistent Linux CloakBrowser no longer poisons the desktop portal before
   login.** The systemd-user unit now pins
   `DBUS_SESSION_BUS_ADDRESS=disabled:`, preserving the mandatory pre-login CDP
@@ -50,6 +298,96 @@ All notable changes to this module will be documented in this file.
 
 ### Tests
 
+- **Secret scanning gets a repository config, added because the branch would
+  otherwise have merged red.** `gitleaks` flags Google's public Chrome
+  signing-key fingerprint as a `generic-api-key`: forty hex characters in a
+  name containing KEY. It is the opposite of a secret — it is the public value
+  this repository verifies a downloaded key against — but the `secret-scan`
+  lane does not know that. `.gitleaks.toml` keeps the full default rule set and
+  allowlists that one value by exact match, never by path and never by
+  disabling the rule, so a genuine credential in the same files is still
+  caught. Verified both directions: the fingerprint passes, and planted AWS and
+  GitHub tokens are still found.
+- **The Ubuntu install branches that had never been executed now have real
+  evidence.** `tests/test_container_apply.py` runs them against a disposable
+  Ubuntu 26.04 container: a fresh Chrome install proves the managed keyring
+  carries the expected fingerprint, the deb822 source is written, the vendor's
+  `repo_add_once` opt-out is set *before* install, the package installs from the
+  managed source — and, the design bet that could not be checked any other way,
+  that the vendor's postinst then adds no competing source. Both fail-closed
+  paths are covered too: a key that does not verify leaves no apt source and no
+  package, and a `.deb` whose digest does not match never reaches dpkg. RustDesk
+  install and idempotence are covered on the same lane. Opt-in via
+  `RLDYOUR_CONTAINER_TESTS=1`; systemd, GNOME and macOS remain out of reach and
+  are named as such.
+- **Every script on the macOS execution path is checked against bash 3.2.**
+  macOS still ships bash 3.2 and `scripts/ci/lint.sh` runs there too; the
+  discovery rewrite used `mapfile`, which is bash 4.0+, and the macOS CI lane
+  failed with `command not found`. Nothing local had caught it — in an adapter
+  whose whole purpose is supporting both platforms. A test now rejects
+  `mapfile`, `readarray`, `declare -A` and `${var^^}`/`${var,,}` in the
+  compositor, the shared library, the macOS scripts and every repository-level
+  entry point, and asserts that a newly added script is classified rather than
+  silently unchecked. `bash -n` cannot see any of these: they are runtime
+  failures, not syntax errors.
+- `scripts/ubuntu/desktop.sh` gained the `BASH_SOURCE` guard the other three
+  entry scripts already had. Without it every test had to cut functions out of
+  the file with `sed`, which tests a copy rather than the script — and no test
+  could exercise a step against a real system at all.
+- `tests/test_agent_context.py` holds the collapsed shape: the Claude file must
+  import the guide and stay a delta, neither surface may copy a pin the contract
+  owns, no surface may name a retired profile or policy, and the memory corpus
+  may not regrow. It also turns the hosted-runner rule from prose into a gate —
+  and immediately found that three callers accepted a `runner` input without
+  passing it (`codeql`, `dependency-review`, `scorecard`), which the earlier
+  eight-caller fix had missed. The two callers whose reusable genuinely exposes
+  no such input now record that exemption next to the call, and the test pins
+  the exemption list so a pin bump has to re-justify it.
+- `scripts/ci/lint.sh` discovers every owned shell script instead of carrying a
+  hand-maintained list. The list had silently skipped `scripts/ubuntu/desktop.sh`
+  since the day it was added, and would have skipped `scripts/remote-exec.sh`
+  too; discovery immediately surfaced four
+  real shellcheck findings in `desktop.sh`, one of them the `&& ok || die`
+  construct behind the skipped-Firefox-step defect. `EXCLUDED_PATHS` is empty on
+  purpose.
+- The release-host guard compares a parsed hostname instead of a substring.
+  CodeQL flagged the generalised version as
+  `py/incomplete-url-substring-sanitization`, correctly: `"github.com" in url`
+  admits `https://github.com.attacker.example/...` and any URL carrying it in a
+  query string — precisely the artifact origin the guard exists to reject. The
+  scheme is checked too, and a test proves the lookalike forms are refused.
+- The two BrowserOS-specific parity tests were generalised to every declared
+  `.deb`: versioned GitHub URL carrying the declared version, no `latest`
+  pointer, well-formed per-architecture digests, and every URL and digest
+  present in `desktop.sh`. As written they would not have covered RustDesk at
+  all.
+- The verifier is now held to the same Telegram icon digests as the contract.
+  The four digests live in four places and the parity check covered only
+  contract↔installer, so a version bump could have left verification gating on
+  the previous release's icons.
+- Telegram `userapp` retirement is covered end to end: a generated pair is
+  retired while a `userapp` entry for another application survives, a
+  hand-written lookalike is preserved and fails closed, the dry run changes
+  nothing, and the ordering after the path-hashed sweep is asserted.
+- Desktop customization has its own offline test module: per-step failure
+  injection proving later steps still run, required-versus-optional aggregation,
+  skipped preconditions, the installer wiring, and a `bash -n` check over every
+  discovered script. Seven of them fail against the previous implementation.
+- Device-receipt replacement is covered by fault injection: an edited payload,
+  a non-canonical body, a symlink, a group-writable mode, a failing
+  `collect_state`, and a failing `os.replace` must each leave the previous
+  active receipt byte-for-byte intact and leave no temporary file behind. The
+  three tests that exercised the old schema-and-owner helper were removed with
+  it — they asserted the behaviour of a function that no longer guarded
+  anything.
+- Remote execution is now covered by a protocol test rather than a source scan.
+  A deterministic harness reproduces OpenSSH's join-and-parse behaviour and
+  asserts byte-exact argv round trips for empty arguments, whitespace, quotes,
+  `$()`, backticks, `;`, `|`, `&`, newlines, tabs, globs, leading dashes,
+  backslashes and Unicode; a second layer proves the same properties against a
+  real `sshd` on loopback and self-skips only where no OpenSSH server exists.
+  The previous "the source contains no `eval`" assertion could not observe the
+  defect at all, because the evaluation happened in the remote shell.
 - The browser contract, static bootstrap checks, installed-runtime verifier,
   and live health wrapper now require the Linux session-bus isolation; a
   managed unit missing it fails closed.

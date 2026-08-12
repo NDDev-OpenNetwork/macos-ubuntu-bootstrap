@@ -38,6 +38,8 @@ jobs:
     permissions:
       contents: read
     uses: NDDev-it-com/ci-workflows/.github/workflows/cross-platform-smoke.yml@7f69c724923d06b2c2057c5a6ad341c37f1a8995 # 0.13.3
+    # This reusable exposes no `runner` input at the pinned commit; the
+    # hosted-runner rule therefore does not apply here. Re-check on a pin bump.
     with:
       os_list: '["${{ matrix.os }}"]'
       command: |

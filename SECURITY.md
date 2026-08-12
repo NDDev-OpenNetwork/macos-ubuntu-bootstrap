@@ -160,10 +160,20 @@ policy.
 Since contract `2.3.0` the active harness set is **codex only**, and it is not
 installed inline. It is owned by its authoritative NDDev module
 (`nddev-codex-app`), pinned by exact commit in `config/rldyour-contract.json` and
-driven through that module's own lifecycle. zcode is declared
+driven through that module's own lifecycle. The module is applied with its
+**unrestricted `full-auto` setup**: this is an owner-controlled workstation and
+the permission profile is chosen deliberately, not inherited. It was previously
+`safe` behind an explicit `RLDYOUR_CODEX_FULL_AUTO=1` flag; that gate was
+removed. Anyone hardening a device that is not owner-controlled must revisit
+this first. `harnesses.detection` in the contract makes the ownership half of
+that decision checkable: `codex` must resolve inside the target its module
+publishes, so a second copy from a package-manager global is reported as drift
+rather than silently trusted. zcode is declared
 `harnesses.delegated` and owned by the `nddev-harnesses` repository: the ZCode app
 creates `~/.zcode` itself and its installer cannot adopt an unstamped target
-unattended, so bootstrap does not delegate to it at all (ADR 0006). The inline Claude Code, OpenCode, MiMoCode,
+unattended, so bootstrap does not delegate to it at all (ADR 0006). Its
+work-policy is `on-pause`; an installed copy is recorded as evidence and never
+installed, removed, or adopted by bootstrap. The inline Claude Code, OpenCode, MiMoCode,
 Antigravity, and raw ZCode installers were removed in `2.0.0`; integrity for
 each harness artifact is the owning module's responsibility. The RTK output
 compressor was removed from this adapter in `2.6.0` by owner decision: it is not

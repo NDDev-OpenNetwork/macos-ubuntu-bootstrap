@@ -117,10 +117,14 @@ def test_contract_version_and_profile_matrix() -> None:
         "templates/browser/cloakbrowser-pyproject.toml"
     )
     assert f'version = "{version}"' in file("templates/browser/cloakbrowser-uv.lock")
+    # Documents that state the adapter version must state the current one.
+    # `.claude/CLAUDE.md` is deliberately absent: it imports AGENTS.md and
+    # carries no pins, so requiring the version there would reintroduce exactly
+    # the duplication that let it drift two releases behind the contract.
+    # tests/test_agent_context.py asserts the opposite for that file.
     for path in (
         "README.md",
         "AGENTS.md",
-        ".claude/CLAUDE.md",
         "docs/install.md",
         "SECURITY.md",
     ):

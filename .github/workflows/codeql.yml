@@ -40,4 +40,9 @@ jobs:
       security-events: write
     uses: NDDev-it-com/ci-workflows/.github/workflows/public-codeql.yml@7f69c724923d06b2c2057c5a6ad341c37f1a8995 # 0.13.3
     with:
+      # Public repo: pull_request runs untrusted fork code. Pin the hosted runner
+      # explicitly — the reusable's `runner` default belongs to the pinned commit,
+      # not to this repository, so inheriting it would let a pin bump move fork
+      # PRs onto trusted private infrastructure with no diff here to review.
+      runner: ubuntu-latest
       languages: '["actions"]'

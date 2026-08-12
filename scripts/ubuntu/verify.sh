@@ -120,11 +120,100 @@ rldyour::ubuntu_verify::telegram_policy() {
       "$HOME/.local/share/dbus-1/services"/org.telegram.desktop._*.service; do
       [ ! -e "$candidate" ] && [ ! -L "$candidate" ] || return 1
     done
+    # GIO userapp entries bound to the Telegram launcher. They do not shadow
+    # the default handler, but they invoke it without the XCB wrapper the
+    # managed entry exists for, so a chooser or a default reset can still start
+    # Telegram in the failing Wayland mode.
+    for candidate in "$HOME/.local/share/applications"/userapp-*.desktop; do
+      [ -f "$candidate" ] || continue
+      grep -Eq "^Exec=($launcher|$resolved|telegram-desktop)( |$)" "$candidate" && return 1
+    done
     if command -v xdg-mime >/dev/null 2>&1; then
       [ "$(xdg-mime query default x-scheme-handler/tg)" = "$desktop_id" ] || return 1
       [ "$(xdg-mime query default x-scheme-handler/tonsite)" = "$desktop_id" ] || return 1
     fi
   fi
+}
+
+# The desktop composer's required outcomes. Strict verification checked none of
+# them, so a desktop that never installed Chrome -- or that still carries the
+# Firefox this bootstrap is supposed to remove -- verified clean. The cosmetic
+# outcomes (dock position, keyboard layout) stay report-only: they depend on a
+# live GNOME session that a verification run does not necessarily have.
+rldyour::ubuntu_verify::desktop_outcomes() {
+  local failed=0
+
+  if command -v dpkg-query >/dev/null 2>&1; then
+    # RustDesk is an optional convenience: reported, never required.
+    if dpkg-query -W -f='${Status}' rustdesk 2>/dev/null |
+      command grep -q "install ok installed"; then
+      rldyour::log "ok" "RustDesk installed (optional)"
+    else
+      rldyour::log "warn" "RustDesk is not installed (optional)"
+    fi
+
+    if dpkg-query -W -f='${Status}' google-chrome-stable 2>/dev/null |
+      command grep -q "install ok installed"; then
+      rldyour::log "ok" "Google Chrome installed"
+    else
+      rldyour::log "missing" "Google Chrome is declared in desktop_apps but not installed"
+      failed=1
+    fi
+
+    if dpkg -l firefox 2>/dev/null | command grep -q '^ii'; then
+      rldyour::log "missing" "apt Firefox is still present; the desktop layer must remove it"
+      failed=1
+    else
+      rldyour::log "ok" "apt Firefox absent"
+    fi
+  fi
+
+  if command -v snap >/dev/null 2>&1; then
+    if snap list firefox >/dev/null 2>&1; then
+      rldyour::log "missing" "snap Firefox is still present; the desktop layer must remove it"
+      failed=1
+    else
+      rldyour::log "ok" "snap Firefox absent"
+    fi
+  fi
+
+  # Two repository paths are in the wild for the same product: Google's own
+  # cron writes `linux/chrome/deb`, while a source created through Ubuntu's
+  # repolib tooling uses `linux/chrome-stable/deb`. Match the common prefix so
+  # either is recognised. The `|| true` is load-bearing: grep exits 1 when it
+  # finds nothing, and under `set -o pipefail` that would abort the whole
+  # verifier on any device without Chrome.
+  local chrome_source chrome_keyring chrome_primary
+  chrome_source="$(command grep -rlF 'dl.google.com/linux/chrome' \
+    /etc/apt/sources.list /etc/apt/sources.list.d/ 2>/dev/null | head -1 || true)"
+  if [ -n "$chrome_source" ]; then
+    chrome_keyring="$(command sed -n -E 's/^[[:space:]]*Signed-By:[[:space:]]*//p; s/.*\[[^]]*signed-by=([^] ]+).*/\1/p' \
+      "$chrome_source" | head -1)"
+    chrome_primary="$(gpg --batch --show-keys --with-colons "$chrome_keyring" 2>/dev/null |
+      awk -F: '$1 == "pub" { c++; a = 1; next } $1 == "fpr" && a { f = toupper($10); a = 0 }
+               END { if (c == 1 && f != "") print f }')"
+    if [ "$chrome_primary" = "EB4C1BFD4F042F6DDDCCEC917721F63BD38B4796" ]; then
+      rldyour::log "ok" "Chrome apt source signed by the verified Google key"
+    else
+      rldyour::log "missing" "Chrome apt source is not signed by the verified Google key: ${chrome_source}"
+      failed=1
+    fi
+  fi
+
+  # Report-only: absence here is a cosmetic gap, not a wrong device. Probe the
+  # source a GNOME session actually reads. `localectl` reports the system X11
+  # keymap, which a Wayland session ignores entirely -- checking only that is
+  # how a desktop with no usable Russian layout still looked configured.
+  if command -v gsettings >/dev/null 2>&1; then
+    if gsettings get org.gnome.desktop.input-sources sources 2>/dev/null |
+      command grep -q "'ru'"; then
+      rldyour::log "ok" "GNOME input sources include ru"
+    else
+      rldyour::log "warn" "GNOME input sources do not include ru"
+    fi
+  fi
+
+  return "$failed"
 }
 
 STRICT=0
@@ -185,21 +274,32 @@ if [ "$PROFILE" != "server" ]; then
   for cmd in go gopls rustc cargo rust-analyzer dart; do
     rldyour::require_cmd "$cmd" required
   done
-  # Pinned source-analysis tools: the four CI-parity scanners, the Markdown
-  # language server, the git pager that ensure_git_delta_config configures, and
-  # the structured YAML/AST utilities.
-  for cmd in gitleaks osv-scanner actionlint hadolint markdown-oxide delta yq ast-grep; do
+  # Pinned upstream CLI artifacts: the four CI-parity scanners, the Markdown
+  # language server, the git pager that ensure_git_delta_config configures, the
+  # structured YAML/AST utilities, the estate's command runner, and the file
+  # encryption pair.
+  for cmd in gitleaks osv-scanner actionlint hadolint markdown-oxide delta yq ast-grep \
+    just age age-keygen; do
     rldyour::require_cmd "$cmd" required
   done
   # User-selected desktop tools (herdr, telegram). Installed by install_user_tools
   # using the same managed-symlink + receipt contract as pinned source tools; a
   # failed install must not stay invisible.
   rldyour::require_cmd herdr required
-  rldyour::require_cmd telegram-desktop required
-  rldyour::ubuntu_verify::telegram_policy || {
-    rldyour::log "missing" "Telegram updater isolation and XCB launcher contract"
-    exit 1
-  }
+  # Telegram publishes an x86_64 portable build only, so an arm64 desktop
+  # legitimately has none and must not be failed for it.
+  case "$(uname -m)" in
+    x86_64|amd64)
+      rldyour::require_cmd telegram-desktop required
+      rldyour::ubuntu_verify::telegram_policy || {
+        rldyour::log "missing" "Telegram updater isolation and XCB launcher contract"
+        exit 1
+      }
+      ;;
+    *)
+      rldyour::log "info" "Telegram skipped: upstream publishes no $(uname -m) build"
+      ;;
+  esac
   # cmake-language-server ships in PYTHON_SOURCE_TOOLS but was never verified,
   # so a failed install stayed invisible on Ubuntu while macOS gated on it.
   rldyour::require_cmd cmake-language-server required
@@ -248,9 +348,16 @@ if [ "$PROFILE" != "server" ]; then
   if [ "$GUI_ENABLED" -eq 1 ]; then
     # Harness desktop apps (e.g. ZCode via nddev-harnesses) are owned and
     # verified by their own repositories; this bootstrap installs no GUI harness
-    # package to check here. BrowserOS and the Firefox removal are desktop
-    # customization owned by desktop.sh, which reports its own result.
+    # package to check here.
     rldyour::log "ok" "desktop GUI harness apps are owned by their own repositories"
+    # "desktop.sh reports its own result" was the reason this block checked
+    # nothing -- while desktop.sh reported success unconditionally. Verify the
+    # outcomes here too: an apply-time report and an independent verification
+    # are not the same evidence.
+    rldyour::ubuntu_verify::desktop_outcomes || {
+      rldyour::log "missing" "required Ubuntu desktop customization outcomes"
+      exit 1
+    }
   fi
 else
   args=(--docker-mode "$DOCKER_MODE")

@@ -298,10 +298,11 @@ state back if enablement or restart fails.
 - `docs/adr/0004-profile-composition-and-cloakbrowser-boundary.md` - profile
   and browser decision.
 - `templates/terminal/`, `templates/browser/` - managed runtime templates.
-- `.serena/memories/CORE-01-INDEX.md` - durable architecture and entry points.
-- `.serena/memories/RELEASE-01-VALIDATION.md` - release and verification facts.
-- `.serena/memories/TECHDEBT-01-NOW.md` - verified current debt only; remove
-  resolved items instead of preserving historical speculation.
+- `AGENTS.md` - the project guide; `.claude/CLAUDE.md` imports it and adds only
+  a Claude Code delta.
+- `.serena/memories/ORIENTATION.md` - a map to the files above. It holds no pins
+  and no policy: a rule that can be checked belongs in a test, a decision in an
+  ADR, a version in the contract.
 
 ## Validation
 

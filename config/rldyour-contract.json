@@ -88,6 +88,21 @@
       "module_commit": "a69d77f1c62b5e02cdd9b886c412a53cee92e24a",
       "default_setup": "full-auto"
     },
+    "detection": {
+      "_doc": "one-owner-per-harness (RVR-P1-004) was prose only: nothing on a device could tell whether a catalogued harness resolved to the target its declared owner publishes, or to a second copy from a package-manager global. Each entry below is a probe device_integrity records into the receipt. `owned-prefix` fails closed when the command resolves outside the owner's target; `observe-only` records presence without acting, which is what a delegated on-pause harness requires.",
+      "codex": {
+        "command": "codex",
+        "enforcement": "owned-prefix",
+        "owned_prefix_env": "RLDYOUR_CODEX_HOME",
+        "owned_prefix_default": "${HOME}/.codex",
+        "reason": "nddev-codex-app publishes its standalone CLI only under its own target; a codex resolving anywhere else is a second owner."
+      },
+      "zcode": {
+        "command": "zcode",
+        "enforcement": "observe-only",
+        "reason": "Delegated and on-pause. Bootstrap never installs, starts, verifies, removes, or adopts it, so presence is recorded as drift evidence and never acted on."
+      }
+    },
     "delegated": {
       "zcode": {
         "work_policy": "on-pause",
@@ -197,6 +212,20 @@
           "arm64": "42600522e7455282e11c71c9fc62dc8e98b05bcdb830210fe16eb673a871e866"
         }
       },
+      "just": {
+        "version": "1.58.0",
+        "sha256": {
+          "x64": "4a5cc2f53e6f0f8c59092a6cc38291eb729d46a7dd95d3ae582008881b84931d",
+          "arm64": "748237128c4c40cbdabc65e841d05ceba13cc23a91eaba395495894c1d9764df"
+        }
+      },
+      "age": {
+        "version": "1.3.1",
+        "sha256": {
+          "x64": "bdc69c09cbdd6cf8b1f333d372a1f58247b3a33146406333e30c0f26e8f51377",
+          "arm64": "c6878a324421b69e3e20b00ba17c04bc5c6dab0030cfe55bf8f68fa8d9e9093a"
+        }
+      },
       "ast-grep": {
         "version": "0.45.0",
         "sha256": {
@@ -232,24 +261,6 @@
       "claude"
     ],
     "ubuntu": []
-  },
-  "open_design": {
-    "_doc": "Open Design (https://github.com/nexu-io/open-design) is the open-source Claude Design alternative. It publishes NO native Linux builds (macOS .dmg / Windows .exe only), so on Linux it runs via the published Docker image ghcr.io/nexu-io/od. This is the first docker-compose workload in the module. It is gated behind an explicit operator opt-in and deliberately does NOT relax the desktop source-lsp policy (Docker must already be present on desktop) nor the never-automatic docker-group policy.",
-    "enabled_by_default": false,
-    "install_flag": "--install-open-design",
-    "env_var": "RLDYOUR_INSTALL_OPEN_DESIGN",
-    "repo": "https://github.com/NDDev-it-com/open-design.git",
-    "workspace_target": "${HOME}/Developer/forks/open-design",
-    "image": "ghcr.io/nexu-io/od:latest",
-    "port": 7456,
-    "requires_docker": true,
-    "desktop_docker_policy": "preinstalled-only (bootstrap never installs Docker on desktop; source-lsp policy preserved)",
-    "server_docker_policy": "installed-by-server-layer (rootful/rootless)",
-    "managed_receipt": "open-design-v1",
-    "profiles": [
-      "desktop",
-      "server"
-    ]
   },
   "supply_chain": {
     "homebrew_pkg_version": "6.0.9",
@@ -290,7 +301,8 @@
       "install_method": "tarball",
       "url": "https://td.telegram.org/tlinux/tsetup.7.0.7.tar.xz",
       "archive_sha256": "45e4bdbe9bdbc800916b81147210f912f5c72f069fdec6f9b201fe305d0d2d9c",
-      "archive_kind": "tar0",
+      "architectures": ["x86_64"],
+      "archive_kind": "tarx",
       "archive_members": [
         "Telegram/Telegram"
       ],
@@ -397,7 +409,9 @@
       "ripgrep",
       "httpie",
       "miller",
-      "software-properties-common"
+      "software-properties-common",
+      "wl-clipboard",
+      "libsecret-tools"
     ],
     "desktop_build": [
       "build-essential"
@@ -444,11 +458,35 @@
     ],
     "desktop_apps": [
       {
-        "name": "browseros",
-        "version": "0.47.18",
-        "deb_version": "148.0.7966.97",
-        "url": "https://github.com/browseros-ai/BrowserOS/releases/download/v0.47.18/BrowserOS_v0.47.18_amd64.deb",
-        "sha256": "bfdda9be19ab0ec69602156a5c8aba3bd163351ca89539ecfda2761596b4dc7b"
+        "_doc": "Google Chrome is the estate's daily browser and the default handler for http/https on the Ubuntu desktop. It is the one deliberate exception to the pin-everything rule: `version_policy` tracks the stable channel rather than a SHA-256, because pinning a browser to an old build trades a real security liability for a reproducibility gain the estate does not need here. Supply-chain control comes from the signing key instead -- the primary fingerprint below is verified before the source is trusted, and it was confirmed against two independent sources (dl.google.com/linux/linux_signing_key.pub and the key embedded in the package's own /etc/cron.daily/google-chrome).",
+        "name": "google-chrome-stable",
+        "version_policy": "tracks-stable-channel",
+        "apt_source": {
+          "uri": "https://dl.google.com/linux/chrome/deb/",
+          "suites": "stable",
+          "components": "main",
+          "architectures": "amd64",
+          "key_url": "https://dl.google.com/linux/linux_signing_key.pub",
+          "key_fingerprint": "EB4C1BFD4F042F6DDDCCEC917721F63BD38B4796",
+          "managed_keyring": "/etc/apt/keyrings/rldyour-google-chrome.asc",
+          "managed_source": "/etc/apt/sources.list.d/rldyour-google-chrome.sources",
+          "vendor_repo_add_once": "false",
+          "vendor_source_policy": "preserve-when-key-verifies"
+        }
+      },
+      {
+        "_doc": "Remote desktop used across the estate. Upstream publishes no apt repository, only per-architecture .deb releases, so it carries an exact version and a per-architecture SHA-256 confirmed by download. `requirement: optional` by owner decision: it is installed by default but its absence or a failed install never fails the desktop layer.",
+        "name": "rustdesk",
+        "requirement": "optional",
+        "version": "1.4.9",
+        "sha256": {
+          "x64": "7244ba47c40e804172044bfbe659467c54ce46554c98e78c8c0406f1d612fda3",
+          "arm64": "ce62c996f14d33f3bbe3a330e953644a44bace7f05885a7953f7395d69fb49c0"
+        },
+        "url": {
+          "x64": "https://github.com/rustdesk/rustdesk/releases/download/1.4.9/rustdesk-1.4.9-x86_64.deb",
+          "arm64": "https://github.com/rustdesk/rustdesk/releases/download/1.4.9/rustdesk-1.4.9-aarch64.deb"
+        }
       },
       "deskflow",
       "happ"

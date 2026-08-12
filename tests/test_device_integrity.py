@@ -512,27 +512,6 @@ def test_metadata_only_cli(tmp_path: Path) -> None:
     assert _run_cli("metadata-only", "--receipt", str(receipt)) == 0
 
 
-def test_is_our_receipt_accepts_valid_receipt(tmp_path: Path) -> None:
-    """_is_our_receipt must recognize our schema/owner."""
-    receipt = tmp_path / "ours.json"
-    assert _run_cli("build", "--output", str(receipt)) == 0
-    assert di._is_our_receipt(receipt) is True
-
-
-def test_is_our_receipt_rejects_foreign_json(tmp_path: Path) -> None:
-    """_is_our_receipt must reject a JSON file with wrong schema/owner."""
-    foreign = tmp_path / "foreign.json"
-    foreign.write_text(json.dumps({"schema": "something-else", "owner": "no-one"}))
-    assert di._is_our_receipt(foreign) is False
-
-
-def test_is_our_receipt_rejects_invalid_json(tmp_path: Path) -> None:
-    """_is_our_receipt must return False for unparseable JSON."""
-    garbage = tmp_path / "garbage.json"
-    garbage.write_text("not json at all")
-    assert di._is_our_receipt(garbage) is False
-
-
 def test_build_overwrites_existing_our_receipt_with_backup(tmp_path: Path) -> None:
     """build must back up an existing our-receipt before rewriting."""
     receipt = tmp_path / "rebuild.json"
@@ -550,6 +529,128 @@ def test_build_refuses_unmanaged_receipt(tmp_path: Path) -> None:
     assert rc != 0
 
 
+# ------------------- receipt replacement is a transaction -------------------
+#
+# Ownership used to be decided by schema+owner alone, and the active receipt was
+# renamed to .bak *before* state collection. Both halves are tested here: an
+# owned-but-unverifiable receipt must not be silently consumed, and no failure
+# may leave the device without an active receipt.
+
+
+def _valid_receipt(tmp_path: Path, name: str = "device.json") -> Path:
+    receipt = tmp_path / name
+    assert _run_cli("build", "--output", str(receipt)) == 0
+    return receipt
+
+
+def test_build_refuses_an_owned_receipt_whose_payload_was_edited(tmp_path: Path) -> None:
+    """Correct schema and owner, wrong digest: evidence, not a stale file."""
+    receipt = _valid_receipt(tmp_path)
+    data = json.loads(receipt.read_text(encoding="utf-8"))
+    data["home"] = "/tmp/somewhere-else"  # digest no longer matches the payload
+    receipt.write_bytes(di.canonical_bytes(data))
+    before = receipt.read_bytes()
+
+    assert _run_cli("build", "--output", str(receipt)) != 0
+    assert receipt.read_bytes() == before, "the tampered receipt must be preserved"
+
+
+def test_build_refuses_a_noncanonical_owned_receipt(tmp_path: Path) -> None:
+    receipt = _valid_receipt(tmp_path)
+    data = json.loads(receipt.read_text(encoding="utf-8"))
+    receipt.write_text(json.dumps(data, indent=2), encoding="utf-8")  # not canonical
+    before = receipt.read_bytes()
+
+    assert _run_cli("build", "--output", str(receipt)) != 0
+    assert receipt.read_bytes() == before
+
+
+def test_build_refuses_a_symlinked_receipt(tmp_path: Path) -> None:
+    real = _valid_receipt(tmp_path, "real.json")
+    link = tmp_path / "link.json"
+    link.symlink_to(real)
+    before = real.read_bytes()
+
+    assert _run_cli("build", "--output", str(link)) != 0
+    assert link.is_symlink(), "the symlink itself must be left in place"
+    assert real.read_bytes() == before
+
+
+def test_build_refuses_a_group_writable_receipt(tmp_path: Path) -> None:
+    receipt = _valid_receipt(tmp_path)
+    receipt.chmod(0o664)
+    before = receipt.read_bytes()
+
+    assert _run_cli("build", "--output", str(receipt)) != 0
+    assert receipt.read_bytes() == before
+
+
+def test_collection_failure_leaves_the_active_receipt_intact(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The previous order renamed the receipt away before collecting state."""
+    receipt = _valid_receipt(tmp_path)
+    before = receipt.read_bytes()
+
+    def exploding_collect(**_: object) -> dict[str, object]:
+        raise di.IntegrityError("collection failed")
+
+    monkeypatch.setattr(di, "collect_state", exploding_collect)
+    assert _run_cli("build", "--output", str(receipt)) != 0
+
+    assert receipt.exists(), "the last valid receipt must still be the active one"
+    assert receipt.read_bytes() == before
+
+
+def test_publication_failure_leaves_the_active_receipt_intact(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    receipt = _valid_receipt(tmp_path)
+    before = receipt.read_bytes()
+
+    real_replace = os.replace
+
+    def exploding_replace(src: object, dst: object) -> None:
+        raise OSError("simulated rename failure")
+
+    monkeypatch.setattr(di.os, "replace", exploding_replace)
+    with pytest.raises(OSError):
+        _run_cli("build", "--output", str(receipt))
+    monkeypatch.setattr(di.os, "replace", real_replace)
+
+    assert receipt.read_bytes() == before
+    leftovers = [p.name for p in tmp_path.iterdir() if p.name.endswith(".tmp")]
+    assert leftovers == [], f"temporary files were left behind: {leftovers}"
+
+
+def test_replace_invalid_retains_the_rejected_copy(tmp_path: Path) -> None:
+    """The escape hatch must preserve the unverifiable receipt as evidence."""
+    receipt = _valid_receipt(tmp_path)
+    data = json.loads(receipt.read_text(encoding="utf-8"))
+    data["home"] = "/tmp/somewhere-else"
+    receipt.write_bytes(di.canonical_bytes(data))
+    tampered = receipt.read_bytes()
+
+    assert _run_cli("build", "--output", str(receipt), "--replace-invalid") == 0
+
+    rejected = tmp_path / f"{receipt.name}.rejected.1"
+    assert rejected.exists()
+    assert rejected.read_bytes() == tampered
+    di.load_receipt(receipt, metadata_only=True)  # the new one must be valid
+
+
+def test_write_file_atomically_is_private_and_durable(tmp_path: Path) -> None:
+    target = tmp_path / "sub" / "payload.bin"
+    target.parent.mkdir()
+    di.write_file_atomically(target, b"first\n")
+    assert target.read_bytes() == b"first\n"
+    assert stat.S_IMODE(target.stat().st_mode) == 0o600
+
+    di.write_file_atomically(target, b"second\n")
+    assert target.read_bytes() == b"second\n"
+    assert [p.name for p in target.parent.iterdir()] == ["payload.bin"]
+
+
 
 def _run_cli(*args: str) -> int:
     """Invoke the script's main() with the given argv."""
@@ -561,3 +662,107 @@ def _run_cli(*args: str) -> int:
         return di.main()
     finally:
         sys.argv = old
+
+
+# --------------------------- harness ownership ---------------------------
+#
+# one-owner-per-harness (RVR-P1-004) lived only in prose. Nothing on a device
+# could tell whether `codex` resolved to the target nddev-codex-app publishes
+# or to a second copy from a bun/npm global, and nothing recorded that the
+# delegated on-pause `zcode` was installed anyway.
+
+
+def _fake_harness(root: Path, name: str, target: Path) -> Path:
+    """Publish `name` on a fake PATH as a symlink to `target`."""
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
+    target.chmod(0o755)
+    bin_dir = root / "fakebin"
+    bin_dir.mkdir(exist_ok=True)
+    link = bin_dir / name
+    link.symlink_to(target)
+    return bin_dir
+
+
+def test_harness_detection_contract_declares_enforcement() -> None:
+    detection = di.load_contract()["harnesses"]["detection"]
+    assert detection["codex"]["enforcement"] == "owned-prefix"
+    assert detection["codex"]["owned_prefix_env"] == "RLDYOUR_CODEX_HOME"
+    assert detection["codex"]["owned_prefix_default"] == "${HOME}/.codex"
+    # A delegated, on-pause harness must never be enforced: bootstrap is
+    # forbidden from installing, removing or adopting it.
+    assert detection["zcode"]["enforcement"] == "observe-only"
+
+
+def test_codex_inside_its_owner_target_is_not_drift(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    owned = tmp_path / ".codex/packages/standalone/current/bin/codex"
+    bin_dir = _fake_harness(tmp_path, "codex", owned)
+    monkeypatch.setenv("PATH", str(bin_dir))
+    monkeypatch.delenv("RLDYOUR_CODEX_HOME", raising=False)
+
+    state = {"harnesses": di._harness_state(tmp_path)}
+    assert state["harnesses"]["codex"]["inside_owned_prefix"] == "True"
+    assert di._verify_harness_ownership(state) == []
+
+
+def test_codex_from_a_package_manager_global_is_drift(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The exact shape the contract forbids: a second owner publishing codex."""
+    stray = tmp_path / ".bun/install/global/node_modules/.bin/codex"
+    bin_dir = _fake_harness(tmp_path, "codex", stray)
+    monkeypatch.setenv("PATH", str(bin_dir))
+    monkeypatch.delenv("RLDYOUR_CODEX_HOME", raising=False)
+
+    state = {"harnesses": di._harness_state(tmp_path)}
+    assert state["harnesses"]["codex"]["inside_owned_prefix"] == "False"
+    drifts = di._verify_harness_ownership(state)
+    assert len(drifts) == 1
+    assert "outside its owner's target" in drifts[0]
+
+
+def test_codex_home_override_moves_the_owned_prefix(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    elsewhere = tmp_path / "opt/codex-home"
+    owned = elsewhere / "bin/codex"
+    bin_dir = _fake_harness(tmp_path, "codex", owned)
+    monkeypatch.setenv("PATH", str(bin_dir))
+    monkeypatch.setenv("RLDYOUR_CODEX_HOME", str(elsewhere))
+
+    state = {"harnesses": di._harness_state(tmp_path)}
+    assert state["harnesses"]["codex"]["owned_prefix"] == str(elsewhere)
+    assert di._verify_harness_ownership(state) == []
+
+
+def test_installed_zcode_is_recorded_but_never_enforced(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    installed = tmp_path / "opt/ZCode/zcode"
+    bin_dir = _fake_harness(tmp_path, "zcode", installed)
+    monkeypatch.setenv("PATH", str(bin_dir))
+
+    state = {"harnesses": di._harness_state(tmp_path)}
+    entry = state["harnesses"]["zcode"]
+    assert entry["present"] == "True"
+    assert entry["resolved"] == str(installed)
+    # Recorded as evidence, never acted on.
+    assert "owned_prefix" not in entry
+    assert di._verify_harness_ownership(state) == []
+
+
+def test_absent_harness_is_neither_recorded_nor_drift(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("PATH", str(tmp_path / "empty"))
+    state = {"harnesses": di._harness_state(tmp_path)}
+    assert state["harnesses"]["codex"] == {"present": "False"}
+    assert di._verify_harness_ownership(state) == []
+
+
+def test_receipt_carries_the_harness_inventory() -> None:
+    state = di.collect_state(home=Path.home(), profile="desktop")
+    assert "harnesses" in state
+    assert set(state["harnesses"]) == {"codex", "zcode"}

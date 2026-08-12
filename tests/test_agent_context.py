@@ -176,3 +176,50 @@ def test_reusable_workflows_are_pinned_to_an_exact_commit(path: Path) -> None:
             assert re.fullmatch(r"[0-9a-f]{40}", match.group(2)), (
                 f"{path.name} uses a mutable ref: {match.group(2)}"
             )
+
+
+def _matrix_values(text: str, key: str) -> list[str]:
+    """Every value of a `matrix.<key>` list, in block or inline form."""
+    values: list[str] = []
+    lines = text.splitlines()
+    for index, line in enumerate(lines):
+        stripped = line.strip()
+        if stripped == f"{key}:":
+            indent = len(line) - len(line.lstrip())
+            for follower in lines[index + 1 :]:
+                if not follower.strip():
+                    continue
+                if (len(follower) - len(follower.lstrip())) <= indent:
+                    break
+                if follower.strip().startswith("- "):
+                    values.append(follower.strip()[2:].strip().strip("'\""))
+        elif stripped.startswith(f"{key}: ["):
+            inline = stripped.split("[", 1)[1].rsplit("]", 1)[0]
+            values.extend(v.strip().strip("'\"") for v in inline.split(",") if v.strip())
+    return values
+
+
+@pytest.mark.parametrize("path", sorted(WORKFLOWS.glob("*.yml")), ids=lambda p: p.name)
+def test_every_job_runs_on_a_hosted_runner(path: Path) -> None:
+    """`runs-on` is the other way onto a runner, and the reusable-caller gate
+    does not see it. A job here selecting `runs-on: standard` would put fork
+    code on the estate fleet exactly as a reusable input would."""
+    text = path.read_text(encoding="utf-8")
+    for line in text.splitlines():
+        stripped = line.strip()
+        if not stripped.startswith("runs-on:"):
+            continue
+        value = stripped.split(":", 1)[1].strip().strip("'\"")
+        if value.startswith("${{"):
+            # Resolve a matrix reference to the values it can take.
+            key = value.strip("${} ").split(".")[-1].strip()
+            candidates = _matrix_values(text, key)
+            assert candidates, f"{path.name}: cannot resolve {value}; check it by hand"
+        else:
+            candidates = [value]
+        for candidate in candidates:
+            assert candidate in HOSTED_RUNNERS, (
+                f"{path.name} runs a job on {candidate!r}. This repository is "
+                "public and the estate runner platform forbids public/fork code "
+                "on a trusted runner group."
+            )

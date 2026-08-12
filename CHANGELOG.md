@@ -68,7 +68,13 @@ All notable changes to this module will be documented in this file.
   repository is public, so routing a job onto that fleet would break the
   platform's contract, not merely a convention written here.
 
-  The gate asserts the value against an allowlist of hosted labels. The fleet's
+  The gate covers both ways onto a runner: the `runner` input of a reusable
+  caller, and a job's own `runs-on` — including one driven by a matrix, whose
+  values are resolved and checked individually. The reusable-caller check alone
+  would not have seen a job selecting `runs-on: standard`. Every value in the
+  repository is hosted today; nothing had been enforcing that.
+
+  It asserts the value against an allowlist of hosted labels. The fleet's
   labels are `standard` (the organization default) and the legacy `amsterdam`,
   behind the `nddev-linux-standard` and `nddev-linux-integration` scale sets;
   `runner: standard` reads like nothing at all in a diff, so a denylist of known

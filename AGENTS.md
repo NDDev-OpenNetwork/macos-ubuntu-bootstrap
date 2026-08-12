@@ -325,9 +325,10 @@ Docker runtime evidence that was not actually produced.
   default setup onto a repository with an active advanced setup fails the whole
   attachment.
 - This repository is public, so `pull_request` executes untrusted fork code.
-  Every `ci-workflows` caller that exposes a `runner` input passes an explicit
-  GitHub-hosted label, and `tests/test_agent_context.py` rejects any value
-  outside the hosted set.
+  Every job runs on a GitHub-hosted runner, whether it is selected by a
+  reusable caller's `runner` input or by the job's own `runs-on` — matrix
+  values included. `tests/test_agent_context.py` rejects any value outside the
+  hosted set on either path.
 
   The rule is the estate runner platform's own, not this repository's
   invention. `modules/github-actions` builds disposable one-job Incus/KVM

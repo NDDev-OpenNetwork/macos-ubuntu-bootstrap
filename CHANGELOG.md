@@ -287,6 +287,16 @@ All notable changes to this module will be documented in this file.
 
 ### Tests
 
+- **Secret scanning gets a repository config, added because the branch would
+  otherwise have merged red.** `gitleaks` flags Google's public Chrome
+  signing-key fingerprint as a `generic-api-key`: forty hex characters in a
+  name containing KEY. It is the opposite of a secret — it is the public value
+  this repository verifies a downloaded key against — but the `secret-scan`
+  lane does not know that. `.gitleaks.toml` keeps the full default rule set and
+  allowlists that one value by exact match, never by path and never by
+  disabling the rule, so a genuine credential in the same files is still
+  caught. Verified both directions: the fingerprint passes, and planted AWS and
+  GitHub tokens are still found.
 - **The Ubuntu install branches that had never been executed now have real
   evidence.** `tests/test_container_apply.py` runs them against a disposable
   Ubuntu 26.04 container: a fresh Chrome install proves the managed keyring

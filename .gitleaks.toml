@@ -1,0 +1,25 @@
+# Gitleaks configuration for macos-ubuntu-bootstrap.
+#
+# The default rule set is kept in full. This file adds one narrowly-scoped
+# allowlist entry and nothing else.
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = """
+Google's Linux package signing key fingerprint.
+
+`generic-api-key` matches it because it is forty hex characters assigned to a
+name containing KEY. It is the opposite of a secret: it is the public
+identifier this repository verifies a downloaded key against before trusting
+the Chrome apt source, and Google publishes it at
+dl.google.com/linux/linux_signing_key.pub and embeds it in the Chrome package's
+own /etc/cron.daily/google-chrome.
+
+Allowlisted by exact value rather than by path or by disabling the rule, so a
+genuine credential in the same files is still caught.
+"""
+regexes = [
+  '''EB4C1BFD4F042F6DDDCCEC917721F63BD38B4796''',
+]

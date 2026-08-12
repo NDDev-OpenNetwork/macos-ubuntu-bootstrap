@@ -245,3 +245,18 @@ def test_secret_scan_uses_the_repository_config() -> None:
     assert "gitleaks_config_path: .gitleaks.toml" in caller, (
         "the allowlist has no effect unless the caller passes it"
     )
+
+
+def test_no_tracked_document_points_at_a_deleted_memory() -> None:
+    """Collapsing the corpus left README naming three memories that no longer
+    exist. Any path a document advertises must resolve."""
+    import re
+
+    present = {p.name for p in MEMORIES.glob("*.md")}
+    for doc in ROOT.rglob("*.md"):
+        if any(part in {".venv", ".git"} for part in doc.parts) or doc.name == "CHANGELOG.md":
+            continue
+        for match in re.finditer(r"\.serena/memories/([A-Za-z0-9_-]+\.md)", doc.read_text(encoding="utf-8")):
+            assert match.group(1) in present, (
+                f"{doc.relative_to(ROOT)} names {match.group(1)}, which does not exist"
+            )

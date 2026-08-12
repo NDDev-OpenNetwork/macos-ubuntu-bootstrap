@@ -34,9 +34,12 @@ check_cmd shellcheck
 # purpose -- add an entry only with the reason, never to silence a finding.
 EXCLUDED_PATHS=()
 
-mapfile -t SCRIPT_PATHS < <(
-  find "$REPO_ROOT/scripts" -type f -name '*.sh' -print | sort
-)
+# `mapfile` is bash 4.0+ and macOS still ships bash 3.2, where this script runs
+# too. A read loop is the portable equivalent.
+SCRIPT_PATHS=()
+while IFS= read -r discovered; do
+  SCRIPT_PATHS+=("$discovered")
+done < <(find "$REPO_ROOT/scripts" -type f -name '*.sh' -print | sort)
 if [ "${#SCRIPT_PATHS[@]}" -eq 0 ]; then
   echo "no shell scripts discovered under $REPO_ROOT/scripts" >&2
   exit 1

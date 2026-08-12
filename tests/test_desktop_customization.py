@@ -156,7 +156,9 @@ def test_installer_surfaces_the_desktop_result_instead_of_warning() -> None:
 def test_every_owned_shell_script_is_linted() -> None:
     """lint.sh discovers scripts instead of carrying a hand-maintained list."""
     lint = (ROOT / "scripts/ci/lint.sh").read_text(encoding="utf-8")
-    assert "SCRIPT_PATHS=(" not in lint.replace("SCRIPT_PATHS=(\"${filtered[@]}\")", "")
+    # What must not come back is a hand-maintained list of paths, not the name
+    # of the array that discovery fills.
+    assert "$REPO_ROOT/scripts/" not in lint, "lint.sh hardcodes a script path"
     assert "find" in lint and "-name '*.sh'" in lint
     discovered = sorted(p.relative_to(ROOT) for p in (ROOT / "scripts").rglob("*.sh"))
     for required in (
@@ -492,3 +494,62 @@ def test_min_version_fails_closed_when_no_version_can_be_read(tmp_path: Path) ->
     assert result.returncode != 0, "an unreadable version must not pass a version gate"
     assert "could not detect version" in result.stdout
     assert "skipping numeric check" not in result.stdout
+
+
+# ------------------- bash 3.2 portability on the macOS path -------------------
+#
+# macOS still ships bash 3.2. The repository's own lint script used `mapfile`
+# and died with "command not found" on the macOS CI lane -- in an adapter whose
+# whole purpose is to support both platforms. The lane caught it; nothing local
+# did.
+
+# bash 4.0+ only. Each would be a runtime failure on macOS, not a syntax error,
+# so `bash -n` does not see them.
+BASH4_ONLY = (
+    (r"\bmapfile\b", "mapfile is bash 4.0+"),
+    (r"\breadarray\b", "readarray is bash 4.0+"),
+    (r"declare\s+-A\b", "associative arrays are bash 4.0+"),
+    (r"\$\{[A-Za-z_][A-Za-z0-9_]*\^\^", "${var^^} is bash 4.0+"),
+    (r"\$\{[A-Za-z_][A-Za-z0-9_]*,,", "${var,,} is bash 4.0+"),
+)
+
+# Scripts that execute on macOS: the compositor, the shared library, the macOS
+# platform scripts and every repository-level entry point. The ubuntu/ scripts
+# are Linux-only and may use bash 4 freely.
+MACOS_PATH_SCRIPTS = [
+    "scripts/ci/lint.sh",
+    "scripts/ci/validate.sh",
+    "scripts/bootstrap.sh",
+    "scripts/lib/common.sh",
+    "scripts/macos/install.sh",
+    "scripts/macos/verify.sh",
+    "scripts/auth-handoff.sh",
+    "scripts/remote-exec.sh",
+    "scripts/verify-browser-runtime.sh",
+]
+
+
+@pytest.mark.parametrize("script", MACOS_PATH_SCRIPTS)
+def test_macos_path_scripts_avoid_bash4_only_features(script: str) -> None:
+    path = ROOT / script
+    assert path.exists(), f"{script} is listed here but does not exist"
+    for number, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
+        if line.lstrip().startswith("#"):
+            continue
+        for pattern, why in BASH4_ONLY:
+            assert not re.search(pattern, line), (
+                f"{script}:{number} uses a construct macOS bash 3.2 lacks — {why}\n"
+                f"  {line.strip()}"
+            )
+
+
+def test_the_macos_path_list_covers_every_non_ubuntu_script() -> None:
+    """A new top-level script must be classified, not silently unchecked."""
+    owned = {
+        str(p.relative_to(ROOT))
+        for p in (ROOT / "scripts").rglob("*.sh")
+        if "ubuntu" not in p.parts
+    }
+    assert owned == set(MACOS_PATH_SCRIPTS), (
+        f"unclassified scripts: {sorted(owned ^ set(MACOS_PATH_SCRIPTS))}"
+    )

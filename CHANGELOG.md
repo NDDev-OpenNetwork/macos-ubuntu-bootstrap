@@ -309,6 +309,16 @@ All notable changes to this module will be documented in this file.
   install and idempotence are covered on the same lane. Opt-in via
   `RLDYOUR_CONTAINER_TESTS=1`; systemd, GNOME and macOS remain out of reach and
   are named as such.
+- **Every script on the macOS execution path is checked against bash 3.2.**
+  macOS still ships bash 3.2 and `scripts/ci/lint.sh` runs there too; the
+  discovery rewrite used `mapfile`, which is bash 4.0+, and the macOS CI lane
+  failed with `command not found`. Nothing local had caught it — in an adapter
+  whose whole purpose is supporting both platforms. A test now rejects
+  `mapfile`, `readarray`, `declare -A` and `${var^^}`/`${var,,}` in the
+  compositor, the shared library, the macOS scripts and every repository-level
+  entry point, and asserts that a newly added script is classified rather than
+  silently unchecked. `bash -n` cannot see any of these: they are runtime
+  failures, not syntax errors.
 - `scripts/ubuntu/desktop.sh` gained the `BASH_SOURCE` guard the other three
   entry scripts already had. Without it every test had to cut functions out of
   the file with `sed`, which tests a copy rather than the script — and no test

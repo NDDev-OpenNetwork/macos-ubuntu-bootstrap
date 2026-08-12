@@ -92,12 +92,17 @@ ensure_native_ubuntu_user() {
       sudo tee /etc/sudoers.d/rldyourevidence >/dev/null
     sudo chmod 0440 /etc/sudoers.d/rldyourevidence
   fi
+  NATIVE_REPO_ROOT=/opt/rldyour-evidence-source
+  if [ ! -d "$NATIVE_REPO_ROOT" ]; then
+    sudo cp -a "$REPO_ROOT" "$NATIVE_REPO_ROOT"
+    sudo chmod -R a+rX "$NATIVE_REPO_ROOT"
+  fi
 }
 
 native_ubuntu_cmd() {
   sudo --user rldyourevidence --set-home env \
     HOME=/home/rldyourevidence USER=rldyourevidence LOGNAME=rldyourevidence \
-    bash -c "cd $(printf '%q' "$REPO_ROOT") && $1"
+    bash -c "cd $(printf '%q' "$NATIVE_REPO_ROOT") && $1"
 }
 
 container_exec_dev() {

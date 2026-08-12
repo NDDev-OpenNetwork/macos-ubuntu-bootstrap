@@ -8,11 +8,13 @@ platform installers/verifiers, `config/rldyour-contract.json`, `README.md`, and
 `SECURITY.md`. Keep implementation, verification, contract, tests, docs,
 `VERSION`, and `CHANGELOG.md` synchronized.
 
-## Contract 3.0.0
+## Contract 3.0.1
 
 - macOS supports `desktop`, with optional GUI, no Docker, and source-analysis
   plus local-check tooling.
 - Ubuntu requires explicit `desktop`, `desktop-builds`, or `server` selection.
+- Ubuntu GUI is supported on `amd64`; `arm64` supports the same profiles with
+  GUI disabled because Chrome and Telegram publish no compatible Linux builds.
 - Ubuntu `desktop` has no Docker; `desktop-builds` adds rootful Docker for local
   builds/tests without the server baseline.
 - Ubuntu `server` is headless, defaults to rootful Docker, and supports explicit
@@ -24,8 +26,8 @@ platform installers/verifiers, `config/rldyour-contract.json`, `README.md`, and
 - Google Chrome stable is the only installed browser. macOS GUI installs
   ChatGPT, Claude, Ghostty, cmux, RustDesk, and Telegram. Ubuntu GUI installs
   Chrome, RustDesk, Telegram, and removes Firefox.
-- Herdr is installed on macOS and Ubuntu desktop profiles, including headless
-  desktop mode where the upstream binary supports it.
+- Herdr is installed and verified on macOS and every Ubuntu profile. Telegram
+  is GUI-only and is installed on supported Linux architectures.
 
 ## Implementation rules
 

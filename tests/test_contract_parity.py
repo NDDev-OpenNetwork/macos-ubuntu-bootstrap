@@ -2,8 +2,8 @@
 
 Extends the pattern established by test_compiled_language_hosts.py
 (test_installer_constants_match_the_contract) to cover the domains that were
-previously unchecked: apt baseline, cloak runtime packages, macOS GUI casks,
-and Node/uv/Bun version+hash constants. A drift between the contract and the
+previously unchecked: apt baseline, GUI applications, macOS GUI casks, and
+Node/uv/Bun version+hash constants. A drift between the contract and the
 installer is caught here at CI time, before it can ship to a device.
 """
 
@@ -17,6 +17,25 @@ ROOT = Path(__file__).resolve().parents[1]
 CONTRACT = json.loads((ROOT / "config/rldyour-contract.json").read_text(encoding="utf-8"))
 UBUNTU_INSTALL = (ROOT / "scripts/ubuntu/install.sh").read_text(encoding="utf-8")
 MACOS_INSTALL = (ROOT / "scripts/macos/install.sh").read_text(encoding="utf-8")
+
+
+def test_release_metadata_matches_contract_version() -> None:
+    version = (ROOT / "VERSION").read_text(encoding="utf-8").strip()
+    agents = (ROOT / "AGENTS.md").read_text(encoding="utf-8")
+    readme = (ROOT / "README.md").read_text(encoding="utf-8")
+    changelog = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
+    assert CONTRACT["adapter"]["version"] == version
+    assert f"## Contract {version}" in agents
+    assert f"current contract is `{version}`" in readme
+    assert re.search(rf"^## \[{re.escape(version)}\] - \d{{4}}-\d{{2}}-\d{{2}}$", changelog, re.M)
+
+
+def test_ubuntu_gui_architecture_boundary_is_explicit_and_enforced() -> None:
+    ubuntu = CONTRACT["targets"]["ubuntu"]
+    assert ubuntu["architectures"] == ["amd64", "arm64"]
+    assert ubuntu["gui_architectures"] == ["amd64"]
+    assert 'if [ "$RLDYOUR_DRY_RUN" -eq 0 ] && [ "$GUI_ENABLED" -eq 1 ]' in UBUNTU_INSTALL
+    assert "Google Chrome and Telegram Desktop publish no supported Linux ARM64 build" in UBUNTU_INSTALL
 
 
 def _parse_bash_array(source: str, name: str) -> set[str]:

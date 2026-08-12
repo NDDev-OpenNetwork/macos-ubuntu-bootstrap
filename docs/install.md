@@ -31,8 +31,9 @@ tools, Herdr, language servers, and source checks.
 
 Ubuntu Telegram Desktop is pinned to the official `telegramdesktop/tdesktop`
 GitHub Linux tarball. That upstream release currently provides Linux x86_64 but
-not Linux ARM64, so ARM64 GUI plans fail closed by skipping Telegram rather
-than executing a Windows ARM64 or foreign-architecture artifact.
+not Linux ARM64; Google Chrome has the same architecture boundary. Ubuntu ARM64
+therefore supports `--no-gui` profiles only, and a real ARM64 GUI apply fails
+before changing the host rather than claiming a partial GUI installation.
 
 Server hardening is explicit:
 

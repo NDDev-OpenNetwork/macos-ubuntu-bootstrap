@@ -262,6 +262,15 @@ validate_target() {
       return 2
       ;;
   esac
+  if [ "$RLDYOUR_DRY_RUN" -eq 0 ] && [ "$GUI_ENABLED" -eq 1 ]; then
+    case "$(uname -m)" in
+      x86_64|amd64) ;;
+      *)
+        rldyour::log "error" "Ubuntu GUI apply requires amd64: Google Chrome and Telegram Desktop publish no supported Linux ARM64 build"
+        return 2
+        ;;
+    esac
+  fi
   if [ "$RLDYOUR_DRY_RUN" -eq 0 ] && ! is_supported_ubuntu; then
     rldyour::log "error" "apply is supported only on Ubuntu 24.04 or 26.04"
     return 2

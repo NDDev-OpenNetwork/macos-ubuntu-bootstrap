@@ -44,6 +44,19 @@ if data.get('schema_version') != 2:
     raise SystemExit('config/rldyour-contract.json: schema_version must be 2')
 if data.get('adapter', {}).get('version') != (Path("${REPO_ROOT}") / 'VERSION').read_text().strip():
     raise SystemExit('contract adapter.version must match VERSION')
+version = data['adapter']['version']
+agents = (Path("${REPO_ROOT}") / 'AGENTS.md').read_text(encoding='utf-8')
+readme = (Path("${REPO_ROOT}") / 'README.md').read_text(encoding='utf-8')
+changelog = (Path("${REPO_ROOT}") / 'CHANGELOG.md').read_text(encoding='utf-8')
+if f'## Contract {version}' not in agents:
+    raise SystemExit('AGENTS.md contract heading must match VERSION')
+if f'current contract is {chr(96)}{version}{chr(96)}' not in readme:
+    raise SystemExit('README.md contract version must match VERSION')
+if not any(line.startswith(f'## [{version}] - ') for line in changelog.splitlines()):
+    raise SystemExit('CHANGELOG.md must contain the bracketed current release heading')
+ubuntu = data.get('targets', {}).get('ubuntu', {})
+if ubuntu.get('gui_architectures') != ['amd64']:
+    raise SystemExit('Ubuntu GUI architecture boundary must be explicit and amd64-only')
 harnesses = data.get('harnesses', {})
 if harnesses.get('policy') != 'vendor-official':
     raise SystemExit('AI CLI policy must require official vendor distributions')

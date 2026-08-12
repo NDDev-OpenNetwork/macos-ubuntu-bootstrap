@@ -22,6 +22,8 @@ Ghostty, cmux, ChatGPT, Claude, RustDesk, and Telegram. Ubuntu GUI installs
 Chrome, RustDesk, Telegram, desktop integration, and removes Firefox. Headless
 profiles do not install GUI applications. Herdr is installed and verified on
 macOS and every Ubuntu profile, including headless desktops and servers.
+Ubuntu GUI is supported on amd64; ARM64 remains supported with `--no-gui`
+because Google and Telegram publish no compatible Linux ARM64 applications.
 
 Desktop source hosts include Node, Python, LLVM/clangd, Go/gopls, Rust with
 rust-analyzer, Dart with its analysis server, TypeScript, YAML, Bash, Dockerfile,

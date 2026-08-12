@@ -29,6 +29,9 @@
         "amd64",
         "arm64"
       ],
+      "gui_architectures": [
+        "amd64"
+      ],
       "profiles": {
         "desktop": {
           "gui_modes": [

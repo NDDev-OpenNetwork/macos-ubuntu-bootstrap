@@ -96,7 +96,7 @@ EXEMPTION = "exposes no `runner` input"
 # values is the only form of this check that survives a renamed class and
 # turns a hang into a failed test.
 HOSTED_RUNNERS = {
-    "ubuntu-latest", "ubuntu-24.04", "ubuntu-22.04",
+    "ubuntu-latest", "ubuntu-24.04", "ubuntu-22.04", "ubuntu-24.04-arm",
     "macos-latest", "macos-15", "macos-14",
     "windows-latest", "windows-2022",
 }

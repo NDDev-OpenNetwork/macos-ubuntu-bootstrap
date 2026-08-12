@@ -1,0 +1,147 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
+LANE="${1:?usage: platform-evidence.sh LANE OUTPUT_DIR}"
+OUTPUT_DIR="${2:?usage: platform-evidence.sh LANE OUTPUT_DIR}"
+EVIDENCE_SHA="${EVIDENCE_SHA:?EVIDENCE_SHA is required}"
+
+mkdir -p "$OUTPUT_DIR"
+LOG="$OUTPUT_DIR/run.log"
+exec > >(tee "$LOG") 2>&1
+
+record_metadata() {
+  EVIDENCE_LANE="$LANE" EVIDENCE_OUTPUT="$OUTPUT_DIR/evidence.json" python3 - <<'PY'
+import json
+import os
+import platform
+from pathlib import Path
+
+payload = {
+    "schema_version": 1,
+    "repository": os.environ.get("GITHUB_REPOSITORY", "local"),
+    "run_id": os.environ.get("GITHUB_RUN_ID", "local"),
+    "run_attempt": os.environ.get("GITHUB_RUN_ATTEMPT", "local"),
+    "job": os.environ.get("GITHUB_JOB", "local"),
+    "lane": os.environ["EVIDENCE_LANE"],
+    "sha": os.environ["EVIDENCE_SHA"],
+    "runner_name": os.environ.get("RUNNER_NAME", "local"),
+    "runner_os": os.environ.get("RUNNER_OS", platform.system()),
+    "runner_arch": os.environ.get("RUNNER_ARCH", platform.machine()),
+    "uname": platform.uname()._asdict(),
+}
+Path(os.environ["EVIDENCE_OUTPUT"]).write_text(
+    json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+)
+PY
+}
+
+assert_exact_source() {
+  local actual
+  actual="$(git -C "$REPO_ROOT" rev-parse HEAD)"
+  [ "$actual" = "$EVIDENCE_SHA" ] || {
+    echo "checked-out SHA $actual does not match required evidence SHA $EVIDENCE_SHA" >&2
+    return 1
+  }
+}
+
+run_native_macos() {
+  local gui_flag=$1
+  local gui_enabled=1
+  local -a verify_args=(--strict)
+  if [ "$gui_flag" = --no-gui ]; then
+    gui_enabled=0
+    verify_args+=(--no-gui)
+  fi
+  [ "$(uname -s)" = Darwin ] && [ "$(uname -m)" = arm64 ]
+  bash "$REPO_ROOT/scripts/bootstrap.sh" --platform macos --profile desktop "$gui_flag" --plan --strict
+  bash "$REPO_ROOT/scripts/bootstrap.sh" --platform macos --profile desktop "$gui_flag" --apply --strict
+  RLDYOUR_GUI_ENABLED="$gui_enabled" bash "$REPO_ROOT/scripts/macos/verify.sh" "${verify_args[@]}"
+  bash "$REPO_ROOT/scripts/bootstrap.sh" --platform macos --profile desktop "$gui_flag" --apply --strict
+  RLDYOUR_GUI_ENABLED="$gui_enabled" bash "$REPO_ROOT/scripts/macos/verify.sh" "${verify_args[@]}"
+}
+
+run_native_ubuntu_desktop() {
+  [ "$(uname -s)" = Linux ]
+  bash "$REPO_ROOT/scripts/bootstrap.sh" --platform ubuntu --profile desktop --no-gui --plan --strict
+  bash "$REPO_ROOT/scripts/bootstrap.sh" --platform ubuntu --profile desktop --no-gui --apply --strict
+  RLDYOUR_PROFILE=desktop RLDYOUR_GUI_ENABLED=0 RLDYOUR_DOCKER_MODE=none \
+    bash "$REPO_ROOT/scripts/ubuntu/verify.sh" --strict
+  bash "$REPO_ROOT/scripts/bootstrap.sh" --platform ubuntu --profile desktop --no-gui --apply --strict
+  RLDYOUR_PROFILE=desktop RLDYOUR_GUI_ENABLED=0 RLDYOUR_DOCKER_MODE=none \
+    bash "$REPO_ROOT/scripts/ubuntu/verify.sh" --strict
+}
+
+run_arm_gui_refusal() {
+  [ "$(uname -m)" = aarch64 ] || [ "$(uname -m)" = arm64 ]
+  local output rc=0
+  output="$(bash "$REPO_ROOT/scripts/bootstrap.sh" --platform ubuntu --profile desktop --gui --apply 2>&1)" || rc=$?
+  printf '%s\n' "$output"
+  [ "$rc" -eq 2 ]
+  grep -Fq "Ubuntu GUI apply requires amd64" <<<"$output"
+  [ ! -e "$HOME/.config/rldyour" ]
+  [ ! -e "$HOME/.local/share/rldyour" ]
+}
+
+container_exec_dev() {
+  docker exec --user dev \
+    --env HOME=/home/dev \
+    --env USER=dev \
+    --env LOGNAME=dev \
+    --env RLDYOUR_SET_LOGIN_SHELL=1 \
+    "$CONTAINER_NAME" bash -lc "$1"
+}
+
+start_systemd_container() {
+  CONTAINER_NAME="rldyour-evidence-${GITHUB_RUN_ID:-local}-${RANDOM}"
+  docker run --detach --privileged --cgroupns=host \
+    --name "$CONTAINER_NAME" \
+    --tmpfs /tmp --tmpfs /run --tmpfs /run/lock \
+    --volume /sys/fs/cgroup:/sys/fs/cgroup:rw \
+    --volume "$REPO_ROOT:/repo:ro" \
+    ubuntu:24.04 /sbin/init
+  trap 'docker rm --force "$CONTAINER_NAME" >/dev/null 2>&1 || true' EXIT
+  docker exec "$CONTAINER_NAME" bash -lc \
+    'export DEBIAN_FRONTEND=noninteractive; apt-get update; apt-get install -y --no-install-recommends sudo ca-certificates curl systemd systemd-sysv dbus-user-session; useradd -m -s /bin/bash dev; printf "dev ALL=(ALL) NOPASSWD:ALL\n" >/etc/sudoers.d/dev; chmod 0440 /etc/sudoers.d/dev'
+  docker exec "$CONTAINER_NAME" systemctl is-system-running --wait || \
+    docker exec "$CONTAINER_NAME" systemctl --failed
+}
+
+run_sandbox_profile() {
+  local profile=$1 docker_mode=$2
+  start_systemd_container
+  container_exec_dev "cd /repo && bash scripts/bootstrap.sh --platform ubuntu --profile $profile --no-gui --docker-mode $docker_mode --plan --strict"
+  container_exec_dev "cd /repo && bash scripts/bootstrap.sh --platform ubuntu --profile $profile --no-gui --docker-mode $docker_mode --apply --strict"
+  container_exec_dev "cd /repo && RLDYOUR_PROFILE=$profile RLDYOUR_GUI_ENABLED=0 RLDYOUR_DOCKER_MODE=$docker_mode bash scripts/ubuntu/verify.sh --strict"
+  container_exec_dev "cd /repo && bash scripts/bootstrap.sh --platform ubuntu --profile $profile --no-gui --docker-mode $docker_mode --apply --strict"
+  container_exec_dev "cd /repo && RLDYOUR_PROFILE=$profile RLDYOUR_GUI_ENABLED=0 RLDYOUR_DOCKER_MODE=$docker_mode bash scripts/ubuntu/verify.sh --strict"
+}
+
+run_sandbox_hardening() {
+  start_systemd_container
+  docker exec "$CONTAINER_NAME" bash -lc \
+    'install -d -m 0700 -o dev -g dev /home/dev/.ssh; ssh-keygen -q -t ed25519 -N "" -f /home/dev/.ssh/evidence; cat /home/dev/.ssh/evidence.pub >/home/dev/.ssh/authorized_keys; chown dev:dev /home/dev/.ssh/authorized_keys; chmod 0600 /home/dev/.ssh/authorized_keys'
+  container_exec_dev "cd /repo && SSH_CONNECTION='192.0.2.10 50000 192.0.2.20 22' RLDYOUR_SERVER_SSH_USER=dev bash scripts/bootstrap.sh --platform ubuntu --profile server --no-gui --docker-mode none --harden-ssh --enable-ufw --with-fail2ban --plan --strict"
+  container_exec_dev "cd /repo && SSH_CONNECTION='192.0.2.10 50000 192.0.2.20 22' RLDYOUR_SERVER_SSH_USER=dev bash scripts/bootstrap.sh --platform ubuntu --profile server --no-gui --docker-mode none --harden-ssh --enable-ufw --with-fail2ban --apply --strict"
+  container_exec_dev "cd /repo && RLDYOUR_PROFILE=server RLDYOUR_GUI_ENABLED=0 RLDYOUR_DOCKER_MODE=none RLDYOUR_SERVER_ENABLE_UFW=1 RLDYOUR_SERVER_HARDEN_SSH=1 RLDYOUR_SERVER_ENABLE_FAIL2BAN=1 bash scripts/ubuntu/verify.sh --strict"
+}
+
+assert_exact_source
+record_metadata
+
+case "$LANE" in
+  macos-gui) run_native_macos --gui ;;
+  macos-no-gui) run_native_macos --no-gui ;;
+  ubuntu-desktop-no-gui) run_native_ubuntu_desktop ;;
+  ubuntu-arm-gui-refusal) run_arm_gui_refusal ;;
+  sandbox-desktop-builds-rootful) run_sandbox_profile desktop-builds rootful ;;
+  sandbox-server-none) run_sandbox_profile server none ;;
+  sandbox-server-rootful) run_sandbox_profile server rootful ;;
+  sandbox-server-rootless) run_sandbox_profile server rootless ;;
+  sandbox-server-hardening) run_sandbox_hardening ;;
+  *) echo "unknown evidence lane: $LANE" >&2; exit 2 ;;
+esac
+
+printf 'PASS\n' >"$OUTPUT_DIR/result"

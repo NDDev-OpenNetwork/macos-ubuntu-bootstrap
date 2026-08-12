@@ -12,6 +12,7 @@ from __future__ import annotations
 import json
 import re
 from pathlib import Path
+from urllib.parse import urlparse
 
 ROOT = Path(__file__).resolve().parents[1]
 CONTRACT = json.loads((ROOT / "config/rldyour-contract.json").read_text(encoding="utf-8"))
@@ -189,10 +190,19 @@ def test_every_declared_deb_is_versioned_and_digest_pinned() -> None:
         assert isinstance(app["url"], dict), f"{name}: url must be per-architecture"
         assert set(app["url"]) == set(app["sha256"]), f"{name}: url/digest arches disagree"
         for arch, url in app["url"].items():
-            assert "github.com" in url, (
-                f"{name}/{arch} must be a versioned GitHub release, not a CDN pointer: {url}"
+            # Compare the parsed host, never a substring: `github.com` appears
+            # in https://github.com.attacker.example/ and in any query string,
+            # so a substring test would admit exactly the artifact this guard
+            # exists to reject. CodeQL flagged the earlier version as
+            # py/incomplete-url-substring-sanitization, correctly.
+            parsed = urlparse(url)
+            assert parsed.scheme == "https", f"{name}/{arch} is not https: {url}"
+            assert parsed.hostname == "github.com", (
+                f"{name}/{arch} must be a versioned GitHub release, not {parsed.hostname}: {url}"
             )
-            assert "/latest/" not in url, f"{name}/{arch} uses a volatile latest pointer"
+            assert "/latest/" not in parsed.path, (
+                f"{name}/{arch} uses a volatile latest pointer"
+            )
             assert app["version"] in url, (
                 f"{name}/{arch} URL does not carry the declared version {app['version']}"
             )
@@ -213,3 +223,18 @@ def test_desktop_sh_downloads_every_declared_deb_verified() -> None:
     assert "cdn.browseros.com" not in desktop_sh, (
         "desktop.sh must not reference the volatile CDN latest pointer"
     )
+
+
+def test_the_release_host_check_rejects_a_lookalike_domain() -> None:
+    """A substring test admitted `github.com.attacker.example`; the parsed-host
+    test must not. Verified directly rather than trusted."""
+    for hostile in (
+        "https://github.com.attacker.example/o/r/releases/download/1.0/a.deb",
+        "https://attacker.example/x?ref=github.com",
+        "http://github.com/o/r/releases/download/1.0/a.deb",
+    ):
+        parsed = urlparse(hostile)
+        assert not (parsed.scheme == "https" and parsed.hostname == "github.com"), hostile
+    good = "https://github.com/o/r/releases/download/1.0/a.deb"
+    parsed = urlparse(good)
+    assert parsed.scheme == "https" and parsed.hostname == "github.com"

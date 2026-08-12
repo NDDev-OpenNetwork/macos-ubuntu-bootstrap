@@ -339,6 +339,12 @@ All notable changes to this module will be documented in this file.
   real shellcheck findings in `desktop.sh`, one of them the `&& ok || die`
   construct behind the skipped-Firefox-step defect. `EXCLUDED_PATHS` is empty on
   purpose.
+- The release-host guard compares a parsed hostname instead of a substring.
+  CodeQL flagged the generalised version as
+  `py/incomplete-url-substring-sanitization`, correctly: `"github.com" in url`
+  admits `https://github.com.attacker.example/...` and any URL carrying it in a
+  query string — precisely the artifact origin the guard exists to reject. The
+  scheme is checked too, and a test proves the lookalike forms are refused.
 - The two BrowserOS-specific parity tests were generalised to every declared
   `.deb`: versioned GitHub URL carrying the declared version, no `latest`
   pointer, well-formed per-architecture digests, and every URL and digest

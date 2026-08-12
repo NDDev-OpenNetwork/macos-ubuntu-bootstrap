@@ -320,13 +320,21 @@ rldyour::install_vendor_ai_clis() {
     rldyour::log "info" "[DRY-RUN] execute reviewed Anthropic native installer after SHA-256 verification"
     rldyour::log "info" "[DRY-RUN] execute reviewed xAI native installer after SHA-256 verification"
   else
-    local stage codex_tgz claude_script grok_script
+    local stage codex_tgz claude_script grok_script npm_bin
     stage="$(mktemp -d)" || return 1
     codex_tgz="$stage/codex.tgz"
     claude_script="$stage/claude-install.sh"
     grok_script="$stage/grok-install.sh"
     rldyour::download_verified_sha512_file "$RLDYOUR_CODEX_TARBALL" "$RLDYOUR_CODEX_SHA512" "$codex_tgz" || return 1
-    npm install --global --prefix "$HOME/.local/share/rldyour/npm" "$codex_tgz" || return 1
+    npm_bin="$(command -v npm 2>/dev/null || true)"
+    if [ -z "$npm_bin" ] && [ -x "$HOME/.local/share/rldyour/node/v24.18.0/bin/npm" ]; then
+      npm_bin="$HOME/.local/share/rldyour/node/v24.18.0/bin/npm"
+    fi
+    [ -n "$npm_bin" ] || {
+      rldyour::log "error" "npm is unavailable for the verified Codex package installation"
+      return 1
+    }
+    "$npm_bin" install --global --prefix "$HOME/.local/share/rldyour/npm" "$codex_tgz" || return 1
     mkdir -p "$HOME/.local/bin" || return 1
     ln -sfn "$HOME/.local/share/rldyour/npm/bin/codex" "$HOME/.local/bin/codex" || return 1
     rldyour::download_verified_file "$RLDYOUR_CLAUDE_INSTALLER_URL" "$RLDYOUR_CLAUDE_INSTALLER_SHA256" "$claude_script" || return 1

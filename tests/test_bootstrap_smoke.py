@@ -49,6 +49,12 @@ def test_unrestricted_launchers_use_vendor_flags() -> None:
     assert 'grok --permission-mode bypassPermissions --always-approve' in common
 
 
+def test_codex_install_uses_receipt_bound_ubuntu_npm_without_publishing_it() -> None:
+    common = (ROOT / "scripts/lib/common.sh").read_text()
+    assert '$HOME/.local/share/rldyour/node/v24.18.0/bin/npm' in common
+    assert '"$npm_bin" install --global' in common
+
+
 def test_ubuntu_profile_is_explicit() -> None:
     result = run("--platform", "ubuntu")
     assert result.returncode == 2

@@ -120,6 +120,12 @@ rldyour::ubuntu_verify::telegram_policy() {
       "$HOME/.local/share/dbus-1/services"/org.telegram.desktop._*.service; do
       [ ! -e "$candidate" ] && [ ! -L "$candidate" ] || return 1
     done
+    for candidate in "$HOME/.local/share/applications"/userapp-*.desktop; do
+      [ -e "$candidate" ] || [ -L "$candidate" ] || continue
+      if grep -Eq '^Exec=(.*/)?telegram-desktop( |$)' "$candidate" 2>/dev/null; then
+        return 1
+      fi
+    done
     if command -v xdg-mime >/dev/null 2>&1; then
       [ "$(xdg-mime query default x-scheme-handler/tg)" = "$desktop_id" ] || return 1
       [ "$(xdg-mime query default x-scheme-handler/tonsite)" = "$desktop_id" ] || return 1
@@ -179,7 +185,7 @@ if [ "$PROFILE" != "server" ]; then
   # Pinned source-analysis tools: the four CI-parity scanners, the Markdown
   # language server, the git pager that ensure_git_delta_config configures, and
   # the structured YAML/AST utilities.
-  for cmd in gitleaks osv-scanner actionlint hadolint markdown-oxide delta yq ast-grep; do
+  for cmd in gitleaks osv-scanner actionlint hadolint markdown-oxide delta yq ast-grep just age age-keygen; do
     rldyour::require_cmd "$cmd" required
   done
   # User-selected desktop tools (herdr, telegram). Installed by install_user_tools
@@ -187,11 +193,16 @@ if [ "$PROFILE" != "server" ]; then
   # failed install must not stay invisible.
   rldyour::require_cmd herdr required
   if [ "$GUI_ENABLED" -eq 1 ]; then
-    rldyour::require_cmd telegram-desktop required
-    rldyour::ubuntu_verify::telegram_policy || {
-      rldyour::log "missing" "Telegram updater isolation and XCB launcher contract"
-      exit 1
-    }
+    case "$(uname -m)" in
+      x86_64|amd64)
+        rldyour::require_cmd telegram-desktop required
+        rldyour::ubuntu_verify::telegram_policy || {
+          rldyour::log "missing" "Telegram updater isolation and XCB launcher contract"
+          exit 1
+        }
+        ;;
+      *) rldyour::log "info" "Telegram skipped: upstream publishes no $(uname -m) build" ;;
+    esac
   fi
   # cmake-language-server ships in PYTHON_SOURCE_TOOLS but was never verified,
   # so a failed install stayed invisible on Ubuntu while macOS gated on it.
@@ -240,6 +251,13 @@ if [ "$PROFILE" != "server" ]; then
   fi
   if [ "$GUI_ENABLED" -eq 1 ]; then
     command -v google-chrome-stable >/dev/null 2>&1 || { rldyour::log "missing" "Google Chrome stable"; exit 1; }
+    command -v rustdesk >/dev/null 2>&1 || { rldyour::log "missing" "RustDesk"; exit 1; }
+    chrome_source="$(grep -RslE 'dl.google.com/linux/chrome(/|-stable/)deb' /etc/apt/sources.list /etc/apt/sources.list.d 2>/dev/null || true)"
+    [ -n "$chrome_source" ] || { rldyour::log "missing" "Google Chrome apt source"; exit 1; }
+    chrome_fingerprints="$(gpg --show-keys --with-colons /etc/apt/keyrings/rldyour-google-chrome.asc 2>/dev/null | awk -F: '$1 == \"fpr\" { print $10 }')"
+    [ "$(printf '%s\n' "$chrome_fingerprints" | grep -Fxc 'EB4C1BFD4F042F6DDDCCEC917721F63BD38B4796')" -eq 1 ] || {
+      rldyour::log "missing" "verified Google Chrome signing key"; exit 1;
+    }
     if command -v firefox >/dev/null 2>&1 || { command -v snap >/dev/null 2>&1 && snap list firefox >/dev/null 2>&1; }; then
       rldyour::log "missing" "Firefox must be absent from the Ubuntu GUI profile"
       exit 1

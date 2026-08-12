@@ -83,6 +83,7 @@ APT_SOURCE_PACKAGES=(
   ca-certificates curl gpg gnupg git jq python3 python3-venv
   shellcheck shfmt clangd zsh unzip xz-utils wget zip lsb-release yamllint
   fd-find bat fzf zoxide tmux btop duf hexyl gh ripgrep httpie miller
+  wl-clipboard libsecret-tools
 )
 
 APT_DESKTOP_BUILD_PACKAGES=(build-essential)
@@ -122,8 +123,12 @@ PYTHON_SOURCE_TOOLS=(
   "semgrep==1.170.0"
 )
 
-# Source-analysis tools that macOS gets from Homebrew and Ubuntu has no
-# acceptable distribution package for. Each is a single upstream release
+# Pinned upstream CLI artifacts: the tools macOS gets from Homebrew for which
+# Ubuntu has no acceptable distribution package, either because none exists or
+# because the archive lags too far behind. "Too far behind" is a judgement each
+# row justifies in a comment, not a reflex — apt is preferred wherever its
+# version is acceptable, which is why ripgrep, fd-find, bat and fzf are apt
+# packages and not rows here. Each is a single upstream release
 # artifact with a tracked per-architecture SHA-256, installed into an owned
 # versioned directory with a runtime receipt — the same contract as Node, uv,
 # Bun, Go, and Rust. Adding a row here is the only way to add such a tool; there
@@ -161,6 +166,18 @@ PINNED_SOURCE_TOOLS=(
   # deprecation banner and exits non-zero, and on a host that has util-linux it
   # would shadow the setgid `sg`.
   "ast-grep;0.45.0;zip;ast-grep;ast-grep;ast-grep;78931ae35ebac33d9a72b3aecea3e3d62d6e5b0b718ac8bbedfbe69d68421e41;62b60892dafacfa76d6de87157659f880bbf85ff38bdab52db12f1f14ec60f94;https://github.com/ast-grep/ast-grep/releases/download/0.45.0/app-x86_64-unknown-linux-gnu.zip;https://github.com/ast-grep/ast-grep/releases/download/0.45.0/app-aarch64-unknown-linux-gnu.zip"
+  # Command runner used across the estate's repositories. Ubuntu 26.04 ships
+  # 1.45.0 against upstream 1.58.0; a justfile written against a newer feature
+  # would fail on the distribution build, so the recipe runner is pinned like
+  # every other tool whose exact behaviour a repository depends on. Both digests
+  # were confirmed by download and matched against upstream's SHA256SUMS.
+  "just;1.58.0;tar0;just;just;just;4a5cc2f53e6f0f8c59092a6cc38291eb729d46a7dd95d3ae582008881b84931d;748237128c4c40cbdabc65e841d05ceba13cc23a91eaba395495894c1d9764df;https://github.com/casey/just/releases/download/1.58.0/just-1.58.0-x86_64-unknown-linux-musl.tar.gz;https://github.com/casey/just/releases/download/1.58.0/just-1.58.0-aarch64-unknown-linux-musl.tar.gz"
+  # File encryption for estate secrets at rest. Ubuntu ships 1.2.1 against
+  # upstream 1.3.1; for a cryptographic tool the current release is the one to
+  # carry. The archive also contains age-inspect and age-plugin-batchpass, which
+  # are deliberately not published: only the two commands the estate uses are
+  # linked, so the managed PATH stays exactly what the contract declares.
+  "age;1.3.1;tar1;age,age-keygen;age,age-keygen;age,age-keygen;bdc69c09cbdd6cf8b1f333d372a1f58247b3a33146406333e30c0f26e8f51377;c6878a324421b69e3e20b00ba17c04bc5c6dab0030cfe55bf8f68fa8d9e9093a;https://github.com/FiloSottile/age/releases/download/v1.3.1/age-v1.3.1-linux-amd64.tar.gz;https://github.com/FiloSottile/age/releases/download/v1.3.1/age-v1.3.1-linux-arm64.tar.gz"
 )
 
 # User-selected CLI tools that are not language hosts, LSPs, or scanners but
@@ -178,14 +195,18 @@ USER_TOOLS=(
   # Telegram Desktop official portable build. Only Telegram/Telegram is
   # published. The binary also has an internal updater, disabled separately by
   # install_telegram_update_policy so it cannot mutate this receipt-bound tree.
-  # x86_64-only: Telegram does not publish an arm64 Linux portable build.
-  "telegram;7.0.7;tarx;Telegram/Telegram;Telegram/Telegram;telegram-desktop;45e4bdbe9bdbc800916b81147210f912f5c72f069fdec6f9b201fe305d0d2d9c;45e4bdbe9bdbc800916b81147210f912f5c72f069fdec6f9b201fe305d0d2d9c;https://td.telegram.org/tlinux/tsetup.7.0.7.tar.xz;https://td.telegram.org/tlinux/tsetup.7.0.7.tar.xz"
+  # x86_64 only: Telegram publishes no arm64 Linux portable build, so the arm64
+  # digest and URL are deliberately empty and the row is skipped there. They
+  # used to hold the x86_64 values, which meant an arm64 desktop verified the
+  # SHA-256 of an executable it could not run.
+  "telegram;7.0.7;tarx;Telegram/Telegram;Telegram/Telegram;telegram-desktop;45e4bdbe9bdbc800916b81147210f912f5c72f069fdec6f9b201fe305d0d2d9c;;https://td.telegram.org/tlinux/tsetup.7.0.7.tar.xz;"
 )
 
 # Telegram v7.0.7 commit ee93b401 installs these four files from
 # InstallLauncher(). Our externalupdater.d policy intentionally makes that
 # function return before it writes anything, so bootstrap must publish the
-# exact upstream assets itself. Rows are source_url;sha256;XDG_DATA_HOME path.
+# exact upstream assets itself. Rows are source_url;sha256;path under
+# ~/.local/share, which is the location the contract declares.
 TELEGRAM_DESKTOP_ASSETS=(
   "https://raw.githubusercontent.com/telegramdesktop/tdesktop/ee93b401ced86ece3f2582fc2ca4da72dfc4f06a/Telegram/Resources/art/logo_256.png;3fb1400c7dc9bbc3b5cb3ffedcbf4a9b09c53e28b57a7ff33a8a6b9048864090;icons/hicolor/256x256/apps/org.telegram.desktop.png"
   "https://raw.githubusercontent.com/telegramdesktop/tdesktop/ee93b401ced86ece3f2582fc2ca4da72dfc4f06a/Telegram/Resources/icons/tray_monochrome.svg;a93380f2c7e6aae4d5fde8940020bd966e97ad8c4880f45c016edfef3f5193e1;icons/hicolor/symbolic/apps/org.telegram.desktop-symbolic.svg"
@@ -351,7 +372,7 @@ rldyour::ubuntu::install_telegram_update_policy() {
   [ "$GUI_ENABLED" -eq 1 ] || return 0
   local launcher="$HOME/.local/bin/telegram-desktop"
   local namespace="$HOME/.local/share/rldyour/telegram"
-  local policy_dir="${XDG_DATA_HOME:-$HOME/.local/share}/TelegramDesktop/externalupdater.d"
+  local policy_dir="$HOME/.local/share/TelegramDesktop/externalupdater.d"
   local policy="$policy_dir/macos-ubuntu-bootstrap"
   local marker="# Managed by macos-ubuntu-bootstrap: telegram-external-updater-v1"
   local resolved tmp
@@ -415,7 +436,7 @@ rldyour::ubuntu::install_telegram_update_policy() {
 rldyour::ubuntu::install_telegram_desktop_assets() {
   [ "$GUI_ENABLED" -eq 1 ] || return 0
 
-  local data_home="${XDG_DATA_HOME:-$HOME/.local/share}"
+  local data_home="$HOME/.local/share"
   local icons_root="$data_home/icons/hicolor"
   local row url expected relative target parent actual tmp
 
@@ -547,7 +568,7 @@ install_desktop_entries() {
 # disabled. Retire only our marker-owned legacy entry so the desktop file ID,
 # running App ID, icon identity, MIME handlers, and GNOME favorite all agree.
 rldyour::ubuntu::retire_telegram_legacy_managed_entry() {
-  local data_home="${XDG_DATA_HOME:-$HOME/.local/share}"
+  local data_home="$HOME/.local/share"
   local legacy="$data_home/applications/telegram.desktop"
   local marker backup_root backup_dir
 
@@ -646,6 +667,119 @@ rldyour::ubuntu::retire_telegram_generated_integrations() {
   rldyour::log "ok" "retired generated Telegram integrations; backup: ${backup_dir}"
 }
 
+# Rewrite mimeapps.list, dropping only [Added Associations] lines whose
+# every handler was just retired. Kept as a named program so the shell
+# function below stays readable.
+RLDYOUR_PRUNE_ADDED_ASSOCIATIONS='import pathlib
+import sys
+
+source = pathlib.Path(sys.argv[1])
+# Only the retired launchers, never the mimeapps.list backup that sits
+# beside them in the same directory.
+retired = {
+    path.name
+    for path in pathlib.Path(sys.argv[2]).iterdir()
+    if path.name.endswith('\''.desktop'\'')
+}
+section = ""
+for line in source.read_text(encoding='\''utf-8'\'').splitlines(keepends=True):
+    stripped = line.strip()
+    if stripped.startswith('\''['\'') and stripped.endswith('\'']'\''):
+        section = stripped
+    elif section == '\''[Added Associations]'\'' and '\''='\'' in stripped:
+        key, _, value = stripped.partition('\''='\'')
+        handlers = [h for h in value.split('\'';'\'') if h]
+        survivors = [h for h in handlers if h not in retired]
+        if handlers and not survivors:
+            continue  # every handler on this line was retired
+        if survivors != handlers:
+            # Keep the association, drop only the dead references. Removing
+            # the whole line would unregister a handler we never touched.
+            line = key + '\''='\'' + '\'';'\''.join(survivors) + '\'';\n'\''
+    sys.stdout.write(line)'
+
+# GIO writes userapp-<Name>-<6 chars>.desktop whenever something picks a custom
+# application for a scheme, and registers it under [Added Associations] in
+# mimeapps.list. Those entries invoke the launcher directly -- `telegram-desktop
+# -- %u` -- WITHOUT the `env QT_QPA_PLATFORM=xcb` wrapper the managed v3 entry
+# exists for. They do not shadow the default handler, so the common path stays
+# correct, but an application chooser, an enumerating caller, or a later default
+# reset can still start Telegram in the Wayland mode that fails with
+# EGL_BAD_MATCH on the estate's NVIDIA workstation. Retire only entries whose
+# Exec is bound to the managed launcher; anything else is preserved.
+rldyour::ubuntu::retire_telegram_userapp_entries() {
+  local launcher="$HOME/.local/bin/telegram-desktop" resolved candidate name
+  local applications="$HOME/.local/share/applications"
+  local mimeapps="${XDG_CONFIG_HOME:-$HOME/.config}/mimeapps.list"
+  local backup_root backup_dir tmp
+  local -a candidates=() retired=()
+
+  for candidate in "$applications"/userapp-*.desktop; do
+    [ -e "$candidate" ] || [ -L "$candidate" ] || continue
+    candidates+=("$candidate")
+  done
+  [ "${#candidates[@]}" -gt 0 ] || return 0
+
+  if [ ! -L "$launcher" ] || [ ! -x "$launcher" ]; then
+    rldyour::log "error" "managed Telegram launcher is unavailable during userapp migration"
+    return 1
+  fi
+  resolved="$(readlink -f -- "$launcher")" || return 1
+
+  for candidate in "${candidates[@]}"; do
+    name="$(basename "$candidate")"
+    # Not ours: a userapp entry for another application must survive intact.
+    if ! grep -Eq "^Exec=(${launcher}|${resolved}|telegram-desktop)( |$)" "$candidate" 2>/dev/null; then
+      continue
+    fi
+    if [ -L "$candidate" ] || [ ! -f "$candidate" ]; then
+      rldyour::log "error" "Telegram userapp entry is unsafe; preserved: ${candidate}"
+      return 1
+    fi
+    # Exact GIO shape. A hand-written file that merely looks similar is
+    # preserved rather than retired.
+    if [[ ! "$name" =~ ^userapp-.+-[A-Za-z0-9]{6}\.desktop$ ]] ||
+      ! grep -Fxq 'NoDisplay=true' "$candidate" ||
+      ! grep -Fxq 'Comment=Custom definition for Telegram Desktop' "$candidate"; then
+      rldyour::log "error" "Telegram userapp entry diverged from the generated shape; preserved: ${candidate}"
+      return 1
+    fi
+    retired+=("$candidate")
+  done
+  [ "${#retired[@]}" -gt 0 ] || return 0
+
+  if [ "$RLDYOUR_DRY_RUN" -eq 1 ]; then
+    rldyour::log "info" "[DRY-RUN] retire ${#retired[@]} generated Telegram userapp launcher(s) and their added associations"
+    return 0
+  fi
+
+  backup_root="$HOME/.local/share/rldyour/backups/telegram-integrations"
+  mkdir -p "$backup_root" || return 1
+  chmod 0700 "$backup_root" || return 1
+  backup_dir="$(mktemp -d "$backup_root/userapp.XXXXXX")" || return 1
+  for candidate in "${retired[@]}"; do
+    mv "$candidate" "$backup_dir/$(basename "$candidate")" || return 1
+  done
+
+  # Drop the now-dangling [Added Associations] lines that name exactly the
+  # files just retired. Every other line, section and ordering is preserved
+  # byte for byte: this file is owner-owned and only its dead references are
+  # ours to remove.
+  if [ -f "$mimeapps" ] && [ ! -L "$mimeapps" ]; then
+    cp -p "$mimeapps" "$backup_dir/mimeapps.list" || return 1
+    tmp="$(mktemp "${mimeapps}.tmp.XXXXXX")" || return 1
+    if ! python3 -c "$RLDYOUR_PRUNE_ADDED_ASSOCIATIONS" "$mimeapps" "$backup_dir" >"$tmp"; then
+      rm -f "$tmp"
+      rldyour::log "error" "could not rewrite ${mimeapps}; retired files are in ${backup_dir}"
+      return 1
+    fi
+    chmod --reference="$mimeapps" "$tmp" 2>/dev/null || chmod 0644 "$tmp"
+    mv -f "$tmp" "$mimeapps" || { rm -f "$tmp"; return 1; }
+  fi
+
+  rldyour::log "ok" "retired ${#retired[@]} generated Telegram userapp launcher(s); backup: ${backup_dir}"
+}
+
 # Make every normal desktop launch resolve to the managed Telegram entry. Only
 # an existing Telegram favorite is migrated; the bootstrap never adds a new
 # favorite or rewrites unrelated GNOME ordering.
@@ -718,6 +852,15 @@ ensure_pinned_source_tool() {
     aarch64|arm64) sha="$sha_arm64"; url="$url_arm64"; members="$members_arm64" ;;
     *) rldyour::log "error" "$name $version has no tracked artifact for $(uname -m)"; return 1 ;;
   esac
+  # An empty pair is a deliberate declaration that upstream publishes nothing
+  # for this architecture. Telegram is the only such row: it ships an x86_64
+  # portable build only, and the fields used to be filled with the x86_64 URL
+  # and digest -- so an arm64 desktop verified its SHA-256 happily and then
+  # installed a binary it cannot execute.
+  if [ -z "$url" ] || [ -z "$sha" ]; then
+    rldyour::log "info" "$name $version: upstream publishes no $(uname -m) build; skipped"
+    return 0
+  fi
 
   local destination parent
   destination="$HOME/.local/share/rldyour/$name/$version"
@@ -1403,6 +1546,11 @@ install_bun_lsps() {
 
 install_ai_runtimes() { rldyour::install_vendor_ai_clis; }
 
+# Set by install_gui_apps when a required desktop step failed. Reported at the
+# end of main so a cosmetic-looking layer cannot strand the layers behind it,
+# and cannot report success either.
+GUI_LAYER_FAILED=0
+
 install_gui_apps() {
   if [ "$PROFILE" = "server" ] || [ "$GUI_ENABLED" -ne 1 ]; then
     rldyour::log "info" "GUI application layer disabled"
@@ -1415,7 +1563,14 @@ install_gui_apps() {
   local desktop_script
   desktop_script="$(dirname "${BASH_SOURCE[0]}")/desktop.sh"
   if [ -f "$desktop_script" ]; then
-    rldyour::run bash "$desktop_script" || rldyour::log "warn" "desktop customization reported issues (non-fatal)"
+    # desktop.sh now distinguishes a cosmetic step from a required one and
+    # returns non-zero only for the latter. Swallowing that into a warning is
+    # what let a desktop missing required applications, or still carrying Firefox, report a
+    # successful apply and then pass strict verification.
+    if ! rldyour::run bash "$desktop_script"; then
+      GUI_LAYER_FAILED=1
+      rldyour::log "error" "desktop customization failed a required step"
+    fi
   fi
 }
 
@@ -1508,17 +1663,22 @@ main() {
   if ! install_user_tools; then
     user_tools_failed=1
   fi
-  if [ "$PROFILE" != "server" ]; then
-    rldyour::ubuntu::install_telegram_update_policy
-    rldyour::ubuntu::install_telegram_desktop_assets
+  if [ "$GUI_ENABLED" -eq 1 ]; then
     install_desktop_entries
-    # GNOME drops a favorite as soon as its desktop file disappears. Migrate
-    # the favorite while every recognized old ID still resolves, then retire
-    # the legacy/generated files and refresh the desktop database once more.
-    rldyour::ubuntu::configure_telegram_desktop_integration
-    rldyour::ubuntu::retire_telegram_legacy_managed_entry
-    rldyour::ubuntu::retire_telegram_generated_integrations
-    rldyour::ubuntu::configure_telegram_desktop_integration
+    case "$(uname -m)" in
+      x86_64|amd64)
+        rldyour::ubuntu::install_telegram_update_policy
+        rldyour::ubuntu::install_telegram_desktop_assets
+        # Migrate the favorite before retiring legacy/generated launchers.
+        rldyour::ubuntu::configure_telegram_desktop_integration
+        rldyour::ubuntu::retire_telegram_legacy_managed_entry
+        rldyour::ubuntu::retire_telegram_generated_integrations
+        rldyour::ubuntu::retire_telegram_userapp_entries
+        rldyour::ubuntu::configure_telegram_desktop_integration
+        ;;
+    esac
+  else
+    rldyour::log "info" "desktop entries skipped: gui disabled"
   fi
   if [ "$user_tools_failed" -ne 0 ]; then
     rldyour::log "error" "one or more user tools remain unmanaged or divergent; all repairs were attempted"
@@ -1537,6 +1697,10 @@ main() {
   # verify.sh requires. Ordering it last keeps the failure fatal, which it must be,
   # while making it fatal to itself instead of to the whole device.
   [ "$SKIP_AI" -eq 1 ] || install_ai_runtimes
+  if [ "$GUI_LAYER_FAILED" -ne 0 ]; then
+    rldyour::log "error" "desktop customization failed a required step; every other layer was still attempted"
+    return 1
+  fi
   verify_apply
   rldyour::log "info" "Run 'bash scripts/auth-handoff.sh' for user-controlled sign-in steps."
 }

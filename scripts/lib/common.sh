@@ -163,8 +163,19 @@ rldyour::require_cmd_min_version() {
   local actual_version
   actual_version=$("$command_name" "$version_cmd" 2>/dev/null | head -n 1 | sed 's/^v//; s/^[^0-9]*//')
   if [ -z "$actual_version" ]; then
-    rldyour::log "warn" "could not detect version for $command_name; skipping numeric check"
-    return 0
+    # Some tools report their version on stderr. The Ubuntu Dart path reads both
+    # streams for exactly that reason; this one discarded stderr and then passed
+    # the check anyway, so a Dart that only answers on stderr satisfied a
+    # minimum-version gate without its version ever being compared.
+    actual_version=$("$command_name" "$version_cmd" 2>&1 | head -n 1 | sed 's/^v//; s/^[^0-9]*//')
+  fi
+  if [ -z "$actual_version" ]; then
+    # Fail closed. A verifier that cannot read a version has not verified it,
+    # and every equivalent Ubuntu check is an exact comparison that exits
+    # non-zero here. "Skipping the numeric check" made the macOS gate weaker
+    # than the Ubuntu one for the same invariant.
+    rldyour::log "missing" "could not detect version for $command_name (expected >= $min_version)"
+    return 1
   fi
 
   local normalized_actual

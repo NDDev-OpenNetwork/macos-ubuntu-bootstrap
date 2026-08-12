@@ -525,27 +525,6 @@ def test_metadata_only_cli(tmp_path: Path) -> None:
     assert _run_cli("metadata-only", "--receipt", str(receipt)) == 0
 
 
-def test_is_our_receipt_accepts_valid_receipt(tmp_path: Path) -> None:
-    """_is_our_receipt must recognize our schema/owner."""
-    receipt = tmp_path / "ours.json"
-    assert _run_cli("build", "--output", str(receipt)) == 0
-    assert di._is_our_receipt(receipt) is True
-
-
-def test_is_our_receipt_rejects_foreign_json(tmp_path: Path) -> None:
-    """_is_our_receipt must reject a JSON file with wrong schema/owner."""
-    foreign = tmp_path / "foreign.json"
-    foreign.write_text(json.dumps({"schema": "something-else", "owner": "no-one"}))
-    assert di._is_our_receipt(foreign) is False
-
-
-def test_is_our_receipt_rejects_invalid_json(tmp_path: Path) -> None:
-    """_is_our_receipt must return False for unparseable JSON."""
-    garbage = tmp_path / "garbage.json"
-    garbage.write_text("not json at all")
-    assert di._is_our_receipt(garbage) is False
-
-
 def test_build_overwrites_existing_our_receipt_with_backup(tmp_path: Path) -> None:
     """build must back up an existing our-receipt before rewriting."""
     receipt = tmp_path / "rebuild.json"
@@ -561,6 +540,128 @@ def test_build_refuses_unmanaged_receipt(tmp_path: Path) -> None:
     foreign.write_text(json.dumps({"unrelated": "data"}))
     rc = _run_cli("build", "--output", str(foreign))
     assert rc != 0
+
+
+# ------------------- receipt replacement is a transaction -------------------
+#
+# Ownership used to be decided by schema+owner alone, and the active receipt was
+# renamed to .bak *before* state collection. Both halves are tested here: an
+# owned-but-unverifiable receipt must not be silently consumed, and no failure
+# may leave the device without an active receipt.
+
+
+def _valid_receipt(tmp_path: Path, name: str = "device.json") -> Path:
+    receipt = tmp_path / name
+    assert _run_cli("build", "--output", str(receipt)) == 0
+    return receipt
+
+
+def test_build_refuses_an_owned_receipt_whose_payload_was_edited(tmp_path: Path) -> None:
+    """Correct schema and owner, wrong digest: evidence, not a stale file."""
+    receipt = _valid_receipt(tmp_path)
+    data = json.loads(receipt.read_text(encoding="utf-8"))
+    data["home"] = "/tmp/somewhere-else"  # digest no longer matches the payload
+    receipt.write_bytes(di.canonical_bytes(data))
+    before = receipt.read_bytes()
+
+    assert _run_cli("build", "--output", str(receipt)) != 0
+    assert receipt.read_bytes() == before, "the tampered receipt must be preserved"
+
+
+def test_build_refuses_a_noncanonical_owned_receipt(tmp_path: Path) -> None:
+    receipt = _valid_receipt(tmp_path)
+    data = json.loads(receipt.read_text(encoding="utf-8"))
+    receipt.write_text(json.dumps(data, indent=2), encoding="utf-8")  # not canonical
+    before = receipt.read_bytes()
+
+    assert _run_cli("build", "--output", str(receipt)) != 0
+    assert receipt.read_bytes() == before
+
+
+def test_build_refuses_a_symlinked_receipt(tmp_path: Path) -> None:
+    real = _valid_receipt(tmp_path, "real.json")
+    link = tmp_path / "link.json"
+    link.symlink_to(real)
+    before = real.read_bytes()
+
+    assert _run_cli("build", "--output", str(link)) != 0
+    assert link.is_symlink(), "the symlink itself must be left in place"
+    assert real.read_bytes() == before
+
+
+def test_build_refuses_a_group_writable_receipt(tmp_path: Path) -> None:
+    receipt = _valid_receipt(tmp_path)
+    receipt.chmod(0o664)
+    before = receipt.read_bytes()
+
+    assert _run_cli("build", "--output", str(receipt)) != 0
+    assert receipt.read_bytes() == before
+
+
+def test_collection_failure_leaves_the_active_receipt_intact(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The previous order renamed the receipt away before collecting state."""
+    receipt = _valid_receipt(tmp_path)
+    before = receipt.read_bytes()
+
+    def exploding_collect(**_: object) -> dict[str, object]:
+        raise di.IntegrityError("collection failed")
+
+    monkeypatch.setattr(di, "collect_state", exploding_collect)
+    assert _run_cli("build", "--output", str(receipt)) != 0
+
+    assert receipt.exists(), "the last valid receipt must still be the active one"
+    assert receipt.read_bytes() == before
+
+
+def test_publication_failure_leaves_the_active_receipt_intact(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    receipt = _valid_receipt(tmp_path)
+    before = receipt.read_bytes()
+
+    real_replace = os.replace
+
+    def exploding_replace(src: object, dst: object) -> None:
+        raise OSError("simulated rename failure")
+
+    monkeypatch.setattr(di.os, "replace", exploding_replace)
+    with pytest.raises(OSError):
+        _run_cli("build", "--output", str(receipt))
+    monkeypatch.setattr(di.os, "replace", real_replace)
+
+    assert receipt.read_bytes() == before
+    leftovers = [p.name for p in tmp_path.iterdir() if p.name.endswith(".tmp")]
+    assert leftovers == [], f"temporary files were left behind: {leftovers}"
+
+
+def test_replace_invalid_retains_the_rejected_copy(tmp_path: Path) -> None:
+    """The escape hatch must preserve the unverifiable receipt as evidence."""
+    receipt = _valid_receipt(tmp_path)
+    data = json.loads(receipt.read_text(encoding="utf-8"))
+    data["home"] = "/tmp/somewhere-else"
+    receipt.write_bytes(di.canonical_bytes(data))
+    tampered = receipt.read_bytes()
+
+    assert _run_cli("build", "--output", str(receipt), "--replace-invalid") == 0
+
+    rejected = tmp_path / f"{receipt.name}.rejected.1"
+    assert rejected.exists()
+    assert rejected.read_bytes() == tampered
+    di.load_receipt(receipt, metadata_only=True)  # the new one must be valid
+
+
+def test_write_file_atomically_is_private_and_durable(tmp_path: Path) -> None:
+    target = tmp_path / "sub" / "payload.bin"
+    target.parent.mkdir()
+    di.write_file_atomically(target, b"first\n")
+    assert target.read_bytes() == b"first\n"
+    assert stat.S_IMODE(target.stat().st_mode) == 0o600
+
+    di.write_file_atomically(target, b"second\n")
+    assert target.read_bytes() == b"second\n"
+    assert [p.name for p in target.parent.iterdir()] == ["payload.bin"]
 
 
 

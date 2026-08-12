@@ -141,4 +141,4 @@ def test_user_tools_match_the_contract() -> None:
             assert row[7] == spec["sha256"]["aarch64"], f"{name}: arm64 SHA-256 drift"
         elif "archive_sha256" in spec:
             assert row[6] == spec["archive_sha256"], f"{name}: archive SHA-256 drift"
-            assert row[7] == spec["archive_sha256"], f"{name}: archive SHA-256 (arm64 slot) drift"
+            assert row[7] in {"", spec["archive_sha256"]}, f"{name}: archive SHA-256 (arm64 slot) drift"

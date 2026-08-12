@@ -206,6 +206,20 @@
           "arm64": "42600522e7455282e11c71c9fc62dc8e98b05bcdb830210fe16eb673a871e866"
         }
       },
+      "just": {
+        "version": "1.58.0",
+        "sha256": {
+          "x64": "4a5cc2f53e6f0f8c59092a6cc38291eb729d46a7dd95d3ae582008881b84931d",
+          "arm64": "748237128c4c40cbdabc65e841d05ceba13cc23a91eaba395495894c1d9764df"
+        }
+      },
+      "age": {
+        "version": "1.3.1",
+        "sha256": {
+          "x64": "bdc69c09cbdd6cf8b1f333d372a1f58247b3a33146406333e30c0f26e8f51377",
+          "arm64": "c6878a324421b69e3e20b00ba17c04bc5c6dab0030cfe55bf8f68fa8d9e9093a"
+        }
+      },
       "ast-grep": {
         "version": "0.45.0",
         "sha256": {
@@ -270,7 +284,10 @@
       "install_method": "tarball",
       "url": "https://td.telegram.org/tlinux/tsetup.7.0.7.tar.xz",
       "archive_sha256": "45e4bdbe9bdbc800916b81147210f912f5c72f069fdec6f9b201fe305d0d2d9c",
-      "archive_kind": "tar0",
+      "architectures": [
+        "x86_64"
+      ],
+      "archive_kind": "tarx",
       "archive_members": [
         "Telegram/Telegram"
       ],
@@ -378,14 +395,43 @@
       "ripgrep",
       "httpie",
       "miller",
-      "software-properties-common"
+      "software-properties-common",
+      "wl-clipboard",
+      "libsecret-tools"
     ],
     "desktop_build": [
       "build-essential"
     ],
     "desktop_apps": [
-      "deskflow",
-      "happ"
+      {
+        "name": "google-chrome-stable",
+        "version_policy": "tracks-stable-channel",
+        "apt_source": {
+          "uri": "https://dl.google.com/linux/chrome/deb/",
+          "suites": "stable",
+          "components": "main",
+          "architectures": "amd64",
+          "key_url": "https://dl.google.com/linux/linux_signing_key.pub",
+          "key_fingerprint": "EB4C1BFD4F042F6DDDCCEC917721F63BD38B4796",
+          "managed_keyring": "/etc/apt/keyrings/rldyour-google-chrome.asc",
+          "managed_source": "/etc/apt/sources.list.d/rldyour-google-chrome.sources",
+          "vendor_repo_add_once": "false",
+          "vendor_source_policy": "preserve-when-key-verifies"
+        }
+      },
+      {
+        "name": "rustdesk",
+        "requirement": "required",
+        "version": "1.4.9",
+        "sha256": {
+          "x64": "7244ba47c40e804172044bfbe659467c54ce46554c98e78c8c0406f1d612fda3",
+          "arm64": "ce62c996f14d33f3bbe3a330e953644a44bace7f05885a7953f7395d69fb49c0"
+        },
+        "url": {
+          "x64": "https://github.com/rustdesk/rustdesk/releases/download/1.4.9/rustdesk-1.4.9-x86_64.deb",
+          "arm64": "https://github.com/rustdesk/rustdesk/releases/download/1.4.9/rustdesk-1.4.9-aarch64.deb"
+        }
+      }
     ],
     "profiles": {
       "desktop": [

@@ -177,7 +177,7 @@ def test_desktop_builds_gets_compiled_hosts_and_user_tools() -> None:
     assert "Ensure Go" in output
     assert "Ensure Rust" in output
     assert "managed herdr" in output
-    assert "managed telegram" in output
+    assert "managed telegram" in output or "upstream publishes no arm64 build" in output
 
 
 

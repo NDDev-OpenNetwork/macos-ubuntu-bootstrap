@@ -90,7 +90,6 @@ container_exec_dev() {
     --env HOME=/home/dev \
     --env USER=dev \
     --env LOGNAME=dev \
-    --env RLDYOUR_SET_LOGIN_SHELL=1 \
     "$CONTAINER_NAME" bash -lc "$1"
 }
 
@@ -101,7 +100,7 @@ start_systemd_container() {
 FROM ubuntu:24.04
 ENV DEBIAN_FRONTEND=noninteractive
 RUN apt-get update \
- && apt-get install -y --no-install-recommends ca-certificates curl dbus-user-session sudo systemd systemd-sysv \
+ && apt-get install -y --no-install-recommends ca-certificates curl dbus-user-session openssh-client sudo systemd systemd-sysv \
  && apt-get clean \
  && rm -rf /var/lib/apt/lists/* \
  && useradd -m -s /bin/bash dev \
@@ -117,8 +116,19 @@ DOCKERFILE
     --volume "$REPO_ROOT:/repo:ro" \
     "$image"
   trap 'docker rm --force "$CONTAINER_NAME" >/dev/null 2>&1 || true' EXIT
-  docker exec "$CONTAINER_NAME" systemctl is-system-running --wait || \
-    docker exec "$CONTAINER_NAME" systemctl --failed
+  local ready=0
+  for _ in {1..30}; do
+    if docker exec "$CONTAINER_NAME" systemctl is-system-running --quiet 2>/dev/null; then
+      ready=1
+      break
+    fi
+    sleep 1
+  done
+  [ "$ready" -eq 1 ] || {
+    docker logs "$CONTAINER_NAME"
+    docker exec "$CONTAINER_NAME" systemctl --failed || true
+    return 1
+  }
 }
 
 run_sandbox_profile() {

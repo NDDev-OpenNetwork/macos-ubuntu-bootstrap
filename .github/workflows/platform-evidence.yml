@@ -51,7 +51,7 @@ jobs:
           name: platform-${{ matrix.lane }}-${{ github.run_attempt }}
           path: ${{ runner.temp }}/evidence
           if-no-files-found: error
-          retention-days: 30
+          retention-days: 1
 
   ubuntu-native:
     if: github.event_name == 'workflow_dispatch' || github.event.pull_request.head.repo.full_name == github.repository
@@ -88,7 +88,7 @@ jobs:
           name: platform-${{ matrix.runner }}-${{ matrix.lane }}-${{ github.run_attempt }}
           path: ${{ runner.temp }}/evidence
           if-no-files-found: error
-          retention-days: 30
+          retention-days: 1
 
   ubuntu-systemd-sandbox:
     if: github.event_name == 'workflow_dispatch' || github.event.pull_request.head.repo.full_name == github.repository
@@ -128,7 +128,7 @@ jobs:
           name: platform-${{ matrix.runner }}-${{ matrix.lane }}-${{ github.run_attempt }}
           path: ${{ runner.temp }}/evidence
           if-no-files-found: error
-          retention-days: 30
+          retention-days: 1
 
   ubuntu-safeguards:
     if: github.event_name == 'workflow_dispatch' || github.event.pull_request.head.repo.full_name == github.repository
@@ -155,7 +155,7 @@ jobs:
           name: platform-ubuntu-24.04-server-safeguards-${{ github.run_attempt }}
           path: ${{ runner.temp }}/evidence
           if-no-files-found: error
-          retention-days: 30
+          retention-days: 1
 
   evidence-gate:
     if: always()

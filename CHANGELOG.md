@@ -1,5 +1,17 @@
 # Changelog
 
+## 3.0.1 - 2026-08-13
+
+### Fixed
+
+- Updated Herdr to the current stable `0.8.0` GitHub release, retained verified
+  Linux x86_64/aarch64 artifacts, and added the missing macOS verification gate.
+- Updated Telegram Desktop to the official `7.0.9` GitHub release and pinned
+  its Linux x86_64 archive and source assets to tag commit `a1e89e1f`.
+- Made the contract explicit that Herdr is present on macOS and every Ubuntu
+  profile while Telegram remains GUI-only; upstream publishes no Linux ARM64
+  Telegram binary.
+
 ## 3.0.0 - 2026-08-13
 
 ### Changed

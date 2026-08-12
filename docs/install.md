@@ -20,10 +20,19 @@ through verified downloads. `cx`, `cl`, and `gk` launch them without approval or
 permission prompts. Authentication is performed afterward with
 `scripts/auth-handoff.sh` and is never automated by bootstrap.
 
+Herdr is a required terminal tool on macOS and every Ubuntu profile. macOS uses
+the official Homebrew formula; Ubuntu installs the pinned x86_64/aarch64 binary
+from the `herdrdev/herdr` GitHub release and verifies its runtime receipt.
+
 GUI profiles install current Google Chrome stable. macOS also installs the
 desktop applications listed in the contract. Ubuntu GUI installs RustDesk and
 Telegram, configures GNOME, and removes Firefox. `--no-gui` retains command-line
 tools, Herdr, language servers, and source checks.
+
+Ubuntu Telegram Desktop is pinned to the official `telegramdesktop/tdesktop`
+GitHub Linux tarball. That upstream release currently provides Linux x86_64 but
+not Linux ARM64, so ARM64 GUI plans fail closed by skipping Telegram rather
+than executing a Windows ARM64 or foreign-architecture artifact.
 
 Server hardening is explicit:
 

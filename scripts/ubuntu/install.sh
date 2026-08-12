@@ -191,7 +191,7 @@ PINNED_SOURCE_TOOLS=(
 # the bootstrap pins the version here so a fresh device is reproducible without
 # trusting the live manifest at install time.
 USER_TOOLS=(
-  "herdr;0.7.5;raw;herdr;herdr;herdr;3dc83288073e4c2d3c679a30e7be97bcca9141c6fd17dbbb9219142e95c59253;32e763a1499a6b694b1d708e4f062b743be1da9f34fcfa4d212d6db6fe09a8b9;https://github.com/herdrdev/herdr/releases/download/v0.7.5/herdr-linux-x86_64;https://github.com/herdrdev/herdr/releases/download/v0.7.5/herdr-linux-aarch64"
+  "herdr;0.8.0;raw;herdr;herdr;herdr;b872ea7e40fa2cb17e857ac9b62b1bf26db7b403c622f5d2f3f5b35f6e9acd28;f647ac66468d9efbc642fe534fb284468f0aea60641606fc008dfc0d82a3ca87;https://github.com/herdrdev/herdr/releases/download/v0.8.0/herdr-linux-x86_64;https://github.com/herdrdev/herdr/releases/download/v0.8.0/herdr-linux-aarch64"
   # Telegram Desktop official portable build. Only Telegram/Telegram is
   # published. The binary also has an internal updater, disabled separately by
   # install_telegram_update_policy so it cannot mutate this receipt-bound tree.
@@ -199,19 +199,19 @@ USER_TOOLS=(
   # digest and URL are deliberately empty and the row is skipped there. They
   # used to hold the x86_64 values, which meant an arm64 desktop verified the
   # SHA-256 of an executable it could not run.
-  "telegram;7.0.7;tarx;Telegram/Telegram;Telegram/Telegram;telegram-desktop;45e4bdbe9bdbc800916b81147210f912f5c72f069fdec6f9b201fe305d0d2d9c;;https://td.telegram.org/tlinux/tsetup.7.0.7.tar.xz;"
+  "telegram;7.0.9;tarx;Telegram/Telegram;Telegram/Telegram;telegram-desktop;d3c05df0259ab116d11d8c1cdc1403019d2a3be303ad3b46d16a84e19df6615f;;https://github.com/telegramdesktop/tdesktop/releases/download/v7.0.9/tsetup.7.0.9.tar.xz;"
 )
 
-# Telegram v7.0.7 commit ee93b401 installs these four files from
+# Telegram v7.0.9 commit a1e89e1f installs these four files from
 # InstallLauncher(). Our externalupdater.d policy intentionally makes that
 # function return before it writes anything, so bootstrap must publish the
 # exact upstream assets itself. Rows are source_url;sha256;path under
 # ~/.local/share, which is the location the contract declares.
 TELEGRAM_DESKTOP_ASSETS=(
-  "https://raw.githubusercontent.com/telegramdesktop/tdesktop/ee93b401ced86ece3f2582fc2ca4da72dfc4f06a/Telegram/Resources/art/logo_256.png;3fb1400c7dc9bbc3b5cb3ffedcbf4a9b09c53e28b57a7ff33a8a6b9048864090;icons/hicolor/256x256/apps/org.telegram.desktop.png"
-  "https://raw.githubusercontent.com/telegramdesktop/tdesktop/ee93b401ced86ece3f2582fc2ca4da72dfc4f06a/Telegram/Resources/icons/tray_monochrome.svg;a93380f2c7e6aae4d5fde8940020bd966e97ad8c4880f45c016edfef3f5193e1;icons/hicolor/symbolic/apps/org.telegram.desktop-symbolic.svg"
-  "https://raw.githubusercontent.com/telegramdesktop/tdesktop/ee93b401ced86ece3f2582fc2ca4da72dfc4f06a/Telegram/Resources/icons/tray_monochrome_attention.svg;2b67ee19839dbbb9f57f2d7433fd6dc1059634d6d081c5e4c422c14f53fcfcc7;icons/hicolor/symbolic/apps/org.telegram.desktop-attention-symbolic.svg"
-  "https://raw.githubusercontent.com/telegramdesktop/tdesktop/ee93b401ced86ece3f2582fc2ca4da72dfc4f06a/Telegram/Resources/icons/tray_monochrome_mute.svg;efa1439bd60b58db7b755f5d21be854ea686a0e1e2f1aa6e43bf35c083ee72fc;icons/hicolor/symbolic/apps/org.telegram.desktop-mute-symbolic.svg"
+  "https://raw.githubusercontent.com/telegramdesktop/tdesktop/a1e89e1f64f08cb058caf1c61ff43f319f98a6ec/Telegram/Resources/art/logo_256.png;3fb1400c7dc9bbc3b5cb3ffedcbf4a9b09c53e28b57a7ff33a8a6b9048864090;icons/hicolor/256x256/apps/org.telegram.desktop.png"
+  "https://raw.githubusercontent.com/telegramdesktop/tdesktop/a1e89e1f64f08cb058caf1c61ff43f319f98a6ec/Telegram/Resources/icons/tray_monochrome.svg;a93380f2c7e6aae4d5fde8940020bd966e97ad8c4880f45c016edfef3f5193e1;icons/hicolor/symbolic/apps/org.telegram.desktop-symbolic.svg"
+  "https://raw.githubusercontent.com/telegramdesktop/tdesktop/a1e89e1f64f08cb058caf1c61ff43f319f98a6ec/Telegram/Resources/icons/tray_monochrome_attention.svg;2b67ee19839dbbb9f57f2d7433fd6dc1059634d6d081c5e4c422c14f53fcfcc7;icons/hicolor/symbolic/apps/org.telegram.desktop-attention-symbolic.svg"
+  "https://raw.githubusercontent.com/telegramdesktop/tdesktop/a1e89e1f64f08cb058caf1c61ff43f319f98a6ec/Telegram/Resources/icons/tray_monochrome_mute.svg;efa1439bd60b58db7b755f5d21be854ea686a0e1e2f1aa6e43bf35c083ee72fc;icons/hicolor/symbolic/apps/org.telegram.desktop-mute-symbolic.svg"
 )
 
 
@@ -430,7 +430,7 @@ rldyour::ubuntu::install_telegram_update_policy() {
 
 # Install the application and symbolic tray icons that Telegram normally
 # publishes from InstallLauncher(). The updater-disabled build deliberately
-# skips that function, so each upstream asset is pinned to the v7.0.7 source
+# skips that function, so each upstream asset is pinned to the v7.0.9 source
 # commit and verified before atomic publication. Divergent local icons are
 # preserved and fail closed instead of being overwritten.
 rldyour::ubuntu::install_telegram_desktop_assets() {
@@ -458,7 +458,7 @@ rldyour::ubuntu::install_telegram_desktop_assets() {
       if [ "$RLDYOUR_DRY_RUN" -eq 0 ]; then
         chmod 0644 "$target" || return 1
       fi
-      rldyour::log "ok" "$(basename "$target") already matches Telegram v7.0.7"
+      rldyour::log "ok" "$(basename "$target") already matches Telegram v7.0.9"
       continue
     fi
 

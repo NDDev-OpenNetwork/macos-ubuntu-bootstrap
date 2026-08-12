@@ -1,7 +1,7 @@
 # rldyour macOS and Ubuntu bootstrap
 
 Plan-first bootstrap for Apple Silicon macOS, Ubuntu 24.04/26.04 desktops, and
-headless Ubuntu servers. The current contract is `3.0.0`.
+headless Ubuntu servers. The current contract is `3.0.1`.
 
 ## Profiles
 
@@ -20,8 +20,8 @@ mode; use them only on machines and repositories you trust.
 GUI workstations install Google Chrome stable. macOS GUI additionally installs
 Ghostty, cmux, ChatGPT, Claude, RustDesk, and Telegram. Ubuntu GUI installs
 Chrome, RustDesk, Telegram, desktop integration, and removes Firefox. Headless
-profiles do not install GUI applications. Herdr is installed on macOS and both
-Ubuntu desktop profiles; it remains usable without a desktop session.
+profiles do not install GUI applications. Herdr is installed and verified on
+macOS and every Ubuntu profile, including headless desktops and servers.
 
 Desktop source hosts include Node, Python, LLVM/clangd, Go/gopls, Rust with
 rust-analyzer, Dart with its analysis server, TypeScript, YAML, Bash, Dockerfile,

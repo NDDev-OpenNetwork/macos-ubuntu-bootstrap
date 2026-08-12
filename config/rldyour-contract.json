@@ -2,7 +2,7 @@
   "schema_version": 2,
   "adapter": {
     "id": "macos-ubuntu-bootstrap",
-    "version": "3.0.0"
+    "version": "3.0.1"
   },
   "verified_on": "2026-08-13",
   "targets": {
@@ -252,15 +252,18 @@
   },
   "user_tools": {
     "herdr": {
-      "version": "0.7.5",
+      "version": "0.8.0",
       "summary": "Terminal workspace manager for AI coding agents (tmux-style multiplexer with agent session support).",
-      "install_method": "github-release-binary",
+      "install_method": {
+        "linux": "verified-github-release-binary",
+        "macos": "homebrew-formula"
+      },
       "repo": "herdrdev/herdr",
       "update_manifest": "https://herdr.dev/latest.json",
       "url_template": "https://github.com/herdrdev/herdr/releases/download/v{version}/herdr-linux-{arch}",
       "sha256": {
-        "x86_64": "3dc83288073e4c2d3c679a30e7be97bcca9141c6fd17dbbb9219142e95c59253",
-        "aarch64": "32e763a1499a6b694b1d708e4f062b743be1da9f34fcfa4d212d6db6fe09a8b9"
+        "x86_64": "b872ea7e40fa2cb17e857ac9b62b1bf26db7b403c622f5d2f3f5b35f6e9acd28",
+        "aarch64": "f647ac66468d9efbc642fe534fb284468f0aea60641606fc008dfc0d82a3ca87"
       },
       "arch_map": {
         "amd64": "x86_64",
@@ -270,7 +273,8 @@
       "bin_target": "${HOME}/.local/bin/herdr",
       "managed_receipt": "ubuntu-runtime-v1",
       "os": [
-        "linux"
+        "linux",
+        "macos"
       ],
       "profiles": [
         "desktop",
@@ -279,11 +283,12 @@
       ]
     },
     "telegram": {
-      "version": "7.0.7",
-      "summary": "Telegram Desktop messenger (official Linux portable build from td.telegram.org).",
-      "install_method": "tarball",
-      "url": "https://td.telegram.org/tlinux/tsetup.7.0.7.tar.xz",
-      "archive_sha256": "45e4bdbe9bdbc800916b81147210f912f5c72f069fdec6f9b201fe305d0d2d9c",
+      "version": "7.0.9",
+      "summary": "Telegram Desktop messenger from the official telegramdesktop/tdesktop GitHub release.",
+      "install_method": "verified-github-release-tarball",
+      "repo": "telegramdesktop/tdesktop",
+      "url": "https://github.com/telegramdesktop/tdesktop/releases/download/v7.0.9/tsetup.7.0.9.tar.xz",
+      "archive_sha256": "d3c05df0259ab116d11d8c1cdc1403019d2a3be303ad3b46d16a84e19df6615f",
       "architectures": [
         "x86_64"
       ],
@@ -301,7 +306,8 @@
         "linux"
       ],
       "profiles": [
-        "desktop"
+        "desktop",
+        "desktop-builds"
       ],
       "gui_required": true
     }
@@ -324,26 +330,26 @@
       "source": "templates/desktop/org.telegram.desktop.desktop",
       "target": "${HOME}/.local/share/applications/org.telegram.desktop.desktop",
       "icon": "org.telegram.desktop",
-      "upstream_source_commit": "ee93b401ced86ece3f2582fc2ca4da72dfc4f06a",
-      "upstream_desktop_entry": "https://github.com/telegramdesktop/tdesktop/blob/v7.0.7/lib/xdg/org.telegram.desktop.desktop",
+      "upstream_source_commit": "a1e89e1f64f08cb058caf1c61ff43f319f98a6ec",
+      "upstream_desktop_entry": "https://github.com/telegramdesktop/tdesktop/blob/v7.0.9/lib/xdg/org.telegram.desktop.desktop",
       "icon_assets": [
         {
-          "source_url": "https://raw.githubusercontent.com/telegramdesktop/tdesktop/ee93b401ced86ece3f2582fc2ca4da72dfc4f06a/Telegram/Resources/art/logo_256.png",
+          "source_url": "https://raw.githubusercontent.com/telegramdesktop/tdesktop/a1e89e1f64f08cb058caf1c61ff43f319f98a6ec/Telegram/Resources/art/logo_256.png",
           "target": "${HOME}/.local/share/icons/hicolor/256x256/apps/org.telegram.desktop.png",
           "sha256": "3fb1400c7dc9bbc3b5cb3ffedcbf4a9b09c53e28b57a7ff33a8a6b9048864090"
         },
         {
-          "source_url": "https://raw.githubusercontent.com/telegramdesktop/tdesktop/ee93b401ced86ece3f2582fc2ca4da72dfc4f06a/Telegram/Resources/icons/tray_monochrome.svg",
+          "source_url": "https://raw.githubusercontent.com/telegramdesktop/tdesktop/a1e89e1f64f08cb058caf1c61ff43f319f98a6ec/Telegram/Resources/icons/tray_monochrome.svg",
           "target": "${HOME}/.local/share/icons/hicolor/symbolic/apps/org.telegram.desktop-symbolic.svg",
           "sha256": "a93380f2c7e6aae4d5fde8940020bd966e97ad8c4880f45c016edfef3f5193e1"
         },
         {
-          "source_url": "https://raw.githubusercontent.com/telegramdesktop/tdesktop/ee93b401ced86ece3f2582fc2ca4da72dfc4f06a/Telegram/Resources/icons/tray_monochrome_attention.svg",
+          "source_url": "https://raw.githubusercontent.com/telegramdesktop/tdesktop/a1e89e1f64f08cb058caf1c61ff43f319f98a6ec/Telegram/Resources/icons/tray_monochrome_attention.svg",
           "target": "${HOME}/.local/share/icons/hicolor/symbolic/apps/org.telegram.desktop-attention-symbolic.svg",
           "sha256": "2b67ee19839dbbb9f57f2d7433fd6dc1059634d6d081c5e4c422c14f53fcfcc7"
         },
         {
-          "source_url": "https://raw.githubusercontent.com/telegramdesktop/tdesktop/ee93b401ced86ece3f2582fc2ca4da72dfc4f06a/Telegram/Resources/icons/tray_monochrome_mute.svg",
+          "source_url": "https://raw.githubusercontent.com/telegramdesktop/tdesktop/a1e89e1f64f08cb058caf1c61ff43f319f98a6ec/Telegram/Resources/icons/tray_monochrome_mute.svg",
           "target": "${HOME}/.local/share/icons/hicolor/symbolic/apps/org.telegram.desktop-mute-symbolic.svg",
           "sha256": "efa1439bd60b58db7b755f5d21be854ea686a0e1e2f1aa6e43bf35c083ee72fc"
         }

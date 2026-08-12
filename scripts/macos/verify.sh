@@ -31,6 +31,7 @@ required_cmds=(
   tsc vtsls yaml-language-server bash-language-server docker-langserver
   vscode-html-language-server vscode-css-language-server vscode-json-language-server
   taplo marksman terraform-ls cmake-language-server
+  herdr
   codex claude grok cx cl gk
 )
 for cmd in "${required_cmds[@]}"; do
@@ -54,6 +55,7 @@ rldyour::require_cmd_min_version bun 1.3 --version
 rldyour::require_cmd_min_version starship 1.0 --version
 rldyour::require_cmd_min_version atuin 18.0 --version
 rldyour::require_cmd_min_version carapace 1.0 --version
+rldyour::require_cmd_min_version herdr 0.8 --version
 # Dart backs the analysis server and the `dart-flutter` MCP transport. Homebrew
 # cannot pin an exact patch, so the floor is a major/minor gate plus proof that
 # the mcp-server subcommand exists (a Dart SDK below 3.9 resolves but cannot

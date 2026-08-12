@@ -324,21 +324,30 @@ Docker runtime evidence that was not actually produced.
   default setup first, because configuration attachment is atomic and forcing
   default setup onto a repository with an active advanced setup fails the whole
   attachment.
-- This repository is public, so `pull_request` executes untrusted fork code and
-  must never reach the estate's self-hosted runners. Every `ci-workflows` caller
-  that exposes a `runner` input passes an explicit GitHub-hosted label, and
-  `tests/test_agent_context.py` rejects any other value.
+- This repository is public, so `pull_request` executes untrusted fork code.
+  Every `ci-workflows` caller that exposes a `runner` input passes an explicit
+  GitHub-hosted label, and `tests/test_agent_context.py` rejects any value
+  outside the hosted set.
 
-  The estate's self-hosted label is `github-actions`. That name is the reason
-  the check asserts the *value* and not merely that the key is present: a
-  `runner: github-actions` reads like a hosted runner in a diff and would pass
-  a presence check unnoticed.
+  The rule is the estate runner platform's own, not this repository's
+  invention. `modules/github-actions` builds disposable one-job Incus/KVM
+  workers, and its `docs/threat-model.md` lists as a non-negotiable control:
+  **no public/fork code on a trusted runner group**. Its cache plane says the
+  same from the other side — public and fork jobs get no cache credential and
+  are "retained on GitHub-hosted capacity" (`docs/cache-plane.md`, ADR 0020).
+  A public repository routing a job onto that fleet would violate the platform's
+  contract, not merely this file's preference.
 
-  Verified 2026-08-12 against `ci-workflows`: at the pinned commit and on its
-  `main`, all 44 reusables that declare a `runner` default use a hosted label,
-  so nothing is currently defaulting to self-hosted. The explicit value is
-  therefore defence against a future change, not a live exposure — and it stays,
-  because the default belongs to the pinned commit rather than to this
-  repository and Dependabot bumps that pin weekly with no diff here to review.
-  Two callers expose no `runner` input at all; their exemption is written next
-  to the call and the test pins the list so a bump has to re-justify it.
+  Check the *value*, never just the key. The fleet's labels are `standard` (the
+  organization default) and the legacy `amsterdam`, behind scale sets
+  `nddev-linux-standard` and `nddev-linux-integration`. `runner: standard` reads
+  like nothing at all in a diff, which is exactly why an allowlist of hosted
+  labels is the gate rather than a denylist of known self-hosted ones.
+
+  Verified 2026-08-12 against `ci-workflows`: of 54 workflow files, 44 declare a
+  `runner` default and every one is hosted, both at the pinned commit and on
+  `main`. Nothing defaults to self-hosted today, so the explicit value is
+  defence against a future change — and it stays, because the default belongs to
+  the pinned commit and Dependabot bumps that pin weekly with no diff here.
+  Two callers expose no `runner` input; their exemption is written next to the
+  call and the test pins the list so a bump has to re-justify it.

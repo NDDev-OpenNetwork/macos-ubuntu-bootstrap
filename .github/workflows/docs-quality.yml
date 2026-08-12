@@ -20,10 +20,11 @@ jobs:
     uses: NDDev-it-com/ci-workflows/.github/workflows/docs-quality.yml@7f69c724923d06b2c2057c5a6ad341c37f1a8995 # 0.13.3
     with:
       # Public repo: pull_request runs untrusted fork code. Pin the hosted runner
-      # explicitly. The reusable's `runner` default belongs to the pinned commit,
-      # not to this repository, and the estate's self-hosted label is now
-      # `github-actions` — which reads like a hosted runner in a diff. Naming
-      # the hosted runner here is what keeps that from slipping through.
+      # explicitly. The estate runner platform forbids public/fork code on a
+      # trusted runner group (modules/github-actions, docs/threat-model.md),
+      # and this repository is public. The reusable's default belongs to the
+      # pinned commit, not here, and the fleet's labels -- `standard`, legacy
+      # `amsterdam` -- read like nothing in a diff.
       runner: ubuntu-latest
       # Broken-link detection (lychee). Exclude openai.com: its marketing pages
       # return 403 to link-checkers (bot-blocked) — a false positive, valid in a

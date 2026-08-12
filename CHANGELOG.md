@@ -53,20 +53,28 @@ All notable changes to this module will be documented in this file.
 
 ### Changed
 
-- **The hosted-runner rule now checks the value, not the key.** The estate's
-  self-hosted label is `github-actions`, which reads like a GitHub-hosted runner
-  in a diff — a presence-only check would have passed `runner: github-actions`
-  without comment. `tests/test_agent_context.py` now rejects any label outside
-  the hosted set, and catching that exact camouflage is verified.
+- **The hosted-runner rule is re-grounded on the runner platform's own threat
+  model, and the gate now checks the value rather than the key.** Its previous
+  justification claimed "39 of 46 reusables default `runner` to the estate's
+  self-hosted `amsterdam` label". Checked on 2026-08-12: of 54 workflow files in
+  `ci-workflows`, 44 declare a `runner` default and every one is hosted, both at
+  the pinned commit and on `main`. Nothing defaults to self-hosted.
 
-  The rule's recorded justification was also restated against current facts.
-  It claimed "39 of 46 reusables default `runner` to the estate's self-hosted
-  `amsterdam` label"; checked on 2026-08-12, all 44 reusables on `ci-workflows`
-  that declare a default use a hosted label, both at the pinned commit and on
-  `main`. Nothing is currently defaulting to self-hosted, so the explicit value
-  is defence against a future change rather than a live exposure — and it stays,
-  because the default belongs to the pinned commit and Dependabot bumps that pin
-  weekly with no diff here to review.
+  The rule is not this repository's preference. `modules/github-actions` — the
+  estate's disposable one-job Incus/KVM runner platform — lists as a
+  non-negotiable control that there is to be **no public/fork code on a trusted
+  runner group**, and its cache plane grants public and fork jobs no credential
+  precisely because they are "retained on GitHub-hosted capacity". This
+  repository is public, so routing a job onto that fleet would break the
+  platform's contract, not merely a convention written here.
+
+  The gate asserts the value against an allowlist of hosted labels. The fleet's
+  labels are `standard` (the organization default) and the legacy `amsterdam`,
+  behind the `nddev-linux-standard` and `nddev-linux-integration` scale sets;
+  `runner: standard` reads like nothing at all in a diff, so a denylist of known
+  self-hosted names would not survive the next label. Catching a camouflaged
+  value is covered by a test.
+
 - **macOS verification is explicitly on-pause.** No macOS claim in this
   repository is currently backed by a run: the estate has no Apple Silicon
   target. The platform stays supported and its code stays maintained, but a

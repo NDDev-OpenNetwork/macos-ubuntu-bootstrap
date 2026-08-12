@@ -83,10 +83,13 @@ def test_the_memory_corpus_stays_small_and_self_describing() -> None:
 EXEMPTION = "exposes no `runner` input"
 
 
-# GitHub-hosted labels. Anything else is self-hosted, and the estate's
-# self-hosted label is `github-actions` -- a name that reads like a hosted
-# runner in a diff, which is exactly why the value is checked and not just the
-# key's presence.
+# GitHub-hosted labels. Anything else routes onto the estate fleet, whose own
+# threat model forbids public/fork code on a trusted runner group
+# (modules/github-actions, docs/threat-model.md) -- and this repository is
+# public. An allowlist rather than a denylist because the fleet's labels are
+# `standard` and the legacy `amsterdam`: `runner: standard` reads like nothing
+# at all in a diff, so enumerating the safe values is the only gate that holds
+# when a new label is introduced.
 HOSTED_RUNNERS = {
     "ubuntu-latest", "ubuntu-24.04", "ubuntu-22.04",
     "macos-latest", "macos-15", "macos-14",
@@ -154,9 +157,9 @@ def test_every_reusable_caller_that_can_name_a_runner_does() -> None:
         if names_runner and value not in HOSTED_RUNNERS
     ]
     assert self_hosted == [], (
-        f"these callers name a non-hosted runner: {self_hosted}. The estate's "
-        "self-hosted label is `github-actions`, which looks hosted; fork PRs "
-        "must never land on it."
+        f"these callers name a non-hosted runner: {self_hosted}. The estate "
+        "runner platform forbids public/fork code on a trusted runner group, "
+        "and this repository is public."
     )
     exempted = [path.name for path, _w, _r, exempt, _v in callers if exempt]
     assert exempted == ["cross-platform.yml", "pr-hygiene.yml"], (

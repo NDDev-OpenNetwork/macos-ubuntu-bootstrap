@@ -309,8 +309,6 @@ def test_both_google_repository_paths_are_recognised() -> None:
 
 
 def _deb_rows() -> list[list[str]]:
-    import re
-
     source = DESKTOP.read_text(encoding="utf-8")
     block = re.search(r"^DESKTOP_DEBS=\((.*?)^\)", source, re.M | re.S)
     assert block, "DESKTOP_DEBS table missing"
@@ -386,9 +384,9 @@ def test_deb_rows_match_the_contract() -> None:
 
 def test_unknown_deb_row_is_refused(tmp_path: Path) -> None:
     source = DESKTOP.read_text(encoding="utf-8")
-    import re as _re
-
-    table = _re.search(r"^DESKTOP_DEBS=\(.*?^\)", source, _re.M | _re.S).group(0)
+    table_match = re.search(r"^DESKTOP_DEBS=\(.*?^\)", source, re.M | re.S)
+    assert table_match, "DESKTOP_DEBS table missing"
+    table = table_match.group(0)
     fn = _extract("nddev::_install_desktop_deb", DESKTOP)
     result = subprocess.run(
         ["bash", "-c",

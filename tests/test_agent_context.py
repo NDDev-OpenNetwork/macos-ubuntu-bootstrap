@@ -59,7 +59,8 @@ def test_no_agent_surface_names_a_retired_profile_or_policy() -> None:
             f"{path.name} uses a policy name the contract retired"
         )
         if "--profile" in text:
-            assert "desktop-builds" in text, f"{path.name} omits a supported profile"
+            missing = sorted(p for p in known_profiles if p not in text)
+            assert missing == [], f"{path.name} omits supported profile(s): {missing}"
     assert "container-execution-only" in policies
 
 
@@ -250,8 +251,6 @@ def test_secret_scan_uses_the_repository_config() -> None:
 def test_no_tracked_document_points_at_a_deleted_memory() -> None:
     """Collapsing the corpus left README naming three memories that no longer
     exist. Any path a document advertises must resolve."""
-    import re
-
     present = {p.name for p in MEMORIES.glob("*.md")}
     for doc in ROOT.rglob("*.md"):
         if any(part in {".venv", ".git"} for part in doc.parts) or doc.name == "CHANGELOG.md":

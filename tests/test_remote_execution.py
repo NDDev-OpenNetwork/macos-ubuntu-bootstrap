@@ -352,6 +352,10 @@ def live_ssh(tmp_path: Path) -> Iterator[Path]:
             try:
                 os.kill(int(pid_file.read_text(encoding="utf-8").strip()), 15)
             except (OSError, ValueError):
+                # Best-effort teardown of a scratch daemon: it may already have
+                # exited, or written a pid this process cannot signal. Raising
+                # here would replace a real test result with a cleanup error,
+                # and the container it lives in is discarded either way.
                 pass
 
 

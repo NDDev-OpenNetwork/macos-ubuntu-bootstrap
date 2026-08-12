@@ -68,6 +68,17 @@ All notable changes to this module will be documented in this file.
   repository is public, so routing a job onto that fleet would break the
   platform's contract, not merely a convention written here.
 
+  Correcting a fact this file previously stated: the fleet's labels are not
+  `standard` and `amsterdam`. `standard` came from
+  `config/code-quality-routing.yaml`, where it is the GitHub Code Quality
+  runner *type*, a different resource class that file names explicitly. The
+  fleet publishes scale-set classes `nddev-linux-fast`,
+  `nddev-linux-standard`, `nddev-linux-integration` and `nddev-linux-release`;
+  `amsterdam` is retired. Two properties make the allowlist the only workable
+  gate: that set changes, and a job requesting a label no runner advertises
+  does not fail — it queues indefinitely, so a wrong value is a hang rather
+  than a red check. All five values above are verified rejected.
+
   The gate covers both ways onto a runner: the `runner` input of a reusable
   caller, and a job's own `runs-on` — including one driven by a matrix, whose
   values are resolved and checked individually. The reusable-caller check alone

@@ -339,11 +339,14 @@ Docker runtime evidence that was not actually produced.
   A public repository routing a job onto that fleet would violate the platform's
   contract, not merely this file's preference.
 
-  Check the *value*, never just the key. The fleet's labels are `standard` (the
-  organization default) and the legacy `amsterdam`, behind scale sets
-  `nddev-linux-standard` and `nddev-linux-integration`. `runner: standard` reads
-  like nothing at all in a diff, which is exactly why an allowlist of hosted
-  labels is the gate rather than a denylist of known self-hosted ones.
+  Check the *value*, never just the key, and use an allowlist of hosted labels
+  rather than a denylist of fleet ones. The fleet publishes scale-set classes
+  `nddev-linux-fast`, `nddev-linux-standard`, `nddev-linux-integration` and
+  `nddev-linux-release`; the former `amsterdam` label is retired. Two reasons
+  the allowlist is the only gate that holds: the set changes — that list is
+  current as of 2026-08-12 and a denylist would silently go stale — and a job
+  requesting a label no runner advertises does not fail, it queues
+  indefinitely. A wrong value here is a hang, not a red check.
 
   Verified 2026-08-12 against `ci-workflows`: of 54 workflow files, 44 declare a
   `runner` default and every one is hosted, both at the pinned commit and on

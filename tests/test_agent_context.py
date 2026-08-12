@@ -87,10 +87,14 @@ EXEMPTION = "exposes no `runner` input"
 # GitHub-hosted labels. Anything else routes onto the estate fleet, whose own
 # threat model forbids public/fork code on a trusted runner group
 # (modules/github-actions, docs/threat-model.md) -- and this repository is
-# public. An allowlist rather than a denylist because the fleet's labels are
-# `standard` and the legacy `amsterdam`: `runner: standard` reads like nothing
-# at all in a diff, so enumerating the safe values is the only gate that holds
-# when a new label is introduced.
+# public.
+#
+# An allowlist, never a denylist of fleet labels. The fleet's scale-set classes
+# (nddev-linux-fast/standard/integration/release as of 2026-08-12, the former
+# `amsterdam` retired) change over time, and a job requesting a label no runner
+# advertises does not fail -- it queues indefinitely. Enumerating the safe
+# values is the only form of this check that survives a renamed class and
+# turns a hang into a failed test.
 HOSTED_RUNNERS = {
     "ubuntu-latest", "ubuntu-24.04", "ubuntu-22.04",
     "macos-latest", "macos-15", "macos-14",
@@ -203,8 +207,9 @@ def _matrix_values(text: str, key: str) -> list[str]:
 @pytest.mark.parametrize("path", sorted(WORKFLOWS.glob("*.yml")), ids=lambda p: p.name)
 def test_every_job_runs_on_a_hosted_runner(path: Path) -> None:
     """`runs-on` is the other way onto a runner, and the reusable-caller gate
-    does not see it. A job here selecting `runs-on: standard` would put fork
-    code on the estate fleet exactly as a reusable input would."""
+    does not see it. A job here selecting `runs-on: nddev-linux-standard`
+    would put fork code on the estate fleet exactly as a reusable input
+    would."""
     text = path.read_text(encoding="utf-8")
     for line in text.splitlines():
         stripped = line.strip()

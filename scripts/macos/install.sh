@@ -17,10 +17,6 @@ SKIP_CHECKS="${RLDYOUR_SKIP_CHECKS:-0}"
 GUI_ENABLED="${RLDYOUR_GUI_ENABLED:-1}"
 LOCAL_EXECUTION_POLICY="${RLDYOUR_LOCAL_EXECUTION_POLICY:-source-lsp-only}"
 
-# One owner per harness (RVR-P1-004): the active harness set is codex, installed
-# by its dedicated authoritative NDDev module via
-# rldyour::install_selected_harnesses. Bootstrap pins no AI CLI versions here.
-# zcode is contract-delegated to nddev-harnesses.
 HOMEBREW_PKG_VERSION="6.0.9"
 HOMEBREW_PKG_SHA256="525599bd2dcbda29857120234336b0103ad5283a3dc8511f72066eeb917abd3c"
 HOMEBREW_INSTALLER_TEAM="927JGANW46"
@@ -43,7 +39,7 @@ BREW_SOURCE_PACKAGES=(
   yamllint markdownlint-cli2 prettier
   ripgrep fd eza bat git-delta jq yq ast-grep
   starship atuin fzf zoxide carapace antidote zsh-completions
-  gh lazygit yazi xh jaq jnv duckdb difftastic tmux
+  gh lazygit yazi xh jaq jnv duckdb difftastic tmux herdr
 )
 
 # Registry-backed language servers, pinned to exact versions for reproducibility
@@ -61,7 +57,7 @@ BUN_LSP_PACKAGES=(
   "gh-actions-language-server@0.0.3"
 )
 
-GUI_CASKS=(ghostty cmux chatgpt codex-app claude)
+GUI_CASKS=(ghostty cmux google-chrome chatgpt claude rustdesk telegram)
 
 usage() {
   cat <<'EOF'
@@ -139,8 +135,10 @@ cask_app_path() {
     ghostty) printf '%s\n' "/Applications/Ghostty.app" ;;
     cmux) printf '%s\n' "/Applications/cmux.app" ;;
     chatgpt) printf '%s\n' "/Applications/ChatGPT.app" ;;
-    codex-app) printf '%s\n' "/Applications/Codex.app" ;;
     claude) printf '%s\n' "/Applications/Claude.app" ;;
+    google-chrome) printf '%s\n' "/Applications/Google Chrome.app" ;;
+    rustdesk) printf '%s\n' "/Applications/RustDesk.app" ;;
+    telegram) printf '%s\n' "/Applications/Telegram.app" ;;
     *) return 1 ;;
   esac
 }
@@ -192,15 +190,10 @@ install_gui_apps() {
   for cask in "${GUI_CASKS[@]}"; do
     ensure_cask "$cask"
   done
-  rldyour::log "info" "ChatGPT and Codex are installed as separate supported OpenAI desktop applications."
-  rldyour::log "info" "ZCode is owned by the nddev-harnesses repository, not by this bootstrap; see scripts/auth-handoff.sh."
+  rldyour::log "info" "ChatGPT is the single OpenAI desktop app; Claude, Chrome, RustDesk, and Telegram are GUI applications."
 }
 
-install_ai_runtimes() {
-  # Delegate the active harness set (codex) to its authoritative NDDev module; no
-  # AI CLI is installed inline or through a bun/npm global path.
-  rldyour::install_selected_harnesses
-}
+install_ai_runtimes() { rldyour::install_vendor_ai_clis; }
 
 install_bun_lsps() {
   rldyour::section "Install registry-backed language servers"
@@ -240,7 +233,7 @@ verify_apply() {
   if [ "$RLDYOUR_DRY_RUN" -eq 1 ]; then
     rldyour::log "info" "plan complete; verification runs only after apply"
   elif [ "$SKIP_CHECKS" -eq 0 ]; then
-    RLDYOUR_GUI_ENABLED="$GUI_ENABLED" RLDYOUR_BROWSER_REQUIRED=1 \
+    RLDYOUR_GUI_ENABLED="$GUI_ENABLED" \
       bash "$SCRIPT_DIR/verify.sh" --strict
   fi
 }
@@ -286,8 +279,6 @@ main() {
 
   [ "$SKIP_LSPS" -eq 1 ] || install_bun_lsps
 
-  # Mandatory on GUI and no-GUI profiles. No skip/fallback path exists.
-  rldyour::install_browser_providers
   configure_cmux_hooks
 
   # Harness last, for the reason documented in scripts/ubuntu/install.sh: the layer

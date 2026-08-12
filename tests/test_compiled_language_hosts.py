@@ -51,12 +51,11 @@ def test_desktop_plans_go_rust_and_dart_hosts() -> None:
     assert "rust-analyzer" in output
 
 
-def test_server_never_plans_a_host_compiler() -> None:
+def test_server_plans_language_server_hosts() -> None:
     output = plan("server")
-    assert "compiled-language LSP hosts skipped" in output
-    assert f"Ensure Go {RUNTIME['ubuntu_go']}" not in output
-    assert f"Ensure Rust {RUNTIME['ubuntu_rust']}" not in output
-    assert f"Ensure Dart {RUNTIME['ubuntu_dart']}" not in output
+    assert f"Ensure Go {RUNTIME['ubuntu_go']}" in output
+    assert f"Ensure Rust {RUNTIME['ubuntu_rust']}" in output
+    assert f"Ensure Dart {RUNTIME['ubuntu_dart']}" in output
 
 
 def test_contract_tracks_a_hash_for_every_supported_architecture() -> None:
@@ -85,7 +84,6 @@ def test_dart_tree_permissions_are_normalized_and_revalidated() -> None:
     assert 'rldyour::_managed_tree_permissions normalize "$stage/prefix"' in dart
     assert 'rldyour::_managed_tree_permissions validate "$destination"' in dart
     # One generic helper, not a second permission path bolted on for Dart.
-    assert "rldyour::_browser_node_runtime_permissions" not in common
     assert common.count("rldyour::_managed_tree_permissions() {") == 1
 
 
@@ -108,7 +106,6 @@ def test_rust_tree_is_permission_normalized_before_its_receipt() -> None:
 
 def test_dart_telemetry_is_disabled_through_one_shared_fail_closed_helper() -> None:
     """The SDK reports telemetry by default, which contradicts the same boundary
-    that makes the browser wrapper reject usage statistics. The opt-out must be
     set through the SDK's own switch (the config is upstream-maintained, never
     hand-written), proven rather than assumed, and shared by both platforms."""
     common = (ROOT / "scripts/lib/common.sh").read_text(encoding="utf-8")

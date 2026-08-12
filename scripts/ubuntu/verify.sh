@@ -151,8 +151,7 @@ required_cmds=(
   pyright pyright-langserver basedpyright ruff
   tsc vtsls yaml-language-server bash-language-server docker-langserver
   vscode-html-language-server vscode-css-language-server vscode-json-language-server taplo
-  codex
-  cloak-chromium cloakbrowser-cdp-health chrome-devtools-mcp playwright-cli
+  codex claude grok cx cl gk
 )
 for cmd in "${required_cmds[@]}"; do
   rldyour::require_cmd "$cmd" required
@@ -169,14 +168,6 @@ uv --version 2>/dev/null | head -n 1 | grep -Eq '^uv 0\.11\.30([[:space:]]|$)' |
   rldyour::log "missing" "uv exact managed Ubuntu version 0.11.30"
   exit 1
 }
-# The active harness set (codex) is owned by its GDS module. Deep harness proof
-# (exact CLI version, setup catalog) is delegated to the module's own status; here
-# we only require the CLI to resolve on PATH (checked above). zcode is
-# contract-delegated to nddev-harnesses and is deliberately not required.
-cloakbrowser-cdp-health
-chrome-devtools-mcp --version | grep -Fq "1.6.0"
-playwright-cli --version | grep -Fq "0.1.17"
-"$SCRIPT_DIR/../verify-browser-runtime.sh" --json
 rldyour::verify_terminal_environment
 
 if [ "$PROFILE" != "server" ]; then
@@ -195,11 +186,13 @@ if [ "$PROFILE" != "server" ]; then
   # using the same managed-symlink + receipt contract as pinned source tools; a
   # failed install must not stay invisible.
   rldyour::require_cmd herdr required
-  rldyour::require_cmd telegram-desktop required
-  rldyour::ubuntu_verify::telegram_policy || {
-    rldyour::log "missing" "Telegram updater isolation and XCB launcher contract"
-    exit 1
-  }
+  if [ "$GUI_ENABLED" -eq 1 ]; then
+    rldyour::require_cmd telegram-desktop required
+    rldyour::ubuntu_verify::telegram_policy || {
+      rldyour::log "missing" "Telegram updater isolation and XCB launcher contract"
+      exit 1
+    }
+  fi
   # cmake-language-server ships in PYTHON_SOURCE_TOOLS but was never verified,
   # so a failed install stayed invisible on Ubuntu while macOS gated on it.
   rldyour::require_cmd cmake-language-server required
@@ -246,13 +239,17 @@ if [ "$PROFILE" != "server" ]; then
     rldyour::log "ok" "desktop-builds policy: Docker is present"
   fi
   if [ "$GUI_ENABLED" -eq 1 ]; then
-    # Harness desktop apps (e.g. ZCode via nddev-harnesses) are owned and
-    # verified by their own repositories; this bootstrap installs no GUI harness
-    # package to check here. BrowserOS and the Firefox removal are desktop
-    # customization owned by desktop.sh, which reports its own result.
-    rldyour::log "ok" "desktop GUI harness apps are owned by their own repositories"
+    command -v google-chrome-stable >/dev/null 2>&1 || { rldyour::log "missing" "Google Chrome stable"; exit 1; }
+    if command -v firefox >/dev/null 2>&1 || { command -v snap >/dev/null 2>&1 && snap list firefox >/dev/null 2>&1; }; then
+      rldyour::log "missing" "Firefox must be absent from the Ubuntu GUI profile"
+      exit 1
+    fi
   fi
 else
+  rldyour::require_cmd herdr required
+  for cmd in go gopls rustc cargo rust-analyzer dart; do
+    rldyour::require_cmd "$cmd" required
+  done
   args=(--docker-mode "$DOCKER_MODE")
   [ "${RLDYOUR_SERVER_ENABLE_UFW:-0}" -eq 1 ] && args+=(--expect-ufw)
   [ "${RLDYOUR_SERVER_HARDEN_SSH:-0}" -eq 1 ] && args+=(--expect-ssh-hardening)

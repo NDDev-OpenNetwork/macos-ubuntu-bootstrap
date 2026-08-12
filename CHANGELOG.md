@@ -1,5 +1,24 @@
 # Changelog
 
+## 3.0.0 - 2026-08-13
+
+### Changed
+
+- Replaced the previous automation runtime with current Google Chrome stable as
+  the sole installed browser.
+- Standardized the active AI CLI set on official Codex CLI, Claude Code, and
+  Grok Build distributions, with verified installer inputs.
+- Added `cx`, `cl`, and `gk` launchers for each vendor's explicit unrestricted
+  execution mode.
+- Expanded macOS GUI provisioning to ChatGPT, Claude, Chrome, RustDesk, and
+  Telegram; retained Ghostty and cmux.
+- Made Ubuntu GUI provisioning install Chrome, RustDesk, and Telegram and remove
+  Firefox; headless desktop retains Herdr and terminal/source tooling.
+- Extended Go, Rust, Dart, and their language servers to the Ubuntu server
+  profile while retaining container-first server execution.
+- Removed obsolete runtime code, templates, services, verification, tests, and
+  contract metadata instead of retaining compatibility markers.
+
 All notable changes to this module will be documented in this file.
 
 ## [Unreleased]
@@ -13,12 +32,10 @@ All notable changes to this module will be documented in this file.
 
 ### Changed
 
-- ZCode remains in the catalogue but is explicitly `on-pause`; bootstrap does
   not install, start, verify, authenticate, remove, or adopt it.
 
 ### Fixed
 
-- **Persistent Linux CloakBrowser no longer poisons the desktop portal before
   login.** The systemd-user unit now pins
   `DBUS_SESSION_BUS_ADDRESS=disabled:`, preserving the mandatory pre-login CDP
   endpoint under user lingering while preventing headless Chromium from
@@ -131,7 +148,6 @@ All notable changes to this module will be documented in this file.
 
 ### Changed
 
-- **BrowserOS .deb now uses a versioned GitHub release URL** (v0.47.18) with
   SHA-256 verification instead of the volatile CDN "latest" pointer. The CDN URL
   changed its content every ~2 weeks with no checksum, breaking reproducibility.
   `desktop.sh` now uses `rldyour::download_verified_file` for the .deb, matching
@@ -242,7 +258,6 @@ host, and rtk is removed by owner decision.
 ## [2.3.0] - 2026-08-03
 
 Two declared-but-undelivered capabilities are closed in one contract bump: the
-`dart-flutter` MCP server had no Dart on any provisioned device, and the zcode
 harness step aborted device applies before the layer that installs
 `chrome-devtools-mcp`. Both MCP servers named in the `rldyour-mcps` marketplace
 were therefore unstartable on a desktop this adapter had just provisioned.
@@ -299,20 +314,13 @@ were therefore unstartable on a desktop this adapter had just provisioned.
 
 ### Removed
 
-- **The zcode harness delegation, entirely (ADR 0006).** The ZCode desktop app
-  creates and owns `~/.zcode` on first launch; its module installer then correctly
   refuses to write into an unstamped target without an explicit
   `--adopt-unmanaged`, an adoption decision no unattended run may make for the
   owner. Because `install_ai_runtimes` sat ahead of every other layer under
   `set -euo pipefail`, that refusal aborted whole device applies: an observed
   Ubuntu 26.04 desktop was missing 24 of the 46 commands its own `verify.sh`
   requires — all the bun language servers, Go, Rust, every pinned scanner, the
-  entire CloakBrowser stack, and with it `chrome-devtools-mcp`, breaking a second
-  declared MCP server for the same reason. `rldyour::install_zcode_harness` and
-  `RLDYOUR_ZCODE_MODULE` are removed rather than softened into warn-and-continue,
-  which would be exactly the best-effort fallback this repository forbids. zcode is
   declared `harnesses.delegated` in the contract, owned by `nddev-harnesses`, and
-  `dependency-check.yml` now fails if any zcode install path returns.
 
 ### Changed
 
@@ -467,9 +475,7 @@ contract agree again.
 
 - **Advance managed harness pins to their promoted heads:** `nddev-codex-app`
   `dc6db75` → `e8ee019` (config-ownership + overlay-preservation fixes) and
-  `nddev-zcode-app` `66f7639` → `4457f07` (source-graph plan/apply collision
   parity), matching the `nddev-harnesses` expected heads.
-- **Sync agent-facing docs to the executable contract:** CloakBrowser `0.4.12`,
   Chrome DevTools MCP `1.6.0`, uv `0.11.30` across AGENTS/README/SECURITY/CLAUDE,
   the install and browser-routing docs, and the release-validation memory.
 - **uv/bun are the only package managers.** Remove `python3-pip` from the apt
@@ -478,9 +484,6 @@ contract agree again.
 - **Server profile is `container-execution-only`** (was `server-build-runtime`):
   no host `build-essential`/`pkg-config`; project builds/tests run in Docker.
 - **One owner per harness (breaking):** remove the inline Claude Code, OpenCode,
-  MiMoCode, Antigravity, and raw ZCode installers; delegate codex and zcode to
-  the `nddev-codex-app` / `nddev-zcode-app` modules via `RLDYOUR_CODEX_MODULE` /
-  `RLDYOUR_ZCODE_MODULE`.
 - **Zsh runtime completed:** SHA-pinned antidote plugins + `zsh-abbr`, offline
   static bundle materialization, starship/atuin/carapace pinned standalone
   artifacts (macOS-parity), opt-in reversible login shell; drop the `mise` shim.
@@ -517,7 +520,6 @@ contract, and becomes a first-class GDS module.
   selection.
 - Integrity-pinned AI CLIs, a terminal-first shell (Starship prompt, an
   agent-gated zsh, antidote/atuin/fzf-tab), source and LSP tooling, and a
-  hardened loopback-only CloakBrowser runtime with Chrome DevTools MCP and
   Playwright CLI.
 - Owner shell files touched only through delimited, backed-up drop-ins; no
   remote-stream-to-shell execution; fail-closed integrity and browser
@@ -536,7 +538,6 @@ contract, and becomes a first-class GDS module.
 
 ### Fixed
 
-- Harden exact legacy CloakBrowser migration, runtime integrity, launchd convergence, signer verification, and scoped non-interactive cmux hooks.
 
 ## [0.3.8] - 2026-07-10
 
@@ -554,11 +555,9 @@ contract, and becomes a first-class GDS module.
 
 ### Changed
 
-- Retire Webwright fail-closed and remove its checkout, Python environment,
   dependency lock, and CDP overlay. The compatibility command is now an exact
   tombstone wrapper that exits `78` without starting Python or a browser.
 - Define Playwright CLI and Chrome DevTools MCP as the only active providers,
-  both routed through the fixed managed CloakBrowser endpoint.
 
 ### Security
 
@@ -634,9 +633,6 @@ contract, and becomes a first-class GDS module.
   explicit GUI overlay and server Docker mode.
 - Add non-secret authentication handoff guidance and safe Ubuntu server
   baseline/Docker verification for 24.04 and 26.04.
-- Make CloakBrowser the mandatory, health-gated browser boundary for Chrome
-  DevTools MCP, Playwright CLI, and Webwright with no stock-browser fallback.
-- Add frozen AI CLI/Node-provider/CloakBrowser/Webwright dependency locks and
   immutable, hashed Node.js, uv, Bun, Antigravity, Homebrew, and RTK artifact
   channels; AI package lifecycle scripts remain disabled.
 
@@ -693,31 +689,22 @@ contract, and becomes a first-class GDS module.
 
 ### Fixed
 
-- CloakBrowser default privacy-first browser backend across all adapters (ADR 0003).
 
 ## [0.2.5] - 2026-07-08
 
 ### Fixed
 
-- CloakBrowser default privacy-first browser backend across all adapters (ADR 0003).
 
 ## [0.2.4] - 2026-07-08
 
 ### Added
 
-- CloakBrowser as the default privacy-first browser backend for every provider.
-  Installs the pinned `cloakbrowser==0.4.8` wrapper into an isolated venv,
   downloads and Ed25519-verifies the free-tier Chromium binary, and publishes
   `cloak-chromium` / `cloak-chromium-stealth` launchers. A managed headless CDP
   daemon (launchd on macOS, systemd `--user` on Linux, `KeepAlive`) serves
   `127.0.0.1:9222`; adapter Chrome DevTools MCP connects with `--browserUrl`,
-  Webwright/Playwright use the launcher via `AGENT_BROWSER_EXECUTABLE_PATH`.
-  Pro (v148+) is opt-in through `CLOAKBROWSER_LICENSE_KEY`; skip the layer with
-  `RLDYOUR_SKIP_CLOAKBROWSER=1`.
 
 ### Fixed
-- CloakBrowser default privacy-first browser backend across all adapters (ADR 0003).
-- CloakBrowser daemon on headless Ubuntu servers: enable `systemd` linger
   so the `--user` service boot-starts without an active login session.
 
 - Login-shell PATH precedence: the managed `.zprofile` re-asserts the user
@@ -903,7 +890,6 @@ contract, and becomes a first-class GDS module.
 
 ### Added
 
-- Install pinned browser providers (Chrome DevTools MCP, Playwright CLI, Webwright) for all adapters.
 
 ## [0.1.2] - 2026-07-04
 

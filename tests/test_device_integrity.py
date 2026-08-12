@@ -227,16 +227,28 @@ def test_verify_contract_versions_detects_absent_runtime() -> None:
         di._verify_contract_versions(state)
 
 
-def test_verify_contract_versions_detects_user_tool_drift() -> None:
+def test_verify_contract_versions_detects_user_tool_drift(monkeypatch: pytest.MonkeyPatch) -> None:
     contract = di.load_contract()
+    monkeypatch.setattr(di, "_applies_to_current_os", lambda spec: True)
+    runtime_support = contract["runtime_support"]
     declared = list(contract.get("user_tools", {}))
     if not declared:
         pytest.skip("contract declares no user tools")
     name = declared[0]
     declared_version = contract["user_tools"][name]["version"]
     state = {
-        "runtime_hosts": {},
-        "pinned_source_tools": {},
+        "runtime_hosts": {
+            runtime_name: {
+                "normalized": di._normalize_version(runtime_support[field], runtime_name),
+                "raw": runtime_support[field],
+                "path": f"/bin/{runtime_name}",
+            }
+            for runtime_name, (_flag, field) in di.RUNTIME_HOSTS.items()
+        },
+        "pinned_source_tools": {
+            tool: spec["version"]
+            for tool, spec in runtime_support[di.PINNED_SOURCE_TOOLS_CONTRACT].items()
+        },
         "user_tools": {
             name: {
                 "installed_version": "0.0.0",
@@ -266,6 +278,7 @@ def test_telegram_presence_probe_never_executes_the_gui(
         return "herdr 0.7.5"
 
     monkeypatch.setattr(di.shutil, "which", lambda name: str(bin_dir / name))
+    monkeypatch.setattr(di, "_applies_to_current_os", lambda spec: True)
     monkeypatch.setattr(di, "_run_version", fake_run_version)
     state = di._user_tool_state(bin_dir, tmp_path)
 

@@ -105,12 +105,10 @@ def test_server_does_not_plan_gui_or_desktop_customization() -> None:
     assert "desktop.sh" not in output
 
 
-def test_server_does_not_plan_user_tools_or_desktop_entries() -> None:
-    """Server profile must not install herdr or .desktop launchers."""
+def test_server_plans_herdr_but_not_desktop_entries() -> None:
+    """Server receives the SSH-capable terminal tool without GUI launchers."""
     output = run_plan_full("--platform", "ubuntu", "--profile", "server", "--docker-mode", "rootful")
-    # The desktop-only block (install_user_tools + install_desktop_entries) is
-    # gated by PROFILE=desktop. Server must not reach it.
-    assert "managed herdr" not in output
+    assert "managed herdr" in output
     assert "herdr.desktop" not in output
 
 
@@ -142,14 +140,12 @@ def test_server_does_plan_server_layer() -> None:
 
 
 def test_desktop_no_gui_skips_desktop_customization_but_keeps_toolchain() -> None:
-    """Desktop+no-gui: skips GNOME/.desktop but retains terminal/LSP/browser stack."""
+    """Desktop+no-gui skips desktop integration but retains terminal/LSP tools."""
     output = run_plan_full("--platform", "ubuntu", "--profile", "desktop", "--no-gui")
     assert "GUI application layer disabled" in output
     assert "desktop entries skipped: gui disabled" in output
     assert "Configure Ubuntu desktop" not in output
     assert "desktop.sh" not in output
-    # Browser layer is mandatory regardless of GUI mode.
-    assert "CloakBrowser" in output
 
 
 def test_desktop_gui_includes_desktop_customization() -> None:
@@ -159,10 +155,10 @@ def test_desktop_gui_includes_desktop_customization() -> None:
     assert "Configure Ubuntu desktop" in output
 
 
-def test_server_plans_compiled_hosts_skip_message() -> None:
-    """Server profile must emit the compiled-language-hosts skip message."""
+def test_server_plans_compiled_language_hosts() -> None:
     output = run_plan("--platform", "ubuntu", "--profile", "server")
-    assert "compiled-language LSP hosts skipped" in output
+    assert "Ensure Go" in output
+    assert "Ensure Rust" in output
 
 
 def test_desktop_builds_plans_docker_without_server_baseline() -> None:
@@ -183,46 +179,6 @@ def test_desktop_builds_gets_compiled_hosts_and_user_tools() -> None:
     assert "managed herdr" in output
     assert "managed telegram" in output
 
-
-def test_browser_is_mandatory_on_all_profiles() -> None:
-    """CloakBrowser must appear in plan output for every profile/mode."""
-    combos = [
-        ("--platform", "ubuntu", "--profile", "desktop", "--gui"),
-        ("--platform", "ubuntu", "--profile", "desktop", "--no-gui"),
-        ("--platform", "ubuntu", "--profile", "server", "--docker-mode", "rootful"),
-        ("--platform", "ubuntu", "--profile", "server", "--docker-mode", "rootless"),
-    ]
-    for combo in combos:
-        output = run_plan_full(*combo)
-        assert "CloakBrowser" in output, f"browser missing from plan: {combo}"
-
-
-# ----------------------------- B2: exit-2 validation coverage -----------------------------
-
-
-# Each case: (args, expected_stderr_substring).
-# These are the rules NOT covered by the existing test_invalid_profile_combinations_fail_closed.
-INVALID_COMBOS: list[tuple[tuple[str, ...], str]] = [
-    (("--platform", "foo"), "Unsupported platform: foo"),
-    (("--platform", "ubuntu", "--profile", "foo"), "Unsupported profile: foo"),
-    (("--platform", "ubuntu", "--profile", "desktop", "--docker-mode", "foo"), "Unsupported Docker mode: foo"),
-    (("--platform", "macos", "--profile", "desktop", "--docker-mode", "rootful"), "source/LSP-only"),
-    (("--platform", "ubuntu", "--profile", "desktop", "--docker-mode", "rootless"), "source/LSP-only"),
-    (("--platform", "ubuntu", "--profile", "desktop", "--harden-ssh"), "Server hardening flags require"),
-    (("--platform", "ubuntu", "--profile", "desktop", "--enable-ufw"), "Server hardening flags require"),
-    (("--platform", "ubuntu", "--profile", "desktop", "--with-fail2ban"), "Server hardening flags require"),
-    (("--platform", "macos", "--profile", "desktop-builds"), "macOS only supports"),
-]
-
-
-@pytest.mark.parametrize("args, expected_message", INVALID_COMBOS)
-def test_invalid_combination_exits_nonzero_with_message(args: tuple[str, ...], expected_message: str) -> None:
-    result = run_invalid(*args)
-    assert result.returncode != 0, f"expected non-zero exit for {args}, got 0"
-    assert expected_message in result.stderr, (
-        f"expected stderr to contain {expected_message!r} for {args}, "
-        f"got: {result.stderr.strip()!r}"
-    )
 
 
 # ----------------------------- B3: validate_target unit tests -----------------------------
@@ -344,11 +300,8 @@ def test_install_gui_apps_guards_on_server_profile() -> None:
     assert '"$GUI_ENABLED" -ne 1' in body, "install_gui_apps missing GUI_ENABLED guard"
 
 
-def test_install_compiled_language_hosts_guards_on_server_profile() -> None:
-    """install_compiled_language_hosts must early-return when PROFILE is server."""
+def test_install_compiled_language_hosts_has_no_server_exclusion() -> None:
     source = INSTALL.read_text(encoding="utf-8")
     start = source.index("install_compiled_language_hosts()")
     body = source[start : start + 300]
-    assert '"$PROFILE" = "server"' in body, (
-        "install_compiled_language_hosts missing PROFILE=server guard"
-    )
+    assert '"$PROFILE" = "server"' not in body

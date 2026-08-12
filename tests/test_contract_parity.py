@@ -46,15 +46,6 @@ def test_apt_baseline_matches_contract() -> None:
     )
 
 
-def test_apt_cloak_runtime_matches_contract() -> None:
-    """APT_CLOAK_RUNTIME_PACKAGES == contract cloak_runtime."""
-    code = _parse_bash_array(UBUNTU_INSTALL, "APT_CLOAK_RUNTIME_PACKAGES")
-    contract = set(CONTRACT["ubuntu_apt_packages"]["cloak_runtime"])
-    assert code == contract, (
-        f"cloak runtime drift:\n  in code only: {code - contract}\n  in contract only: {contract - code}"
-    )
-
-
 def test_host_build_packages_are_profile_isolated() -> None:
     code = _parse_bash_array(UBUNTU_INSTALL, "APT_DESKTOP_BUILD_PACKAGES")
     assert code == set(CONTRACT["ubuntu_apt_packages"]["desktop_build"])
@@ -151,37 +142,3 @@ def test_user_tools_match_the_contract() -> None:
         elif "archive_sha256" in spec:
             assert row[6] == spec["archive_sha256"], f"{name}: archive SHA-256 drift"
             assert row[7] == spec["archive_sha256"], f"{name}: archive SHA-256 (arm64 slot) drift"
-
-
-def test_browseros_deb_url_and_sha_in_contract() -> None:
-    """BrowserOS .deb must be versioned (not CDN latest) with a pinned SHA-256."""
-    desktop_apps = CONTRACT["ubuntu_apt_packages"]["desktop_apps"]
-    browseros = next(app for app in desktop_apps if isinstance(app, dict) and app.get("name") == "browseros")
-    assert "version" in browseros, "browseros desktop_app missing version"
-    assert "sha256" in browseros, "browseros desktop_app missing sha256"
-    assert "github.com" in browseros["url"], (
-        f"browseros URL must be a versioned GitHub release, not CDN latest: {browseros['url']}"
-    )
-    assert browseros["sha256"] != "", "browseros sha256 must not be empty"
-
-
-def test_browseros_desktop_sh_uses_versioned_url_and_sha() -> None:
-    """desktop.sh must download BrowserOS from the versioned GitHub URL with SHA-256 verification."""
-    desktop_sh = (ROOT / "scripts/ubuntu/desktop.sh").read_text(encoding="utf-8")
-    browseros = next(
-        app for app in CONTRACT["ubuntu_apt_packages"]["desktop_apps"]
-        if isinstance(app, dict) and app.get("name") == "browseros"
-    )
-    assert browseros["url"] in desktop_sh, (
-        f"desktop.sh missing versioned BrowserOS URL: {browseros['url']}"
-    )
-    assert browseros["sha256"] in desktop_sh, (
-        "desktop.sh missing BrowserOS SHA-256 constant"
-    )
-    assert "download_verified_file" in desktop_sh, (
-        "desktop.sh must use rldyour::download_verified_file, not bare wget"
-    )
-    assert "cdn.browseros.com" not in desktop_sh, (
-        "desktop.sh must not reference the volatile CDN latest pointer"
-    )
-

@@ -17,6 +17,7 @@ def _run_policy(home: Path, *, dry_run: bool = False) -> subprocess.CompletedPro
     env = os.environ.copy()
     env["HOME"] = str(home)
     env["RLDYOUR_DRY_RUN"] = "1" if dry_run else "0"
+    env["RLDYOUR_GUI_ENABLED"] = "1"
     env.pop("XDG_DATA_HOME", None)
     return subprocess.run(
         [
@@ -169,6 +170,7 @@ def test_user_tool_install_attempts_telegram_after_an_earlier_failure(
     env["HOME"] = str(tmp_path)
     env["RLDYOUR_DRY_RUN"] = "0"
     env["CALLS_FILE"] = str(calls)
+    env["RLDYOUR_GUI_ENABLED"] = "1"
     result = subprocess.run(
         [
             "bash",
@@ -192,13 +194,6 @@ install_user_tools
     assert result.returncode != 0
     assert calls.read_text(encoding="utf-8").splitlines() == ["herdr", "telegram"]
 
-
-def test_mandatory_browser_repair_precedes_optional_user_tools() -> None:
-    source = INSTALL.read_text(encoding="utf-8")
-    main = source.split("main() {", 1)[1]
-    assert main.index("rldyour::install_browser_providers") < main.index(
-        "if ! install_user_tools"
-    )
 
 
 def test_telegram_favorite_migrates_before_legacy_launchers_are_retired() -> None:

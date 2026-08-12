@@ -16,7 +16,6 @@ SKIP_CHECKS=0
 HARDEN_SSH=0
 ENABLE_UFW=0
 WITH_FAIL2BAN=0
-INSTALL_OPEN_DESIGN=0
 
 usage() {
   cat <<'EOF'
@@ -25,7 +24,6 @@ Usage: scripts/bootstrap.sh [--platform macos|ubuntu] [--profile desktop|desktop
                            [--apply|--plan] [--skip-system] [--skip-ai]
                            [--skip-lsps] [--skip-checks] [--strict]
                            [--harden-ssh] [--enable-ufw] [--with-fail2ban]
-                           [--install-open-design]
 
 Entrypoint for the module installer.
 
@@ -37,28 +35,19 @@ Default:
   - Docker: rootful on Ubuntu server/desktop-builds, none on desktop; rootless is explicit
 
 Profiles:
-  - desktop:        source editing, LSP/quality tools, AI CLIs, mandatory headless
-                    CloakBrowser, and optional GUI apps. No Docker or project runtime.
+  - desktop:        source editing, LSP/quality tools, three vendor AI CLIs, and
+                    optional GUI apps. No Docker or project runtime.
   - desktop-builds: Ubuntu-only — everything desktop has, PLUS Docker rootful for
                     local builds/tests. Receives the server Docker layer without the
                     server baseline (no openssh-server, unattended-upgrades, or chrony).
   - server:         Ubuntu-only headless build/runtime host with Docker, AI CLIs,
-                    LSPs, mandatory CloakBrowser, and safe server verification.
+                    LSPs, terminal tooling, and safe server verification.
 
 Safety:
   --harden-ssh and --enable-ufw are never implied. They require an explicit
   apply run because a generic remote-host mutation can lock out SSH or expose
   Docker-published ports. Plan mode remains the default.
 
-Optional workload:
-  --install-open-design  Bring up Open Design (https://github.com/nexu-io/open-design)
-                         as a Docker container on http://127.0.0.1:7456. Open Design
-                         publishes no native Linux builds, so on Linux it runs via the
-                         published Docker image ghcr.io/nexu-io/od. This is the first
-                         docker-compose workload in the module and is opt-in only; it
-                         does NOT relax the desktop source-lsp policy (Docker must
-                         already be present on desktop) and never adds the user to the
-                         docker group. Disabled by default.
 EOF
 }
 
@@ -104,10 +93,6 @@ while [ "$#" -gt 0 ]; do
       SKIP_LSPS=1
       shift
       ;;
-    --skip-browser)
-      echo "--skip-browser is unsupported: CloakBrowser is mandatory and has no stock-browser fallback" >&2
-      exit 2
-      ;;
     --skip-checks)
       SKIP_CHECKS=1
       shift
@@ -126,10 +111,6 @@ while [ "$#" -gt 0 ]; do
       ;;
     --with-fail2ban)
       WITH_FAIL2BAN=1
-      shift
-      ;;
-    --install-open-design)
-      INSTALL_OPEN_DESIGN=1
       shift
       ;;
     -h | --help)
@@ -250,12 +231,10 @@ export RLDYOUR_STRICT=$STRICT
 export RLDYOUR_SKIP_SYSTEM=$SKIP_SYSTEM
 export RLDYOUR_SKIP_AI=$SKIP_AI
 export RLDYOUR_SKIP_LSPS=$SKIP_LSPS
-export RLDYOUR_BROWSER_REQUIRED=1
 export RLDYOUR_SKIP_CHECKS=$SKIP_CHECKS
 export RLDYOUR_HARDEN_SSH=$HARDEN_SSH
 export RLDYOUR_ENABLE_UFW=$ENABLE_UFW
 export RLDYOUR_WITH_FAIL2BAN=$WITH_FAIL2BAN
-export RLDYOUR_INSTALL_OPEN_DESIGN=$INSTALL_OPEN_DESIGN
 if [ "$PROFILE" = "desktop" ]; then
   export RLDYOUR_LOCAL_EXECUTION_POLICY="source-lsp-only"
 elif [ "$PROFILE" = "desktop-builds" ]; then

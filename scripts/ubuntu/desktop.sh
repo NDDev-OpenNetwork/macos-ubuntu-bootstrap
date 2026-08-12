@@ -11,8 +11,9 @@
 # What it does (desktop profile only):
 #   1. GNOME dock: move to bottom, centered, macOS-style.
 #   2. Keyboard: add Russian layout with Alt+Shift toggle.
-#   3. BrowserOS: install the open-source agentic browser (.deb).
-#   4. Firefox: remove the stock snap+apt Firefox completely.
+#   3. Google Chrome: install from Google's fingerprint-verified apt source.
+#   4. RustDesk: install the pinned official package.
+#   5. Firefox: remove the stock snap+apt Firefox completely.
 #
 # Server profile (headless) skips this entirely.
 # ------------------------------------------------------------
@@ -25,9 +26,16 @@ MODULE_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 # shellcheck source=../lib/common.sh
 . "$SCRIPT_DIR/../lib/common.sh"
 
-BROWSEROS_DEB_URL="https://github.com/browseros-ai/BrowserOS/releases/download/v0.47.18/BrowserOS_v0.47.18_amd64.deb"
-BROWSEROS_DEB_SHA256="bfdda9be19ab0ec69602156a5c8aba3bd163351ca89539ecfda2761596b4dc7b"
-BROWSEROS_DEB_TMP="/tmp/BrowserOS.deb"
+CHROME_KEY_URL="https://dl.google.com/linux/linux_signing_key.pub"
+CHROME_KEY_FINGERPRINT="EB4C1BFD4F042F6DDDCCEC917721F63BD38B4796"
+CHROME_REPO_URI="https://dl.google.com/linux/chrome/deb/"
+CHROME_MANAGED_KEYRING="/etc/apt/keyrings/rldyour-google-chrome.asc"
+CHROME_MANAGED_SOURCE="/etc/apt/sources.list.d/rldyour-google-chrome.sources"
+RUSTDESK_VERSION="1.4.9"
+RUSTDESK_URL_X64="https://github.com/rustdesk/rustdesk/releases/download/1.4.9/rustdesk-1.4.9-x86_64.deb"
+RUSTDESK_SHA256_X64="7244ba47c40e804172044bfbe659467c54ce46554c98e78c8c0406f1d612fda3"
+RUSTDESK_URL_ARM64="https://github.com/rustdesk/rustdesk/releases/download/1.4.9/rustdesk-1.4.9-aarch64.deb"
+RUSTDESK_SHA256_ARM64="ce62c996f14d33f3bbe3a330e953644a44bace7f05885a7953f7395d69fb49c0"
 
 # ----------------------------- helpers -----------------------------
 info() { printf '\033[1;34m==> %s\033[0m\n' "$*"; }
@@ -42,7 +50,7 @@ nddev::desktop_configure() {
   command -v localectl >/dev/null || die "localectl missing (needs systemd)"
 
   if [ "${RLDYOUR_DRY_RUN:-1}" -eq 1 ]; then
-    rldyour::log "info" "[DRY-RUN] desktop customization: GNOME dock bottom, Russian layout, BrowserOS install, Firefox removal"
+    rldyour::log "info" "[DRY-RUN] desktop customization: GNOME dock bottom, Russian layout, Google Chrome stable, RustDesk ${RUSTDESK_VERSION}, Firefox removal"
     return 0
   fi
 
@@ -53,9 +61,29 @@ nddev::desktop_configure() {
 
   nddev::_gnome_dock_bottom || warn "GNOME dock step reported an error (continuing)"
   nddev::_russian_keyboard_layout || warn "Russian keyboard step reported an error (continuing)"
-  nddev::_install_browseros || warn "BrowserOS install step reported an error (continuing)"
+  nddev::_install_google_chrome || die "Google Chrome installation failed"
+  nddev::_install_rustdesk || die "RustDesk installation failed"
   nddev::_remove_firefox || warn "Firefox removal step reported an error (continuing)"
   ok "desktop customization complete"
+}
+
+nddev::_install_rustdesk() {
+  info "Installing RustDesk ${RUSTDESK_VERSION}"
+  local url sha stage
+  case "$(uname -m)" in
+    x86_64|amd64) url="$RUSTDESK_URL_X64"; sha="$RUSTDESK_SHA256_X64" ;;
+    aarch64|arm64) url="$RUSTDESK_URL_ARM64"; sha="$RUSTDESK_SHA256_ARM64" ;;
+    *) warn "RustDesk has no declared package for $(uname -m)"; return 1 ;;
+  esac
+  if dpkg-query -W -f='${Version}' rustdesk 2>/dev/null | grep -Fq "$RUSTDESK_VERSION"; then
+    ok "RustDesk already installed"
+    return 0
+  fi
+  stage="$(mktemp -d)" || return 1
+  rldyour::download_verified_file "$url" "$sha" "$stage/rustdesk.deb" || return 1
+  nddev::_sudo_refresh
+  sudo env DEBIAN_FRONTEND=noninteractive apt-get install -y "$stage/rustdesk.deb"
+  dpkg-query -W -f='${Status}' rustdesk 2>/dev/null | grep -Fq 'install ok installed'
 }
 
 # Refresh sudo timestamp before a sudo-requiring step. Dies if it cannot.
@@ -100,29 +128,28 @@ nddev::_russian_keyboard_layout() {
   ok "X11 keymap set to us,ru with Alt+Shift toggle"
 }
 
-# ----------------------------- BrowserOS -----------------------------
-nddev::_install_browseros() {
-  info "Installing BrowserOS (open-source agentic browser)"
-  local installed
-  installed="$(dpkg-query -W -f='${Status}' browseros 2>/dev/null || true)"
-  if printf '%s' "$installed" | command grep -q "install ok installed"; then
-    ok "BrowserOS already installed"
-    return 0
-  fi
-
+# ----------------------------- Google Chrome -----------------------------
+nddev::_install_google_chrome() {
+  info "Installing current Google Chrome stable"
   nddev::_sudo_refresh
-  info "Downloading BrowserOS .deb (versioned, SHA-256 verified)"
-  rldyour::download_verified_file "$BROWSEROS_DEB_URL" "$BROWSEROS_DEB_SHA256" "$BROWSEROS_DEB_TMP" \
-    || { warn "BrowserOS .deb download or SHA-256 verification failed"; return 1; }
-  ok "downloaded and verified ($(du -h "$BROWSEROS_DEB_TMP" | cut -f1))"
-
-  sudo dpkg -i "$BROWSEROS_DEB_TMP" 2>/dev/null \
-    || sudo apt-get install -f -y 2>/dev/null
-  rm -f "$BROWSEROS_DEB_TMP"
-
-  dpkg-query -W -f='${Status}' browseros 2>/dev/null | command grep -q "install ok installed" \
-    && ok "BrowserOS installed" \
-    || die "BrowserOS installation failed"
+  local stage fingerprint
+  stage="$(mktemp -d)" || return 1
+  curl --proto '=https' --tlsv1.2 --fail --silent --show-error --location \
+    "$CHROME_KEY_URL" --output "$stage/google.asc" || return 1
+  fingerprint="$(gpg --show-keys --with-colons "$stage/google.asc" 2>/dev/null | awk -F: '$1 == "fpr" { print $10 }')"
+  [ "$fingerprint" = "$CHROME_KEY_FINGERPRINT" ] || {
+    warn "Google signing key fingerprint mismatch"
+    return 1
+  }
+  sudo install -d -m 0755 /etc/apt/keyrings
+  sudo install -m 0644 "$stage/google.asc" "$CHROME_MANAGED_KEYRING"
+  printf 'Types: deb\nURIs: %s\nSuites: stable\nComponents: main\nArchitectures: amd64\nSigned-By: %s\n' \
+    "$CHROME_REPO_URI" "$CHROME_MANAGED_KEYRING" | sudo tee "$CHROME_MANAGED_SOURCE" >/dev/null
+  sudo apt-get update
+  sudo env DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends google-chrome-stable
+  command -v google-chrome-stable >/dev/null || return 1
+  xdg-settings set default-web-browser google-chrome.desktop 2>/dev/null || true
+  ok "Google Chrome stable installed"
 }
 
 # ----------------------------- Firefox removal -----------------------------

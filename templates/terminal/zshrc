@@ -79,8 +79,8 @@ elif command -v batcat >/dev/null 2>&1; then
   alias cat='batcat'
 fi
 command -v lazygit >/dev/null 2>&1 && alias lg='lazygit'
-# Harness launchers cl / cx / oc are real executables in ~/.local/bin
-# (installed by rldyour-ai-cli-tools) — not aliases, so agents can exec them.
+# Harness launchers cx / cl / gk are real executables in ~/.local/bin and start
+# Codex, Claude Code, and Grok Build in their vendor-supported full-auto modes.
 if command -v abbr >/dev/null; then
   if command -v git >/dev/null 2>&1; then
     abbr -S -qq gs='git status'     2>/dev/null

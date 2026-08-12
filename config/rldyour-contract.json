@@ -2,9 +2,9 @@
   "schema_version": 2,
   "adapter": {
     "id": "macos-ubuntu-bootstrap",
-    "version": "2.6.1"
+    "version": "3.0.0"
   },
-  "verified_on": "2026-08-04",
+  "verified_on": "2026-08-13",
   "targets": {
     "macos": {
       "architectures": [
@@ -67,7 +67,9 @@
     }
   },
   "remote_execution": {
-    "client_profiles": ["desktop"],
+    "client_profiles": [
+      "desktop"
+    ],
     "executor_profile": "server",
     "transport": "openssh-exact-head",
     "entrypoint": "scripts/remote-exec.sh",
@@ -77,24 +79,31 @@
     "credentials": "owner-managed-ssh-agent"
   },
   "harnesses": {
-    "policy": "one-owner-per-harness",
+    "policy": "vendor-official",
     "active": [
-      "codex"
+      "codex",
+      "claude-code",
+      "grok-build"
     ],
     "codex": {
-      "owner_module": "nddev-codex-app",
-      "module_path_env": "RLDYOUR_CODEX_MODULE",
-      "module_repo": "https://github.com/NDDev-it-com/nddev-codex-app.git",
-      "module_commit": "a69d77f1c62b5e02cdd9b886c412a53cee92e24a",
-      "default_setup": "full-auto"
+      "version": "0.147.0",
+      "install_method": "verified-npm-tarball",
+      "launcher": "cx",
+      "sha512": "1102c45de7001b6a6dc48ed4a41328d9347f81ae79f7afdcfceb1817fd0ba140e1e4900d67b2281aa97304459bb84550efa25e3c86ed4d6fe2842929d5aed9df"
     },
-    "delegated": {
-      "zcode": {
-        "work_policy": "on-pause",
-        "owner_repo": "nddev-harnesses",
-        "owner_module": "modules/nddev-zcode-app",
-        "reason": "ZCode remains catalogued but its global work-policy is on-pause. Bootstrap never installs, starts, verifies, removes, or adopts it; any installed copy is preserved until a separate approved device plan changes that state."
-      }
+    "claude-code": {
+      "channel": "stable",
+      "install_method": "verified-vendor-script",
+      "launcher": "cl",
+      "installer_url": "https://claude.ai/install.sh",
+      "installer_sha256": "cde4f1702d3b1695f92b73d26888364e17bca476e17f0fd676484c951d36c125"
+    },
+    "grok-build": {
+      "channel": "stable",
+      "install_method": "verified-vendor-script",
+      "launcher": "gk",
+      "installer_url": "https://x.ai/cli/install.sh",
+      "installer_sha256": "43d0943123edade1383a476a4f778674877acee7c1f98a00f094c4a0f7349321"
     }
   },
   "runtime_support": {
@@ -206,57 +215,26 @@
       }
     }
   },
-  "browser_automation": {
-    "required": true,
-    "provider": "cloakbrowser",
-    "cloakbrowser": "0.4.12",
-    "cdp_endpoint": "http://127.0.0.1:9222",
-    "linux_service_dbus_address": "disabled:",
-    "fallback_allowed": false,
-    "chrome_devtools_mcp": "1.6.0",
-    "playwright_cli": "0.1.17",
-    "active_providers": [
-      "playwright-cli",
-      "chrome-devtools-mcp"
-    ],
-    "webwright_status": "retired-fail-closed",
-    "webwright_enabled": false,
-    "disabled_wrapper": "webwright"
-  },
   "gui": {
     "macos": [
       "ghostty",
       "cmux",
+      "google-chrome",
       "chatgpt",
-      "codex-app",
-      "claude"
+      "claude",
+      "rustdesk",
+      "telegram"
     ],
-    "ubuntu": []
-  },
-  "open_design": {
-    "_doc": "Open Design (https://github.com/nexu-io/open-design) is the open-source Claude Design alternative. It publishes NO native Linux builds (macOS .dmg / Windows .exe only), so on Linux it runs via the published Docker image ghcr.io/nexu-io/od. This is the first docker-compose workload in the module. It is gated behind an explicit operator opt-in and deliberately does NOT relax the desktop source-lsp policy (Docker must already be present on desktop) nor the never-automatic docker-group policy.",
-    "enabled_by_default": false,
-    "install_flag": "--install-open-design",
-    "env_var": "RLDYOUR_INSTALL_OPEN_DESIGN",
-    "repo": "https://github.com/NDDev-it-com/open-design.git",
-    "workspace_target": "${HOME}/Developer/forks/open-design",
-    "image": "ghcr.io/nexu-io/od:latest",
-    "port": 7456,
-    "requires_docker": true,
-    "desktop_docker_policy": "preinstalled-only (bootstrap never installs Docker on desktop; source-lsp policy preserved)",
-    "server_docker_policy": "installed-by-server-layer (rootful/rootless)",
-    "managed_receipt": "open-design-v1",
-    "profiles": [
-      "desktop",
-      "server"
+    "ubuntu": [
+      "google-chrome",
+      "rustdesk",
+      "telegram"
     ]
   },
   "supply_chain": {
     "homebrew_pkg_version": "6.0.9",
     "homebrew_pkg_sha256": "525599bd2dcbda29857120234336b0103ad5283a3dc8511f72066eeb917abd3c",
-    "homebrew_installer_team": "927JGANW46",
-    "browser_provider_lock": "templates/browser/provider/bun.lock",
-    "cloakbrowser_lock": "templates/browser/cloakbrowser-uv.lock"
+    "homebrew_installer_team": "927JGANW46"
   },
   "user_tools": {
     "herdr": {
@@ -281,7 +259,9 @@
         "linux"
       ],
       "profiles": [
-        "desktop"
+        "desktop",
+        "desktop-builds",
+        "server"
       ]
     },
     "telegram": {
@@ -305,7 +285,8 @@
       ],
       "profiles": [
         "desktop"
-      ]
+      ],
+      "gui_required": true
     }
   },
   "desktop_entries": {
@@ -365,7 +346,7 @@
     }
   },
   "ubuntu_apt_packages": {
-    "_doc": "apt packages installed by scripts/ubuntu/install.sh::install_apt_baseline. The terminal/LSP baseline and cloak_runtime are installed on all profiles. desktop_build adds the host compiler only to desktop profiles; server remains container-execution-only. desktop_apps are installed only for GUI desktop profiles.",
+    "_doc": "Packages for terminal, source analysis, LSP hosts, and profile-specific build support.",
     "baseline": [
       "ca-certificates",
       "curl",
@@ -402,54 +383,7 @@
     "desktop_build": [
       "build-essential"
     ],
-    "cloak_runtime": [
-      "libnss3",
-      "libnspr4",
-      "libatk1.0-0t64",
-      "libatk-bridge2.0-0t64",
-      "libcups2t64",
-      "libdbus-1-3",
-      "libdrm2",
-      "libxkbcommon0",
-      "libatspi2.0-0t64",
-      "libxcomposite1",
-      "libxdamage1",
-      "libxfixes3",
-      "libxrandr2",
-      "libgbm1",
-      "libpango-1.0-0",
-      "libcairo2",
-      "libasound2t64",
-      "libx11-xcb1",
-      "libfontconfig1",
-      "libfreetype6",
-      "libx11-6",
-      "libxcb1",
-      "libxext6",
-      "libxshmfence1",
-      "libglib2.0-0t64",
-      "libgtk-3-0t64",
-      "libpangocairo-1.0-0",
-      "libcairo-gobject2",
-      "libgdk-pixbuf-2.0-0",
-      "libxss1",
-      "libxtst6",
-      "fonts-liberation",
-      "fonts-noto-color-emoji",
-      "fonts-unifont",
-      "fonts-freefont-ttf",
-      "fonts-ipafont-gothic",
-      "fonts-wqy-zenhei",
-      "fonts-tlwg-loma-otf"
-    ],
     "desktop_apps": [
-      {
-        "name": "browseros",
-        "version": "0.47.18",
-        "deb_version": "148.0.7966.97",
-        "url": "https://github.com/browseros-ai/BrowserOS/releases/download/v0.47.18/BrowserOS_v0.47.18_amd64.deb",
-        "sha256": "bfdda9be19ab0ec69602156a5c8aba3bd163351ca89539ecfda2761596b4dc7b"
-      },
       "deskflow",
       "happ"
     ],
@@ -457,25 +391,21 @@
       "desktop": [
         "baseline",
         "desktop_build",
-        "cloak_runtime",
         "desktop_apps"
       ],
       "desktop-builds": [
         "baseline",
         "desktop_build",
-        "cloak_runtime",
         "desktop_apps"
       ],
       "server": [
-        "baseline",
-        "cloak_runtime"
+        "baseline"
       ]
     }
   },
   "safety": {
     "default_mode": "plan",
     "ubuntu_profile_selection": "explicit",
-    "browser_unmanaged_files": "preserve-and-fail",
     "system_configuration": "backup-validate-rollback",
     "credentials": "manual-handoff-only",
     "desktop_local_runtime": false,

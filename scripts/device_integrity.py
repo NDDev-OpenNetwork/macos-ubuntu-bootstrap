@@ -1,10 +1,8 @@
 #!/usr/bin/env python3
 """Build and verify the installed device runtime receipt against the contract.
 
-This script mirrors the architecture of ``browser_runtime_integrity.py``: a
 canonical-JSON receipt is built from a proven installed state, persisted
 atomically, and verified by re-collecting the state and comparing exactly. It
-extends the pattern to the *whole device* — not just the browser stack — by
 also comparing every declared runtime version and pinned source tool against
 ``config/rldyour-contract.json``, closing the gap between the contract and the
 hardcoded literals the bash installer writes.
@@ -71,7 +69,6 @@ VALID_PROFILES = ("desktop", "desktop-builds", "server")
 # which returns early on the server profile (execution_policy
 # container-execution-only) and also skips the pinned source tools, user tools,
 # and desktop entries. node/uv/bun are deliberately NOT here: the mandatory Bun
-# browser stack needs them, so they are installed on every profile. Requiring a
 # server device to carry the desktop-only set is what forced a permanent
 # NOT_PROVEN on a fully-correct server.
 COMPILED_LANGUAGE_HOSTS = frozenset({"go", "gopls", "rustc", "dart"})
@@ -196,7 +193,6 @@ def safe_directory(path: Path, *, enforce_private_mode: bool = True) -> None:
     ``enforce_private_mode`` additionally refuses a group- or world-writable
     directory. Container directories under ``~/.local/share/rldyour`` are
     routinely ``775`` because the device's umask is ``0002``; the managed
-    runtimes inside them (browser-stack, cloakbrowser) are ``700``. We refuse a
     symlink or foreign-owned directory unconditionally, but follow the same
     private-mode opt-out the Git-source hashes use for containers.
     """
@@ -259,7 +255,6 @@ def policy_hashes() -> dict[str, str]:
 def _run_version(binary: Path, flag: str) -> str:
     """Run ``<binary> <flag>`` in a scrubbed environment and return stdout.
 
-    Mirrors the subprocess idiom of browser_runtime_integrity.py: strip
     PYTHONPATH/PYTHONHOME, capture output, timeout, and chain-raise on failure.
     """
     if not binary.exists():
@@ -540,7 +535,6 @@ def _verify_contract_versions(state: dict[str, Any], *, profile: str = "desktop"
     profile (container-execution-only) never provisions the compiled-language
     hosts, pinned source tools, user tools, or desktop entries, so requiring
     them there is a false drift — the whole reason a correct server used to fail.
-    node/uv/bun stay required on every profile because the mandatory browser
     stack depends on them. The default is ``desktop``, the strict superset.
     """
     server = profile == "server"
@@ -656,7 +650,6 @@ def main() -> int:
             if output.exists() or output.is_symlink():
                 # build replaces a stale receipt: validate the old one's
                 # metadata first, then atomically swap. This mirrors the
-                # metadata-only gate the browser receipt uses before an
                 # in-place replacement.
                 if not _is_our_receipt(output):
                     fail(f"refusing to overwrite unmanaged receipt: {output}")

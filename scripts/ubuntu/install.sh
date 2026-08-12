@@ -10,9 +10,6 @@ source "$SCRIPT_DIR/../lib/common.sh"
 # shellcheck source=server.sh
 # shellcheck disable=SC1091
 source "$SCRIPT_DIR/server.sh"
-# shellcheck source=open-design.sh
-# shellcheck disable=SC1091
-source "$SCRIPT_DIR/open-design.sh"
 
 RLDYOUR_DRY_RUN="${RLDYOUR_DRY_RUN:-1}"
 PROFILE="${RLDYOUR_PROFILE:-server}"
@@ -29,10 +26,6 @@ WITH_FAIL2BAN="${RLDYOUR_WITH_FAIL2BAN:-0}"
 # Login shell change is explicit opt-in only; never mutated silently.
 SET_LOGIN_SHELL="${RLDYOUR_SET_LOGIN_SHELL:-0}"
 
-# One owner per harness (RVR-P1-004): the active harness set is codex, installed
-# by its dedicated authoritative NDDev module via
-# rldyour::install_selected_harnesses. Bootstrap pins no AI CLI versions here.
-# zcode is contract-delegated to nddev-harnesses.
 NODE_VERSION="24.18.0"
 NODE_SHA256_X64="55aa7153f9d88f28d765fcdad5ae6945b5c0f98a36881703817e4c450fa76742"
 NODE_SHA256_ARM64="58c9520501f6ae2b52d5b210444e24b9d0c029a58c5011b797bc1fe7105886f6"
@@ -94,20 +87,6 @@ APT_SOURCE_PACKAGES=(
 
 APT_DESKTOP_BUILD_PACKAGES=(build-essential)
 
-# Runtime libraries/fonts from the CloakBrowser v0.4.12 upstream Linux image.
-# They support the mandatory downloaded Chromium binary; they are not a stock
-# browser or a project runtime.
-APT_CLOAK_RUNTIME_PACKAGES=(
-  libnss3 libnspr4 libatk1.0-0t64 libatk-bridge2.0-0t64 libcups2t64
-  libdbus-1-3 libdrm2 libxkbcommon0 libatspi2.0-0t64 libxcomposite1
-  libxdamage1 libxfixes3 libxrandr2 libgbm1 libpango-1.0-0
-  libcairo2 libasound2t64 libx11-xcb1 libfontconfig1 libfreetype6 libx11-6
-  libxcb1 libxext6 libxshmfence1 libglib2.0-0t64 libgtk-3-0t64
-  libpangocairo-1.0-0 libcairo-gobject2 libgdk-pixbuf-2.0-0
-  libxss1 libxtst6 fonts-liberation fonts-noto-color-emoji
-  fonts-unifont fonts-freefont-ttf fonts-ipafont-gothic
-  fonts-wqy-zenhei fonts-tlwg-loma-otf
-)
 
 # Registry-backed language servers + source checks, pinned to exact versions
 # for reproducibility (RVR-P2-003). Two package identities are corrected here:
@@ -267,7 +246,6 @@ validate_target() {
     return 2
   fi
   if [ "$RLDYOUR_DRY_RUN" -eq 0 ] && [ "$EUID" -eq 0 ]; then
-    rldyour::log "error" "full Ubuntu bootstrap must run as the non-root developer account that will own AI configs and the CloakBrowser user service"
     rldyour::log "error" "create/login to that account with sudo, then rerun; use scripts/ubuntu/server.sh separately for root-only baseline work"
     return 2
   fi
@@ -276,8 +254,7 @@ validate_target() {
 install_apt_baseline() {
   rldyour::section "Install Ubuntu package baseline"
   rldyour::ubuntu::as_root apt-get update
-  apt_install software-properties-common \
-    "${APT_SOURCE_PACKAGES[@]}" "${APT_CLOAK_RUNTIME_PACKAGES[@]}"
+  apt_install software-properties-common "${APT_SOURCE_PACKAGES[@]}"
   if [ "$PROFILE" != "server" ]; then
     apt_install "${APT_DESKTOP_BUILD_PACKAGES[@]}"
   fi
@@ -354,6 +331,9 @@ install_pinned_source_tools() {
 install_user_tools() {
   local row failed=0
   for row in "${USER_TOOLS[@]}"; do
+    if [ "$GUI_ENABLED" -ne 1 ] && [ "${row%%;*}" = "telegram" ]; then
+      continue
+    fi
     if ! ensure_pinned_source_tool "$row"; then
       failed=1
     fi
@@ -368,6 +348,7 @@ install_user_tools() {
 # This also disables Telegram's self-generated, path-hashed desktop/D-Bus files;
 # the repository-owned .desktop entry below is the only launcher contract.
 rldyour::ubuntu::install_telegram_update_policy() {
+  [ "$GUI_ENABLED" -eq 1 ] || return 0
   local launcher="$HOME/.local/bin/telegram-desktop"
   local namespace="$HOME/.local/share/rldyour/telegram"
   local policy_dir="${XDG_DATA_HOME:-$HOME/.local/share}/TelegramDesktop/externalupdater.d"
@@ -945,14 +926,8 @@ ensure_uv() {
   "$HOME/.local/bin/uv" --version | grep -Fq "uv ${UV_VERSION}"
 }
 
-# Go and Rust back gopls and rust-analyzer. Both are desktop-only: the server
-# profile is `container-execution-only`, so a compiler on the host would be
-# exactly the local build capability that policy removes.
+# Go, Rust, and Dart are source-analysis hosts on every profile.
 install_compiled_language_hosts() {
-  if [ "$PROFILE" = "server" ]; then
-    rldyour::log "info" "compiled-language LSP hosts skipped: profile=$PROFILE builds run in Docker"
-    return 0
-  fi
   ensure_go
   ensure_rust
   ensure_dart
@@ -1426,11 +1401,7 @@ install_bun_lsps() {
   done
 }
 
-install_ai_runtimes() {
-  # Delegate the active harness set (codex) to its authoritative NDDev module; no
-  # AI CLI is installed inline or through a bun/npm global path.
-  rldyour::install_selected_harnesses
-}
+install_ai_runtimes() { rldyour::install_vendor_ai_clis; }
 
 install_gui_apps() {
   if [ "$PROFILE" = "server" ] || [ "$GUI_ENABLED" -ne 1 ]; then
@@ -1439,10 +1410,7 @@ install_gui_apps() {
   fi
   rldyour::section "Install verified Ubuntu GUI applications"
   apt_install fonts-jetbrains-mono || rldyour::log "warn" "fonts-jetbrains-mono unavailable"
-  # The active harness set (codex) is owned by its GDS module; the ZCode desktop
-  # app is owned by nddev-harnesses, not by this bootstrap.
-  rldyour::log "info" "harness desktop apps are owned by their own repositories; no GUI harness is installed here."
-  # Desktop customization: GNOME dock, Russian layout, BrowserOS, Firefox removal.
+  # Desktop customization: GNOME dock, Russian layout, Chrome, Firefox removal.
   rldyour::section "Configure Ubuntu desktop (dock, keyboard, browser)"
   local desktop_script
   desktop_script="$(dirname "${BASH_SOURCE[0]}")/desktop.sh"
@@ -1463,7 +1431,10 @@ run_server_layer() {
   fi
   if ! is_supported_ubuntu; then
     if [ "$RLDYOUR_DRY_RUN" -eq 1 ]; then
-      rldyour::log "info" "[DRY-RUN] Ubuntu server layer: Docker=$DOCKER_MODE, UFW=$ENABLE_UFW, SSH hardening=$HARDEN_SSH, Fail2ban=$WITH_FAIL2BAN"
+      rldyour::section "Ubuntu server module"
+      rldyour::log "info" "[DRY-RUN] Docker Engine ($DOCKER_MODE)"
+      [ "$PROFILE" != "desktop-builds" ] || rldyour::log "info" "[DRY-RUN] server baseline skipped"
+      rldyour::log "info" "[DRY-RUN] UFW=$ENABLE_UFW, SSH hardening=$HARDEN_SSH, Fail2ban=$WITH_FAIL2BAN"
       return 0
     fi
     rldyour::log "error" "server layer requires Ubuntu 24.04 or 26.04"
@@ -1485,24 +1456,12 @@ run_server_layer() {
   rldyour::ubuntu_server::main "${args[@]}"
 }
 
-# Open Design docker-compose workload. Gated behind an explicit operator
-# opt-in (RLDYOUR_INSTALL_OPEN_DESIGN=1). Runs on both profiles: on desktop it
-# requires Docker to already be present (never installs it); on server it runs
-# after the server layer has installed Docker. Non-fatal on failure, mirroring
-# install_gui_apps. See scripts/ubuntu/open-design.sh for the rationale.
-install_open_design_layer() {
-  [ "${RLDYOUR_INSTALL_OPEN_DESIGN:-0}" -eq 1 ] || return 0
-  rldyour::section "Install Open Design (opt-in Docker workload)"
-  rldyour::ubuntu_opendesign::install \
-    || rldyour::log "warn" "open-design layer reported issues (non-fatal)"
-}
-
 verify_apply() {
   if [ "$RLDYOUR_DRY_RUN" -eq 1 ]; then
     rldyour::log "info" "plan complete; verification runs only after apply"
   elif [ "$SKIP_CHECKS" -eq 0 ]; then
     RLDYOUR_PROFILE="$PROFILE" RLDYOUR_GUI_ENABLED="$GUI_ENABLED" \
-      RLDYOUR_DOCKER_MODE="$DOCKER_MODE" RLDYOUR_BROWSER_REQUIRED=1 \
+      RLDYOUR_DOCKER_MODE="$DOCKER_MODE" \
       RLDYOUR_SERVER_ENABLE_UFW="$ENABLE_UFW" \
       RLDYOUR_SERVER_HARDEN_SSH="$HARDEN_SSH" \
       RLDYOUR_SERVER_ENABLE_FAIL2BAN="$WITH_FAIL2BAN" \
@@ -1544,19 +1503,12 @@ main() {
   [ "$SKIP_LSPS" -eq 1 ] || install_bun_lsps
   [ "$SKIP_LSPS" -eq 1 ] || install_compiled_language_hosts
 
-  # This layer is mandatory on every profile and must precede independently
-  # optional/user-owned tools. A preserved unmanaged desktop convenience may
-  # still make the apply fail, but can no longer strand the CDP/portal repair.
-  rldyour::install_browser_providers
-
-  # User-selected desktop tools (herdr, telegram) and .desktop launchers. Desktop
-  # and desktop-builds profiles only — these are operator conveniences. Attempt
-  # every declared tool before surfacing an aggregate failure so an unmanaged
-  # herdr cannot prevent Telegram's independent repair/migration.
+  # Herdr is useful locally and over SSH, so it is installed on every profile.
+  # Telegram and desktop integration remain GUI-only.
+  if ! install_user_tools; then
+    user_tools_failed=1
+  fi
   if [ "$PROFILE" != "server" ]; then
-    if ! install_user_tools; then
-      user_tools_failed=1
-    fi
     rldyour::ubuntu::install_telegram_update_policy
     rldyour::ubuntu::install_telegram_desktop_assets
     install_desktop_entries
@@ -1567,27 +1519,21 @@ main() {
     rldyour::ubuntu::retire_telegram_legacy_managed_entry
     rldyour::ubuntu::retire_telegram_generated_integrations
     rldyour::ubuntu::configure_telegram_desktop_integration
-    if [ "$user_tools_failed" -ne 0 ]; then
-      rldyour::log "error" "one or more user tools remain unmanaged or divergent; all user-tool repairs were attempted"
-      return 1
-    fi
+  fi
+  if [ "$user_tools_failed" -ne 0 ]; then
+    rldyour::log "error" "one or more user tools remain unmanaged or divergent; all repairs were attempted"
+    return 1
   fi
 
   install_gui_apps
   run_server_layer
-
-  # Opt-in Open Design docker-compose workload. Runs after the server layer so
-  # Docker is already installed on server profiles; on desktop it preflights an
-  # already-present Docker (it never installs Docker itself).
-  install_open_design_layer
 
   # The harness layer runs LAST of the installing layers, and deliberately so.
   # It delegates to a separate module whose own fail-closed guards depend on local
   # state this repository does not own: a stale builder profile under the harness
   # target, or a checkout whose modes came from the caller's umask. Under
   # `set -euo pipefail` an abort here used to strand every layer behind it - the
-  # language servers, the compiled hosts, the pinned scanners, and the browser
-  # stack - which is how a desktop ended up missing 24 of the 46 commands
+  # language servers, compiled hosts, and pinned scanners
   # verify.sh requires. Ordering it last keeps the failure fatal, which it must be,
   # while making it fatal to itself instead of to the whole device.
   [ "$SKIP_AI" -eq 1 ] || install_ai_runtimes

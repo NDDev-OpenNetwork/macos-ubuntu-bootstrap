@@ -31,8 +31,7 @@ required_cmds=(
   tsc vtsls yaml-language-server bash-language-server docker-langserver
   vscode-html-language-server vscode-css-language-server vscode-json-language-server
   taplo marksman terraform-ls cmake-language-server
-  codex
-  cloak-chromium cloakbrowser-cdp-health chrome-devtools-mcp playwright-cli
+  codex claude grok cx cl gk
 )
 for cmd in "${required_cmds[@]}"; do
   rldyour::require_cmd "$cmd" required
@@ -64,18 +63,10 @@ dart mcp-server --version >/dev/null 2>&1 || {
   rldyour::log "missing" "'dart mcp-server' transport for the dart-flutter MCP server"
   exit 1
 }
-# The active harness set (codex) is owned by its GDS module. Deep harness proof
-# (exact CLI version, setup catalog) is delegated to the module's own status; here
-# we only require the CLI to resolve on PATH (checked above). zcode is
-# contract-delegated to nddev-harnesses and is deliberately not required.
-cloakbrowser-cdp-health
-chrome-devtools-mcp --version | grep -Fq "1.6.0"
-playwright-cli --version | grep -Fq "0.1.17"
-"$SCRIPT_DIR/../verify-browser-runtime.sh" --json
 rldyour::verify_terminal_environment
 
 if [ "$GUI_ENABLED" -eq 1 ]; then
-  for app in Ghostty cmux ChatGPT Codex Claude; do
+  for app in Ghostty cmux "Google Chrome" ChatGPT Claude RustDesk Telegram; do
     [ -d "/Applications/${app}.app" ] || {
       rldyour::log "missing" "required GUI app: /Applications/${app}.app"
       exit 1

@@ -1,262 +1,54 @@
-# rldyour macOS or Ubuntu Bootstrap
+# macOS and Ubuntu bootstrap contributor instructions
 
-## Purpose
+This repository owns plan-first installation and verification for Apple Silicon
+macOS, Ubuntu 24.04/26.04 desktops, and Ubuntu 24.04/26.04 servers.
 
-This repository owns plan-first bootstrap and verification for the rldyour AI
-CLI environment on Apple Silicon macOS desktops, Ubuntu 24.04/26.04 desktops,
-and headless Ubuntu 24.04/26.04 servers.
+The sources of truth are `scripts/bootstrap.sh`, `scripts/lib/common.sh`, the
+platform installers/verifiers, `config/rldyour-contract.json`, `README.md`, and
+`SECURITY.md`. Keep implementation, verification, contract, tests, docs,
+`VERSION`, and `CHANGELOG.md` synchronized.
 
-It is an adapter, not an upstream AI runtime. Keep installation logic,
-verification, contract metadata, tests, and documentation synchronized.
+## Contract 3.0.0
 
-## Sources Of Truth
+- macOS supports `desktop`, with optional GUI, no Docker, and source-analysis
+  plus local-check tooling.
+- Ubuntu requires explicit `desktop`, `desktop-builds`, or `server` selection.
+- Ubuntu `desktop` has no Docker; `desktop-builds` adds rootful Docker for local
+  builds/tests without the server baseline.
+- Ubuntu `server` is headless, defaults to rootful Docker, and supports explicit
+  `rootless` or `none` alternatives.
+- All profiles receive Codex CLI, Claude Code, Grok Build, zsh configuration,
+  modern terminal tools, source-quality tools, and applicable language servers.
+- `cx`, `cl`, and `gk` invoke the three AI CLIs in their documented unrestricted
+  modes. Keep the ordinary vendor commands unchanged.
+- Google Chrome stable is the only installed browser. macOS GUI installs
+  ChatGPT, Claude, Ghostty, cmux, RustDesk, and Telegram. Ubuntu GUI installs
+  Chrome, RustDesk, Telegram, and removes Firefox.
+- Herdr is installed on macOS and Ubuntu desktop profiles, including headless
+  desktop mode where the upstream binary supports it.
 
-- Public compositor: `scripts/bootstrap.sh`
-- Shared helpers and managed browser layer: `scripts/lib/common.sh`
-- macOS installer/verifier: `scripts/macos/install.sh`, `scripts/macos/verify.sh`
-- Ubuntu installer/verifier: `scripts/ubuntu/install.sh`, `scripts/ubuntu/verify.sh`
-- Ubuntu server module/verifier: `scripts/ubuntu/server.sh`, `scripts/ubuntu/verify-server.sh`
-- Authentication handoff: `scripts/auth-handoff.sh`
-- Machine-readable contract: `config/rldyour-contract.json`
-- Profile/browser decision: `docs/adr/0004-profile-composition-and-cloakbrowser-boundary.md`
-- Language-server host decision: `docs/adr/0005-go-and-rust-language-server-hosts.md`
-- Operator guide: `README.md`, `docs/install.md`, `SECURITY.md`
-- Product version: `VERSION`, `CHANGELOG.md`
+## Implementation rules
 
-When prose and implementation disagree, verify the scripts and contract, then
-update the affected documentation in the same change. Do not invent a second
-policy source.
+- Keep entrypoints strict, idempotent, plan-aware, and non-interactive.
+- Never pipe a network response into a shell. Download, verify reviewed integrity
+  metadata, then execute.
+- Use atomic managed-file updates. Preserve unmanaged/user-modified files.
+- Never read, print, store, upload, or synthesize authentication credentials.
+- Keep desktop source/check manifests free of deployment orchestration. Keep
+  server runtime and hardening in `scripts/ubuntu/server.sh`.
+- Preserve exact runtime receipts and architecture hashes for fixed artifacts.
+- Do not add mutable dependency resolution where a frozen/pinned path exists.
 
-## Contract `2.6.1`
+## Ubuntu server safeguards
 
-Ubuntu profile selection is always explicit. Never infer server/rootful Docker
-from `uname=Linux`; require `--profile desktop|desktop-builds|server`.
+The full compositor runs as the non-root sudo-capable owner. Never grant Docker
+group membership automatically. UFW, key-only SSH, and Fail2ban are independent
+opt-ins. Validate SSH syntax and live contexts before reload, preserve the active
+service/socket provider, add the SSH allow rule before enabling UFW, validate
+Fail2ban before restart, and roll back failed managed changes. Do not upgrade
+existing packages or healthy Docker implicitly.
 
-Supported compositions:
-
-- Apple Silicon macOS: `desktop`, GUI enabled or disabled, Docker `none`,
-  `source-lsp-only`.
-- Ubuntu 24.04/26.04 `amd64` or `arm64` desktop: GUI enabled or disabled,
-  Docker `none`, `source-lsp-only`.
-- Ubuntu 24.04/26.04 `amd64` or `arm64` desktop-builds: GUI enabled or disabled,
-  Docker `rootful`, `local-dev-with-builds` (everything desktop has PLUS Docker
-  for local builds/tests, without the server baseline).
-- Ubuntu 24.04/26.04 `amd64` or `arm64` server: headless, Docker
-  `none|rootful|rootless`, default `rootful`, `container-execution-only` (project
-  builds/tests run inside Docker; the host installs no build toolchain or SDKs).
-
-macOS never accepts the server or desktop-builds profile. The plain desktop
-profile never installs Docker or configures local project build/runtime
-execution; desktop-builds is the explicit exception (ADR 0008). `--no-gui`
-removes only the GUI overlay; it does not change the execution policy. Server is
-Ubuntu-only and always headless.
-
-Desktop and desktop-builds profiles additionally install Go, Rust, and the Dart SDK as
-language-server hosts for `gopls`, `rust-analyzer`, and the Dart analysis server,
-on the same footing as Node, Python, and LLVM — present to resolve source, not to
-authorize project builds (ADR 0005, ADR 0006). Dart also provides
-`dart mcp-server`, the transport the `dart-flutter` MCP server in `rldyour-mcps`
-executes; the Flutter SDK is not installed because its `bin/cache` self-populates
-and would mutate a receipt-verified tree. The server profile receives no host
-toolchain: `install_compiled_language_hosts` returns early there.
-
-## Managed Versions
-
-These values must match both platform installers, the contract, tests, and
-operator documentation:
-
-- Active harness set (one owner per harness, RVR-P1-004): `codex`.
-  Bootstrap installs no AI CLI inline and never through a bun/npm global path.
-  The harness is owned by its authoritative NDDev module, whose materialized
-  checkout GDS device bootstrap passes in an env var:
-  - `codex`: `nddev-codex-app` (`RLDYOUR_CODEX_MODULE`); `install-cli`, then
-    `apply --setup full-auto`, then `install-builder`. The module publishes its
-    CLI only under its own target, so
-    `${RLDYOUR_CODEX_HOME:-$HOME/.codex}/bin` is part of the managed PATH.
-  - `zcode`: catalogued but **on-pause** (`harnesses.delegated`, ADR 0006).
-    Bootstrap never installs, starts, verifies, removes, or adopts it. Do not
-    reintroduce a zcode path, not even a warn-and-continue one.
-- CloakBrowser: `0.4.12`. The managed headless service passes `--no-sandbox` on
-  Linux only: Ubuntu 23.10+ restrict unprivileged user namespaces through
-  AppArmor, so without it the zygote aborts and the mandatory browser layer cannot
-  start at all. macOS keeps its sandbox and the flag must never appear there. Do
-  not relax `kernel.apparmor_restrict_unprivileged_userns` instead.
-- Chrome DevTools MCP: `1.6.0`
-- Playwright CLI: `0.1.17`
-- Webwright: retired fail-closed; publish only the exact disabled wrapper
-- Ubuntu Node.js/uv/Bun: `24.18.0` / `0.11.30` / `1.3.14`, immutable assets
-  with tracked architecture hashes
-- Ubuntu pinned source tools (desktop-only, `PINNED_SOURCE_TOOLS` table, one
-  generic installer, tracked per-architecture SHA-256 + runtime receipts):
-  gitleaks `8.30.1`, osv-scanner `2.4.0`, actionlint `1.7.12`, hadolint
-  `2.15.1`, markdown-oxide `0.25.12`, delta `0.19.2`, yq `4.53.3`, ast-grep
-  `0.45.0`. Adding a tool means adding a row; there is no second install path.
-  Ubuntu uses markdown-oxide where macOS uses marksman (marksman's formula
-  depends on `dotnet@9`). ast-grep's deprecated `sg` shim is never published.
-- Ubuntu Go `1.26.5`, Rust `1.97.1`, and Dart SDK `3.12.2`, desktop-only
-  language-server hosts, tracked architecture hashes. One combined Rust archive
-  carries rustc, cargo, rust-std, clippy, rustfmt, and rust-analyzer. One Dart SDK
-  archive carries both `dart language-server` and `dart mcp-server`; both
-  verifiers gate on the exact/floor version *and* on the mcp-server subcommand
-  responding, because an SDK that resolves but cannot serve MCP is the defect
-  ADR 0006 exists to prevent. The Dart tree is permission-normalized before
-  publication (its zip stores `0775` directories, which umask cannot fix), and its
-  telemetry is disabled through the SDK's own switch and then proven by reading
-  `reporting=0` back. gopls `v0.23.0` is pinned by module version and verified
-  through the Go checksum database — it publishes no prebuilt archive, so it
-  carries no tracked archive hash (ADR 0005).
-
-Use current, source-backed facts before changing a dependency. Preserve exact
-pins and integrity checks unless the change intentionally updates the contract.
-Never reintroduce mutable, unauthenticated remote installer execution or
-unfrozen dependency resolution. The Node browser providers use
-`templates/browser/provider/bun.lock`; CloakBrowser uses its tracked `uv.lock`.
-The codex harness owns its standalone artifacts inside its module; never
-reintroduce an inline AI-CLI bundle or a bun/npm global install.
-
-The codex harness stays update-locked: `DISABLE_AUTOUPDATER=1` and
-`DISABLE_UPDATES=1` keep the codex module's standalone binary from drifting.
-
-## Non-Negotiable Browser Boundary
-
-CloakBrowser is mandatory on every profile. A managed launchd or systemd user
-service owns `http://127.0.0.1:9222`. Chrome DevTools MCP, Playwright CLI, and
-the exact disabled Webwright tombstone are repository-managed. Only Chrome
-DevTools MCP and Playwright CLI are active and may use the fixed endpoint;
-Webwright must exit `78` without starting Python or a browser.
-
-There is no supported `--skip-browser`, `RLDYOUR_SKIP_CLOAKBROWSER`, alternate
-browser executable, alternate endpoint, auto-started stock browser, or stock
-Chromium fallback. Playwright `run-code` and `--filename` are also forbidden.
-Missing, unhealthy, or receipt-divergent browser state must fail closed. Never
-bind the CDP listener beyond loopback. Use `scripts/verify-browser-runtime.sh`
-as the exact installed-runtime authority.
-
-Preserve unmanaged browser files and fail instead of adopting or replacing
-them. The only adoption exception is the complete byte/shape-verified legacy
-rldyour CloakBrowser home, launcher pair, and service template. Its migration
-must snapshot the home, all six browser wrappers, and active service state;
-failed handoff must restore them transactionally. Browser Node staging must
-remove group/world-write bits before publication and rebuild an already unsafe
-managed runtime from the frozen lock while preserving the rejected tree.
-Runtime browser profiles, traces, caches, tokens, and service state must never
-be committed.
-
-## GUI And Integrity Boundaries
-
-- macOS GUI: Ghostty, cmux, ChatGPT, and the separate Codex app.
-- Ubuntu GUI: no bootstrap-installed harness apps; the ZCode desktop app is
-  installed by the `nddev-harnesses` repository. Desktop customization
-  (GNOME dock, Russian layout, BrowserOS install, Firefox removal) is owned by
-  `scripts/ubuntu/desktop.sh`.
-- Ubuntu server: no GUI applications.
-
-macOS GUI apply configures cmux non-interactively only for Codex. Do not replace
-that targeted `--yes` install with broad interactive `cmux hooks setup`, which
-can create unrelated agent configs.
-
-ZCode is owned by the `nddev-harnesses` repository and installed through its own
-lifecycle. Bootstrap never installs ZCode via an apt `.deb` or a
-`RLDYOUR_ZCODE_SHA256` gate; both were removed in contract `2.0.0`, and the
-remaining module delegation was removed in `2.6.0`. Do not reintroduce a silent
-download, fallback checksum, or integrity bypass.
-
-Authentication is a post-install owner handoff. `scripts/auth-handoff.sh` may
-show instructions and perform non-secret status probes, but bootstrap code must
-not read, print, store, upload, or synthesize credentials.
-
-## Ubuntu Server Safety
-
-Plan mode is the default. Rootful Docker is the composed server default, but
-the installer never grants Docker group membership. Rootless and `none` remain
-explicit alternatives.
-
-The full Ubuntu compositor runs as the non-root sudo-capable developer account
-that owns its home and systemd-user browser service. Root-only automation may
-use the sourceable server layer, not install AI state under `/root`.
-
-UFW, key-only SSH, and Fail2ban are independent explicit opt-ins. Never infer
-them from the server profile. Preserve these safeguards:
-
-- require a non-root account with a readable supported public key before
-  disabling password authentication;
-- require `ssh-keygen` parsing and StrictModes-safe key path metadata;
-- validate OpenSSH syntax and full `sshd -T -C` user/client/local connection
-  contexts before reload, including a separate root context;
-- preserve the active/enabled `ssh.service` versus `ssh.socket` provider and
-  never restart a socket for authentication-only changes;
-- restore the previous managed SSH drop-in after validation or reload failure;
-- add the SSH allow rule before enabling UFW;
-- validate the Fail2ban jail before restart;
-- restore prior Fail2ban file/service state after activation failure;
-- preserve existing synchronized NTP/PTP providers;
-- warn operators to keep the current SSH session open until a second connection
-  succeeds;
-- do not pretend UFW alone contains Docker-published ports;
-- do not add generic sysctl or resource-limit tuning without a separate,
-  host-specific decision.
-- never upgrade apt packages or an existing healthy Docker runtime implicitly;
-  fail on partial/custom Docker state.
-
-Full server validation requires a real supported Ubuntu VM with systemd.
-
-## Implementation Rules
-
-- Keep shell entry points strict, idempotent, plan-aware, and non-interactive
-  unless an explicit owner handoff is the purpose.
-- Never pipe a remote network stream directly into a shell. Download to a
-  temporary file, verify available integrity metadata, then execute.
-- Update managed files atomically. Preserve unmanaged or user-modified files
-  and fail with a clear explanation.
-- Keep shell policy in owned `~/.config/rldyour/` drop-ins. Modify owner shell
-  files only through the delimited, backed-up source blocks and verify a fresh
-  login shell after apply.
-- Ubuntu Node.js, uv, Bun, Go, and Rust must retain verified runtime receipts
-  and exact managed links; an external same-version PATH binary is not
-  provenance.
-- APT key validation must reject bundles with more than one primary key.
-- Keep desktop source/LSP manifests free of Docker and general project runtime
-  dependencies.
-- Keep server build/runtime and hardening behavior in the Ubuntu server layer.
-- Prefer existing shared helpers and namespaced server functions over duplicate
-  shell logic.
-- Do not swallow errors, fake successful checks, or downgrade mandatory checks
-  to best-effort behavior.
-- Do not commit credentials, `.env` files, local browser state, caches, traces,
-  diagnostics output, or runtime markers.
-
-## Common Commands
-
-Plan:
-
-```bash
-bash scripts/bootstrap.sh --platform macos
-bash scripts/bootstrap.sh --platform macos --no-gui
-bash scripts/bootstrap.sh --platform ubuntu --profile desktop
-bash scripts/bootstrap.sh --platform ubuntu --profile server
-```
-
-Apply:
-
-```bash
-bash scripts/bootstrap.sh --platform macos --apply
-bash scripts/bootstrap.sh --platform ubuntu --profile desktop --apply
-bash scripts/bootstrap.sh --platform ubuntu --profile server --apply
-```
-
-Supported skip flags are `--skip-system`, `--skip-ai`, `--skip-lsps`, and
-`--skip-checks`. Do not document a browser skip.
-
-Authentication handoff:
-
-```bash
-bash scripts/auth-handoff.sh show
-bash scripts/auth-handoff.sh check
-```
-
-## Verification Gates
-
-Run checks matching the touched scope and report exact commands:
+## Verification
 
 ```bash
 bash scripts/ci/lint.sh
@@ -264,47 +56,9 @@ bash scripts/ci/validate.sh
 python3 -m pytest
 ```
 
-Use platform verification on real targets when platform behavior changes:
+Use the strict platform verifiers on real target machines when platform behavior
+changes. Do not claim runtime evidence that was not produced.
 
-```bash
-bash scripts/macos/verify.sh --strict
-bash scripts/ubuntu/verify.sh --strict
-bash scripts/ubuntu/verify-server.sh --docker-mode rootful
-```
-
-For documentation-only changes, at minimum run `git diff --check` and targeted
-stale-fact scans. Do not claim macOS, Ubuntu GUI, SSH, firewall, systemd, or
-Docker runtime evidence that was not actually produced.
-
-## Git And Delivery
-
-- Preserve unrelated user changes in a dirty worktree.
-- Use atomic Conventional Commits when commits are requested.
-- Keep implementation, tests/validators, docs/policy, and generated metadata
-  independently reviewable when practical.
-- Do not force-push `main` or rewrite pushed history without explicit approval.
-- Releases support numeric tag pushes and a numeric `workflow_dispatch` input.
-  Manual dispatch must use the exact `origin/main` commit, require its green
-  `bootstrap-gate`, and verify an already existing exact non-rewritten tag.
-  Root automation is the sole tag creator; the pinned reusable workflow owns
-  immutable release publication.
-- Move any superproject gitlink only after this repository's changes are pushed
-  and verified.
-- **CodeQL mode is `default`, and `.github/workflows/codeql.yml` is inert.**
-  Code scanning runs through CodeQL default setup (configured 2026-07-31 for
-  `actions` and `python`); the tracked advanced-setup workflow is
-  `disabled_manually` at the platform and last ran 2026-07-03, failing. The file
-  is kept for a possible switch back, but do not read its presence as evidence
-  that it runs — check `GET /repos/{owner}/{repo}/actions/workflows`. Exactly
-  one mode is intended at a time: re-enabling the workflow means disabling
-  default setup first, because configuration attachment is atomic and forcing
-  default setup onto a repository with an active advanced setup fails the whole
-  attachment.
-- This repository is public, so `pull_request` executes untrusted fork code.
-  Every caller of a `ci-workflows` reusable that exposes a `runner` input must
-  pass `runner: ubuntu-latest` explicitly and keep it. Several of those
-  reusables default `runner` to the estate's self-hosted `amsterdam` label, and
-  a default belongs to the pinned commit — so dropping the explicit value would
-  let a routine Dependabot pin bump route fork PRs onto trusted private
-  infrastructure with no diff here to review. When reviewing a pin bump, diff
-  the reusable's `inputs.runner.default` between the old and new commit.
+Preserve unrelated worktree changes. Use atomic Conventional Commits when
+committing. This public repository executes untrusted fork PR code; reusable
+workflow callers with a `runner` input must explicitly pass `ubuntu-latest`.

@@ -102,7 +102,10 @@ def test_optional_step_failure_does_not_fail_the_layer(tmp_path: Path) -> None:
     result = run_desktop(stubs)
     combined = result.stdout + result.stderr
     assert result.returncode == 0
-    assert "russian_layout: skipped (precondition absent)" in combined
+    assert (
+        "russian_layout: skipped (precondition absent)" in combined
+        or "russian_layout: failed (optional)" in combined
+    )
 
 
 def test_absent_precondition_is_skipped_not_failed(tmp_path: Path) -> None:

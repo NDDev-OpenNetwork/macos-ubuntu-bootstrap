@@ -65,24 +65,39 @@ run_native_macos() {
 
 run_native_ubuntu_desktop() {
   [ "$(uname -s)" = Linux ]
-  bash "$REPO_ROOT/scripts/bootstrap.sh" --platform ubuntu --profile desktop --no-gui --plan --strict
-  bash "$REPO_ROOT/scripts/bootstrap.sh" --platform ubuntu --profile desktop --no-gui --apply --strict
-  RLDYOUR_PROFILE=desktop RLDYOUR_GUI_ENABLED=0 RLDYOUR_DOCKER_MODE=none \
-    bash "$REPO_ROOT/scripts/ubuntu/verify.sh" --strict
-  bash "$REPO_ROOT/scripts/bootstrap.sh" --platform ubuntu --profile desktop --no-gui --apply --strict
-  RLDYOUR_PROFILE=desktop RLDYOUR_GUI_ENABLED=0 RLDYOUR_DOCKER_MODE=none \
-    bash "$REPO_ROOT/scripts/ubuntu/verify.sh" --strict
+  ensure_native_ubuntu_user
+  native_ubuntu_cmd "bash scripts/bootstrap.sh --platform ubuntu --profile desktop --no-gui --plan --strict"
+  native_ubuntu_cmd "bash scripts/bootstrap.sh --platform ubuntu --profile desktop --no-gui --apply --strict"
+  native_ubuntu_cmd "RLDYOUR_PROFILE=desktop RLDYOUR_GUI_ENABLED=0 RLDYOUR_DOCKER_MODE=none bash scripts/ubuntu/verify.sh --strict"
+  native_ubuntu_cmd "bash scripts/bootstrap.sh --platform ubuntu --profile desktop --no-gui --apply --strict"
+  native_ubuntu_cmd "RLDYOUR_PROFILE=desktop RLDYOUR_GUI_ENABLED=0 RLDYOUR_DOCKER_MODE=none bash scripts/ubuntu/verify.sh --strict"
 }
 
 run_arm_gui_refusal() {
   [ "$(uname -m)" = aarch64 ] || [ "$(uname -m)" = arm64 ]
   local output rc=0
-  output="$(bash "$REPO_ROOT/scripts/bootstrap.sh" --platform ubuntu --profile desktop --gui --apply 2>&1)" || rc=$?
+  ensure_native_ubuntu_user
+  output="$(native_ubuntu_cmd "bash scripts/bootstrap.sh --platform ubuntu --profile desktop --gui --apply" 2>&1)" || rc=$?
   printf '%s\n' "$output"
   [ "$rc" -eq 2 ]
   grep -Fq "Ubuntu GUI apply requires amd64" <<<"$output"
-  [ ! -e "$HOME/.config/rldyour" ]
-  [ ! -e "$HOME/.local/share/rldyour" ]
+  [ ! -e /home/rldyourevidence/.config/rldyour ]
+  [ ! -e /home/rldyourevidence/.local/share/rldyour ]
+}
+
+ensure_native_ubuntu_user() {
+  if ! id rldyourevidence >/dev/null 2>&1; then
+    sudo useradd -m -s /bin/bash rldyourevidence
+    printf 'rldyourevidence ALL=(ALL) NOPASSWD:ALL\n' | \
+      sudo tee /etc/sudoers.d/rldyourevidence >/dev/null
+    sudo chmod 0440 /etc/sudoers.d/rldyourevidence
+  fi
+}
+
+native_ubuntu_cmd() {
+  sudo --user rldyourevidence --set-home env \
+    HOME=/home/rldyourevidence USER=rldyourevidence LOGNAME=rldyourevidence \
+    bash -c "cd $(printf '%q' "$REPO_ROOT") && $1"
 }
 
 container_exec_dev() {

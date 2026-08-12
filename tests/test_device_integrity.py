@@ -290,46 +290,40 @@ def test_telegram_presence_probe_never_executes_the_gui(
 # ----------------------------- profile awareness -----------------------------
 
 
-def _server_state_node_uv_bun_present() -> dict[str, object]:
-    """A server-shaped state: node/uv/bun match the contract; the desktop-only
-    compiled hosts are absent; no pinned source tools or user tools."""
+def _server_state_all_required_tools_present() -> dict[str, object]:
+    """A server-shaped state matching contract 3.0.1 source-tooling policy."""
     contract = di.load_contract()
     rs = contract["runtime_support"]
     runtime_hosts: dict[str, object] = {}
     for name, (_flag, field) in di.RUNTIME_HOSTS.items():
-        if name in di.COMPILED_LANGUAGE_HOSTS:
-            runtime_hosts[name] = {
-                "normalized": "absent",
-                "raw": "absent",
-                "path": f"/bin/{name}",
-            }
-        else:
-            runtime_hosts[name] = {
-                "normalized": di._normalize_version(rs[field], name),
-                "raw": rs[field],
-                "path": f"/bin/{name}",
-            }
+        runtime_hosts[name] = {
+            "normalized": di._normalize_version(rs[field], name),
+            "raw": rs[field],
+            "path": f"/bin/{name}",
+        }
     return {
         "runtime_hosts": runtime_hosts,
-        "pinned_source_tools": {},
-        "user_tools": {},
+        "pinned_source_tools": {
+            name: spec["version"]
+            for name, spec in rs[di.PINNED_SOURCE_TOOLS_CONTRACT].items()
+        },
+        "user_tools": {
+            "herdr": {"installed_version": contract["user_tools"]["herdr"]["version"]}
+        },
     }
 
 
-def test_server_profile_allows_absent_desktop_only_tools() -> None:
-    """On server, absent compiled hosts / pinned tools / user tools are expected
-    — but the same state must still fail as desktop, proving the gate is real."""
-    state = _server_state_node_uv_bun_present()
-    # Server: must not raise despite go/gopls/rustc/dart absent.
+def test_server_profile_requires_compiled_hosts_pinned_tools_and_herdr() -> None:
+    state = _server_state_all_required_tools_present()
     di._verify_contract_versions(state, profile="server")
-    # Desktop (the pre-fix behavior): the same state is drift.
-    with pytest.raises(di.IntegrityError, match="absent"):
-        di._verify_contract_versions(state, profile="desktop")
+    state["runtime_hosts"]["go"]["normalized"] = "absent"
+    with pytest.raises(di.IntegrityError, match="go: absent"):
+        di._verify_contract_versions(state, profile="server")
 
 
 def test_server_profile_still_requires_node_uv_bun() -> None:
     """node/uv/bun are provisioned on every profile; a server drift still fails."""
-    state = _server_state_node_uv_bun_present()
+    state = _server_state_all_required_tools_present()
     state["runtime_hosts"]["node"]["normalized"] = "0.0.0"
     with pytest.raises(di.IntegrityError, match="node: installed 0.0.0"):
         di._verify_contract_versions(state, profile="server")

@@ -268,6 +268,28 @@ else
   for cmd in go gopls rustc cargo rust-analyzer dart; do
     rldyour::require_cmd "$cmd" required
   done
+  for cmd in gitleaks osv-scanner actionlint hadolint markdown-oxide delta yq ast-grep just age age-keygen cmake-language-server; do
+    rldyour::require_cmd "$cmd" required
+  done
+  [ "$(go version 2>/dev/null | awk '{ print $3 }')" = "go1.26.5" ] || {
+    rldyour::log "missing" "Go exact managed Ubuntu version 1.26.5"; exit 1;
+  }
+  [ "$(rustc --version 2>/dev/null | awk '{ print $2 }')" = "1.97.1" ] || {
+    rldyour::log "missing" "Rust exact managed Ubuntu version 1.97.1"; exit 1;
+  }
+  [ "$(dart --version 2>&1 | awk 'NR == 1 { print $4 }')" = "3.12.2" ] || {
+    rldyour::log "missing" "Dart exact managed Ubuntu version 3.12.2"; exit 1;
+  }
+  dart mcp-server --version >/dev/null 2>&1 || {
+    rldyour::log "missing" "'dart mcp-server' transport for the dart-flutter MCP server"; exit 1;
+  }
+  dart_telemetry_config="$HOME/.dart-tool/dart-flutter-telemetry.config"
+  if [ ! -f "$dart_telemetry_config" ] || [ -L "$dart_telemetry_config" ] ||
+    ! grep -Fxq 'reporting=0' "$dart_telemetry_config" ||
+    grep -Fxq 'reporting=1' "$dart_telemetry_config"; then
+    rldyour::log "missing" "Dart telemetry provably disabled in ${dart_telemetry_config}"
+    exit 1
+  fi
   args=(--docker-mode "$DOCKER_MODE")
   [ "${RLDYOUR_SERVER_ENABLE_UFW:-0}" -eq 1 ] && args+=(--expect-ufw)
   [ "${RLDYOUR_SERVER_HARDEN_SSH:-0}" -eq 1 ] && args+=(--expect-ssh-hardening)

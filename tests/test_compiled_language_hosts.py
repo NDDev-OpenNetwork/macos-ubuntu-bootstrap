@@ -1,10 +1,8 @@
-"""Go, Rust, and Dart are desktop-only language-server hosts.
+"""Go, Rust, and Dart are language-server hosts on every Ubuntu profile.
 
 They back gopls, rust-analyzer, and the Dart analysis server over the estate's
-sources. The Ubuntu server profile is `container-execution-only`, so a host
-toolchain there would restore exactly the local build capability that policy
-removes — project builds belong in Docker. These tests pin that split, and pin the
-tracked artifact provenance so a version bump cannot silently drop a hash.
+sources. Server project builds still belong in Docker; host toolchains are
+installed only to make source analysis and local verification available.
 
 Dart carries a second obligation (ADR 0006): the same archive provides the
 `dart mcp-server` transport that the rldyour-mcps `dart-flutter` server executes,
@@ -143,9 +141,7 @@ def test_dart_host_serves_both_the_analysis_server_and_the_mcp_transport() -> No
         body = (ROOT / verifier).read_text(encoding="utf-8")
         assert "dart mcp-server --version" in body, f"{verifier} does not prove the MCP transport"
     ubuntu_verify = (ROOT / "scripts/ubuntu/verify.sh").read_text(encoding="utf-8")
-    desktop_block = ubuntu_verify.split('if [ "$PROFILE" != "server" ]; then', 1)
-    assert len(desktop_block) == 2
-    assert "dart" in desktop_block[1], "dart must be verified inside the non-server block"
+    assert ubuntu_verify.count("dart mcp-server --version") >= 2
 
 
 def test_installer_constants_match_the_contract() -> None:
@@ -219,31 +215,22 @@ def test_pinned_tools_match_the_contract() -> None:
         assert declared[name]["sha256"]["arm64"] == row[7], f"{name}: arm64 digest drift"
 
 
-def test_pinned_tools_are_verified_on_desktop_only() -> None:
-    """Every pinned tool must be gated inside the non-server block —
-    the server profile is container-execution-only and gets none of them."""
+def test_pinned_tools_are_verified_on_every_profile() -> None:
     verify = (ROOT / "scripts/ubuntu/verify.sh").read_text(encoding="utf-8")
-    desktop_block = verify.split('if [ "$PROFILE" != "server" ]; then', 1)
-    assert len(desktop_block) == 2, "non-server block not found in verify.sh"
+    profile_block = verify.split('if [ "$PROFILE" != "server" ]; then', 1)[1]
+    desktop_block, server_block = profile_block.rsplit("\nelse\n", 1)
     for row in _pinned_rows():
         for link in row[5].split(","):
-            assert link in desktop_block[1], f"{link} is installed but never verified"
+            assert link in desktop_block, f"{link} is not verified on desktop"
+            assert link in server_block, f"{link} is not verified on server"
 
 
-def test_user_tools_are_verified_on_desktop_only() -> None:
-    """Every USER_TOOLS entry must be verified inside the non-server block."""
+def test_herdr_is_verified_on_every_profile() -> None:
     verify = (ROOT / "scripts/ubuntu/verify.sh").read_text(encoding="utf-8")
-    desktop_block = verify.split('if [ "$PROFILE" != "server" ]; then', 1)
-    assert len(desktop_block) == 2, "non-server block not found in verify.sh"
-    install = INSTALL.read_text(encoding="utf-8")
-    match = re.search(r'USER_TOOLS=\(\s*(.*?)\)', install, re.DOTALL)
-    assert match is not None, "USER_TOOLS array not found"
-    for raw in re.findall(r'"([^"]+)"', match.group(1)):
-        fields = raw.split(";")
-        name, link = fields[0], fields[5]
-        assert link in desktop_block[1], (
-            f"{name} ({link}) is installed via USER_TOOLS but never verified"
-        )
+    profile_block = verify.split('if [ "$PROFILE" != "server" ]; then', 1)[1]
+    desktop_block, server_block = profile_block.rsplit("\nelse\n", 1)
+    assert "rldyour::require_cmd herdr required" in desktop_block
+    assert "rldyour::require_cmd herdr required" in server_block
 
 
 

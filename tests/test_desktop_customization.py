@@ -374,10 +374,10 @@ def test_unknown_deb_row_is_refused(tmp_path: Path) -> None:
 
 # ------------------- macOS: an optional layer cannot strand the rest -------------------
 #
-# macos/install.sh runs the GUI cask layer BEFORE the mandatory browser layer.
+# macos/install.sh runs the GUI cask layer before the AI CLI layer.
 # The loop used to call ensure_cask bare under `set -euo pipefail`, so one
 # unavailable cask aborted the script and took the language servers, the
-# mandatory browser layer, the harness layer and verification with it. This is
+# AI CLI layer and verification with it. This is
 # the failure this repository already fixed twice on the Ubuntu side.
 
 MACOS_INSTALL = ROOT / "scripts/macos/install.sh"

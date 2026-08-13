@@ -149,6 +149,7 @@ DOCKERFILE
     docker exec "$CONTAINER_NAME" systemctl --failed || true
     return 1
   }
+  docker exec "$CONTAINER_NAME" install -d -m 0755 /run/sshd
 }
 
 run_sandbox_profile() {

@@ -136,10 +136,14 @@ native_ubuntu_cmd() {
 }
 
 container_exec_dev() {
+  local uid
+  uid="$(docker exec "$CONTAINER_NAME" id -u dev)"
   docker exec --user dev \
     --env HOME=/home/dev \
     --env USER=dev \
     --env LOGNAME=dev \
+    --env XDG_RUNTIME_DIR="/run/user/$uid" \
+    --env DBUS_SESSION_BUS_ADDRESS="unix:path=/run/user/$uid/bus" \
     "$CONTAINER_NAME" bash -lc "$1"
 }
 
@@ -178,6 +182,11 @@ DOCKERFILE
     docker exec "$CONTAINER_NAME" systemctl --failed || true
     return 1
   }
+  local dev_uid
+  dev_uid="$(docker exec "$CONTAINER_NAME" id -u dev)"
+  docker exec "$CONTAINER_NAME" loginctl enable-linger dev
+  docker exec "$CONTAINER_NAME" systemctl start "user@${dev_uid}.service"
+  docker exec "$CONTAINER_NAME" test -S "/run/user/${dev_uid}/bus"
   docker exec "$CONTAINER_NAME" install -d -m 0755 /run/sshd
 }
 

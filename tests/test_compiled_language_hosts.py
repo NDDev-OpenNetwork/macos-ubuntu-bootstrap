@@ -1,10 +1,8 @@
-"""Go, Rust, and Dart are desktop-only language-server hosts.
+"""Go, Rust, and Dart are language-server hosts on every Ubuntu profile.
 
 They back gopls, rust-analyzer, and the Dart analysis server over the estate's
-sources. The Ubuntu server profile is `container-execution-only`, so a host
-toolchain there would restore exactly the local build capability that policy
-removes — project builds belong in Docker. These tests pin that split, and pin the
-tracked artifact provenance so a version bump cannot silently drop a hash.
+sources. Server project builds still belong in Docker; host toolchains are
+installed only to make source analysis and local verification available.
 
 Dart carries a second obligation (ADR 0006): the same archive provides the
 `dart mcp-server` transport that the rldyour-mcps `dart-flutter` server executes,
@@ -51,12 +49,11 @@ def test_desktop_plans_go_rust_and_dart_hosts() -> None:
     assert "rust-analyzer" in output
 
 
-def test_server_never_plans_a_host_compiler() -> None:
+def test_server_plans_language_server_hosts() -> None:
     output = plan("server")
-    assert "compiled-language LSP hosts skipped" in output
-    assert f"Ensure Go {RUNTIME['ubuntu_go']}" not in output
-    assert f"Ensure Rust {RUNTIME['ubuntu_rust']}" not in output
-    assert f"Ensure Dart {RUNTIME['ubuntu_dart']}" not in output
+    assert f"Ensure Go {RUNTIME['ubuntu_go']}" in output
+    assert f"Ensure Rust {RUNTIME['ubuntu_rust']}" in output
+    assert f"Ensure Dart {RUNTIME['ubuntu_dart']}" in output
 
 
 def test_contract_tracks_a_hash_for_every_supported_architecture() -> None:
@@ -85,7 +82,6 @@ def test_dart_tree_permissions_are_normalized_and_revalidated() -> None:
     assert 'rldyour::_managed_tree_permissions normalize "$stage/prefix"' in dart
     assert 'rldyour::_managed_tree_permissions validate "$destination"' in dart
     # One generic helper, not a second permission path bolted on for Dart.
-    assert "rldyour::_browser_node_runtime_permissions" not in common
     assert common.count("rldyour::_managed_tree_permissions() {") == 1
 
 
@@ -106,26 +102,68 @@ def test_rust_tree_is_permission_normalized_before_its_receipt() -> None:
     assert normalize < receipt, "the tree must be normalized before its receipt is written"
 
 
-def test_dart_telemetry_is_disabled_through_one_shared_fail_closed_helper() -> None:
-    """The SDK reports telemetry by default, which contradicts the same boundary
-    that makes the browser wrapper reject usage statistics. The opt-out must be
-    set through the SDK's own switch (the config is upstream-maintained, never
-    hand-written), proven rather than assumed, and shared by both platforms."""
+def test_dart_telemetry_uses_the_documented_command_and_optional_diagnostic() -> None:
+    """The documented command is the contract. The unified-analytics config is
+    an upstream implementation detail that can remain absent in CI."""
     common = (ROOT / "scripts/lib/common.sh").read_text(encoding="utf-8")
     assert "rldyour::ensure_dart_telemetry_disabled() {" in common
-    assert '"$binary" --disable-analytics' in common
-    # Proven, not assumed: a conflicting enable line fails instead of being
-    # averaged away by upstream duplicate-key resolution.
+    assert 'env -u CI "$binary" --disable-analytics' in common
     assert "grep -Fxq 'reporting=0'" in common
     assert "grep -Fxq 'reporting=1'" in common
     for installer in ("scripts/ubuntu/install.sh", "scripts/macos/install.sh"):
         body = (ROOT / installer).read_text(encoding="utf-8")
         assert "rldyour::ensure_dart_telemetry_disabled" in body, installer
+    macos_install = (ROOT / "scripts/macos/install.sh").read_text(encoding="utf-8")
+    assert 'managed_dart="$(brew --prefix dart-sdk)/bin/dart"' in macos_install
     # The config is never written by this repository, only read back.
     assert "dart-flutter-telemetry.config" in common
     assert "reporting=0\\n" not in common
-    verify = (ROOT / "scripts/ubuntu/verify.sh").read_text(encoding="utf-8")
-    assert "dart-flutter-telemetry.config" in verify
+    for verifier in ("scripts/ubuntu/verify.sh", "scripts/macos/verify.sh"):
+        body = (ROOT / verifier).read_text(encoding="utf-8")
+        assert "rldyour::observe_dart_telemetry_config" in body
+
+
+def _run_dart_opt_out(tmp_path: Path, body: str, config: str | None = None) -> subprocess.CompletedProcess[str]:
+    dart = tmp_path / "dart"
+    dart.write_text("#!/bin/sh\n" + body + "\n", encoding="utf-8")
+    dart.chmod(0o755)
+    if config is not None:
+        config_path = tmp_path / ".dart-tool/dart-flutter-telemetry.config"
+        config_path.parent.mkdir()
+        config_path.write_text(config, encoding="utf-8")
+    return subprocess.run(
+        ["bash", "-c", f'source scripts/lib/common.sh; rldyour::ensure_dart_telemetry_disabled "{dart}"'],
+        cwd=ROOT,
+        env={**os.environ, "HOME": str(tmp_path), "CI": "true"},
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+
+
+def test_dart_opt_out_accepts_materialized_disabled_config(tmp_path: Path) -> None:
+    result = _run_dart_opt_out(tmp_path, '[ "$1" = --disable-analytics ]', "reporting=0\n")
+    assert result.returncode == 0, result.stderr
+    assert "optional Dart telemetry config reports disabled" in result.stdout
+
+
+def test_dart_opt_out_accepts_ci_noop_without_internal_config(tmp_path: Path) -> None:
+    result = _run_dart_opt_out(tmp_path, '[ "$1" = --disable-analytics ]')
+    assert result.returncode == 0, result.stderr
+    assert "optional Dart telemetry config was not materialized" in result.stdout
+
+
+def test_dart_opt_out_fails_when_documented_command_fails(tmp_path: Path) -> None:
+    result = _run_dart_opt_out(tmp_path, "exit 19")
+    assert result.returncode != 0
+    assert "Dart telemetry state is unknown" in result.stdout + result.stderr
+
+
+def test_dart_verifiers_reject_wrong_versions() -> None:
+    ubuntu = (ROOT / "scripts/ubuntu/verify.sh").read_text(encoding="utf-8")
+    macos = (ROOT / "scripts/macos/verify.sh").read_text(encoding="utf-8")
+    assert '"$(dart --version 2>&1 | awk \'NR == 1 { print $4 }\')" = "3.12.2"' in ubuntu
+    assert "rldyour::require_cmd_min_version dart 3.12 --version" in macos
 
 
 def test_dart_host_serves_both_the_analysis_server_and_the_mcp_transport() -> None:
@@ -146,9 +184,7 @@ def test_dart_host_serves_both_the_analysis_server_and_the_mcp_transport() -> No
         body = (ROOT / verifier).read_text(encoding="utf-8")
         assert "dart mcp-server --version" in body, f"{verifier} does not prove the MCP transport"
     ubuntu_verify = (ROOT / "scripts/ubuntu/verify.sh").read_text(encoding="utf-8")
-    desktop_block = ubuntu_verify.split('if [ "$PROFILE" != "server" ]; then', 1)
-    assert len(desktop_block) == 2
-    assert "dart" in desktop_block[1], "dart must be verified inside the non-server block"
+    assert ubuntu_verify.count("dart mcp-server --version") >= 2
 
 
 def test_installer_constants_match_the_contract() -> None:
@@ -222,31 +258,22 @@ def test_pinned_tools_match_the_contract() -> None:
         assert declared[name]["sha256"]["arm64"] == row[7], f"{name}: arm64 digest drift"
 
 
-def test_pinned_tools_are_verified_on_desktop_only() -> None:
-    """Every pinned tool must be gated inside the non-server block —
-    the server profile is container-execution-only and gets none of them."""
+def test_pinned_tools_are_verified_on_every_profile() -> None:
     verify = (ROOT / "scripts/ubuntu/verify.sh").read_text(encoding="utf-8")
-    desktop_block = verify.split('if [ "$PROFILE" != "server" ]; then', 1)
-    assert len(desktop_block) == 2, "non-server block not found in verify.sh"
+    profile_block = verify.split('if [ "$PROFILE" != "server" ]; then', 1)[1]
+    desktop_block, server_block = profile_block.rsplit("\nelse\n", 1)
     for row in _pinned_rows():
         for link in row[5].split(","):
-            assert link in desktop_block[1], f"{link} is installed but never verified"
+            assert link in desktop_block, f"{link} is not verified on desktop"
+            assert link in server_block, f"{link} is not verified on server"
 
 
-def test_user_tools_are_verified_on_desktop_only() -> None:
-    """Every USER_TOOLS entry must be verified inside the non-server block."""
+def test_herdr_is_verified_on_every_profile() -> None:
     verify = (ROOT / "scripts/ubuntu/verify.sh").read_text(encoding="utf-8")
-    desktop_block = verify.split('if [ "$PROFILE" != "server" ]; then', 1)
-    assert len(desktop_block) == 2, "non-server block not found in verify.sh"
-    install = INSTALL.read_text(encoding="utf-8")
-    match = re.search(r'USER_TOOLS=\(\s*(.*?)\)', install, re.DOTALL)
-    assert match is not None, "USER_TOOLS array not found"
-    for raw in re.findall(r'"([^"]+)"', match.group(1)):
-        fields = raw.split(";")
-        name, link = fields[0], fields[5]
-        assert link in desktop_block[1], (
-            f"{name} ({link}) is installed via USER_TOOLS but never verified"
-        )
+    profile_block = verify.split('if [ "$PROFILE" != "server" ]; then', 1)[1]
+    desktop_block, server_block = profile_block.rsplit("\nelse\n", 1)
+    assert "rldyour::require_cmd herdr required" in desktop_block
+    assert "rldyour::require_cmd herdr required" in server_block
 
 
 

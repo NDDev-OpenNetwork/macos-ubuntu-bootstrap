@@ -12,7 +12,7 @@
 #   1. GNOME dock: move to bottom, centered, macOS-style.
 #   2. Keyboard: add Russian layout with Alt+Shift toggle.
 #   3. Google Chrome: install from the fingerprint-verified signed apt source.
-#   4. RustDesk: optional pinned .deb.
+#   4. RustDesk: required pinned .deb.
 #   5. Firefox: remove the stock snap+apt Firefox completely.
 #
 # Server profile (headless) skips this entirely.
@@ -28,10 +28,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # Desktop applications upstream publishes only as a .deb. One row per
 # application, one generic installer: a second bespoke install path is how an
-# application quietly stops being verified. BrowserOS used to be here too and
-# was removed by owner decision when Google Chrome became the standard browser;
-# an already-installed copy is left alone, because bootstrap does not remove
-# what it no longer provisions.
+# application quietly stops being verified.
 #
 # Row format (semicolon-separated, no spaces inside a field):
 #   name;package;url_x64;sha256_x64;url_arm64;sha256_arm64
@@ -65,12 +62,11 @@ die()  { printf '\033[1;31m  \u2717 %s\033[0m\n' "$*" >&2; exit 1; }
 
 # Steps whose failure makes the desktop layer wrong rather than merely
 # incomplete. Google Chrome is the estate's standard browser and the Firefox
-# removal is a declared policy, so both are required. RustDesk is a convenience
-# the owner asked to keep optional; the dock and keyboard layout are cosmetic
+# removal and RustDesk are declared policy, so all three are required. The dock and keyboard layout are cosmetic
 # and legitimately unavailable on a session without the dash-to-dock extension
 # or xkb data. Only a required failure fails the run.
-REQUIRED_STEPS=(google_chrome firefox_removal)
-OPTIONAL_STEPS=(gnome_dock russian_layout rustdesk)
+REQUIRED_STEPS=(google_chrome rustdesk firefox_removal)
+OPTIONAL_STEPS=(gnome_dock russian_layout)
 
 # Populated by nddev::_record; read by the aggregate report.
 declare -A STEP_STATUS=()
@@ -107,7 +103,7 @@ nddev::desktop_configure() {
   command -v localectl >/dev/null || die "localectl missing (needs systemd)"
 
   if [ "${RLDYOUR_DRY_RUN:-1}" -eq 1 ]; then
-    rldyour::log "info" "[DRY-RUN] desktop customization: GNOME dock bottom, Russian layout, Google Chrome install, optional RustDesk install, Firefox removal"
+    rldyour::log "info" "[DRY-RUN] desktop customization: GNOME dock bottom, Russian layout, Google Chrome install, RustDesk install, Firefox removal"
     return 0
   fi
 

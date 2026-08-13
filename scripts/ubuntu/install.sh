@@ -26,10 +26,6 @@ WITH_FAIL2BAN="${RLDYOUR_WITH_FAIL2BAN:-0}"
 # Login shell change is explicit opt-in only; never mutated silently.
 SET_LOGIN_SHELL="${RLDYOUR_SET_LOGIN_SHELL:-0}"
 
-# One owner per harness (RVR-P1-004): the active harness set is codex, installed
-# by its dedicated authoritative NDDev module via
-# rldyour::install_selected_harnesses. Bootstrap pins no AI CLI versions here.
-# zcode is contract-delegated to nddev-harnesses.
 NODE_VERSION="24.18.0"
 NODE_SHA256_X64="55aa7153f9d88f28d765fcdad5ae6945b5c0f98a36881703817e4c450fa76742"
 NODE_SHA256_ARM64="58c9520501f6ae2b52d5b210444e24b9d0c029a58c5011b797bc1fe7105886f6"
@@ -92,20 +88,6 @@ APT_SOURCE_PACKAGES=(
 
 APT_DESKTOP_BUILD_PACKAGES=(build-essential)
 
-# Runtime libraries/fonts from the CloakBrowser v0.4.12 upstream Linux image.
-# They support the mandatory downloaded Chromium binary; they are not a stock
-# browser or a project runtime.
-APT_CLOAK_RUNTIME_PACKAGES=(
-  libnss3 libnspr4 libatk1.0-0t64 libatk-bridge2.0-0t64 libcups2t64
-  libdbus-1-3 libdrm2 libxkbcommon0 libatspi2.0-0t64 libxcomposite1
-  libxdamage1 libxfixes3 libxrandr2 libgbm1 libpango-1.0-0
-  libcairo2 libasound2t64 libx11-xcb1 libfontconfig1 libfreetype6 libx11-6
-  libxcb1 libxext6 libxshmfence1 libglib2.0-0t64 libgtk-3-0t64
-  libpangocairo-1.0-0 libcairo-gobject2 libgdk-pixbuf-2.0-0
-  libxss1 libxtst6 fonts-liberation fonts-noto-color-emoji
-  fonts-unifont fonts-freefont-ttf fonts-ipafont-gothic
-  fonts-wqy-zenhei fonts-tlwg-loma-otf
-)
 
 # Registry-backed language servers + source checks, pinned to exact versions
 # for reproducibility (RVR-P2-003). Two package identities are corrected here:
@@ -206,10 +188,11 @@ PINNED_SOURCE_TOOLS=(
 # downloading the artifact.
 #
 # herdr ships its own `herdr update` command that fetches https://herdr.dev/latest.json;
-# the bootstrap pins the version here so a fresh device is reproducible without
-# trusting the live manifest at install time.
+# that live manifest is discovery-only. The canonical source tag, URLs, and
+# architecture hashes live in config/rldyour-contract.json and parity tests bind
+# this shell row to them; installation never resolves mutable `latest` state.
 USER_TOOLS=(
-  "herdr;0.7.5;raw;herdr;herdr;herdr;3dc83288073e4c2d3c679a30e7be97bcca9141c6fd17dbbb9219142e95c59253;32e763a1499a6b694b1d708e4f062b743be1da9f34fcfa4d212d6db6fe09a8b9;https://github.com/herdrdev/herdr/releases/download/v0.7.5/herdr-linux-x86_64;https://github.com/herdrdev/herdr/releases/download/v0.7.5/herdr-linux-aarch64"
+  "herdr;0.8.0;raw;herdr;herdr;herdr;b872ea7e40fa2cb17e857ac9b62b1bf26db7b403c622f5d2f3f5b35f6e9acd28;f647ac66468d9efbc642fe534fb284468f0aea60641606fc008dfc0d82a3ca87;https://github.com/herdrdev/herdr/releases/download/v0.8.0/herdr-linux-x86_64;https://github.com/herdrdev/herdr/releases/download/v0.8.0/herdr-linux-aarch64"
   # Telegram Desktop official portable build. Only Telegram/Telegram is
   # published. The binary also has an internal updater, disabled separately by
   # install_telegram_update_policy so it cannot mutate this receipt-bound tree.
@@ -217,19 +200,19 @@ USER_TOOLS=(
   # digest and URL are deliberately empty and the row is skipped there. They
   # used to hold the x86_64 values, which meant an arm64 desktop verified the
   # SHA-256 of an executable it could not run.
-  "telegram;7.0.7;tarx;Telegram/Telegram;Telegram/Telegram;telegram-desktop;45e4bdbe9bdbc800916b81147210f912f5c72f069fdec6f9b201fe305d0d2d9c;;https://td.telegram.org/tlinux/tsetup.7.0.7.tar.xz;"
+  "telegram;7.0.9;tarx;Telegram/Telegram;Telegram/Telegram;telegram-desktop;d3c05df0259ab116d11d8c1cdc1403019d2a3be303ad3b46d16a84e19df6615f;;https://github.com/telegramdesktop/tdesktop/releases/download/v7.0.9/tsetup.7.0.9.tar.xz;"
 )
 
-# Telegram v7.0.7 commit ee93b401 installs these four files from
+# Telegram v7.0.9 commit a1e89e1f installs these four files from
 # InstallLauncher(). Our externalupdater.d policy intentionally makes that
 # function return before it writes anything, so bootstrap must publish the
 # exact upstream assets itself. Rows are source_url;sha256;path under
 # ~/.local/share, which is the location the contract declares.
 TELEGRAM_DESKTOP_ASSETS=(
-  "https://raw.githubusercontent.com/telegramdesktop/tdesktop/ee93b401ced86ece3f2582fc2ca4da72dfc4f06a/Telegram/Resources/art/logo_256.png;3fb1400c7dc9bbc3b5cb3ffedcbf4a9b09c53e28b57a7ff33a8a6b9048864090;icons/hicolor/256x256/apps/org.telegram.desktop.png"
-  "https://raw.githubusercontent.com/telegramdesktop/tdesktop/ee93b401ced86ece3f2582fc2ca4da72dfc4f06a/Telegram/Resources/icons/tray_monochrome.svg;a93380f2c7e6aae4d5fde8940020bd966e97ad8c4880f45c016edfef3f5193e1;icons/hicolor/symbolic/apps/org.telegram.desktop-symbolic.svg"
-  "https://raw.githubusercontent.com/telegramdesktop/tdesktop/ee93b401ced86ece3f2582fc2ca4da72dfc4f06a/Telegram/Resources/icons/tray_monochrome_attention.svg;2b67ee19839dbbb9f57f2d7433fd6dc1059634d6d081c5e4c422c14f53fcfcc7;icons/hicolor/symbolic/apps/org.telegram.desktop-attention-symbolic.svg"
-  "https://raw.githubusercontent.com/telegramdesktop/tdesktop/ee93b401ced86ece3f2582fc2ca4da72dfc4f06a/Telegram/Resources/icons/tray_monochrome_mute.svg;efa1439bd60b58db7b755f5d21be854ea686a0e1e2f1aa6e43bf35c083ee72fc;icons/hicolor/symbolic/apps/org.telegram.desktop-mute-symbolic.svg"
+  "https://raw.githubusercontent.com/telegramdesktop/tdesktop/a1e89e1f64f08cb058caf1c61ff43f319f98a6ec/Telegram/Resources/art/logo_256.png;3fb1400c7dc9bbc3b5cb3ffedcbf4a9b09c53e28b57a7ff33a8a6b9048864090;icons/hicolor/256x256/apps/org.telegram.desktop.png"
+  "https://raw.githubusercontent.com/telegramdesktop/tdesktop/a1e89e1f64f08cb058caf1c61ff43f319f98a6ec/Telegram/Resources/icons/tray_monochrome.svg;a93380f2c7e6aae4d5fde8940020bd966e97ad8c4880f45c016edfef3f5193e1;icons/hicolor/symbolic/apps/org.telegram.desktop-symbolic.svg"
+  "https://raw.githubusercontent.com/telegramdesktop/tdesktop/a1e89e1f64f08cb058caf1c61ff43f319f98a6ec/Telegram/Resources/icons/tray_monochrome_attention.svg;2b67ee19839dbbb9f57f2d7433fd6dc1059634d6d081c5e4c422c14f53fcfcc7;icons/hicolor/symbolic/apps/org.telegram.desktop-attention-symbolic.svg"
+  "https://raw.githubusercontent.com/telegramdesktop/tdesktop/a1e89e1f64f08cb058caf1c61ff43f319f98a6ec/Telegram/Resources/icons/tray_monochrome_mute.svg;efa1439bd60b58db7b755f5d21be854ea686a0e1e2f1aa6e43bf35c083ee72fc;icons/hicolor/symbolic/apps/org.telegram.desktop-mute-symbolic.svg"
 )
 
 
@@ -280,12 +263,20 @@ validate_target() {
       return 2
       ;;
   esac
+  if [ "$RLDYOUR_DRY_RUN" -eq 0 ] && [ "$GUI_ENABLED" -eq 1 ]; then
+    case "$(uname -m)" in
+      x86_64|amd64) ;;
+      *)
+        rldyour::log "error" "Ubuntu GUI apply requires amd64: Google Chrome and Telegram Desktop publish no supported Linux ARM64 build"
+        return 2
+        ;;
+    esac
+  fi
   if [ "$RLDYOUR_DRY_RUN" -eq 0 ] && ! is_supported_ubuntu; then
     rldyour::log "error" "apply is supported only on Ubuntu 24.04 or 26.04"
     return 2
   fi
   if [ "$RLDYOUR_DRY_RUN" -eq 0 ] && [ "$EUID" -eq 0 ]; then
-    rldyour::log "error" "full Ubuntu bootstrap must run as the non-root developer account that will own AI configs and the CloakBrowser user service"
     rldyour::log "error" "create/login to that account with sudo, then rerun; use scripts/ubuntu/server.sh separately for root-only baseline work"
     return 2
   fi
@@ -294,8 +285,7 @@ validate_target() {
 install_apt_baseline() {
   rldyour::section "Install Ubuntu package baseline"
   rldyour::ubuntu::as_root apt-get update
-  apt_install software-properties-common \
-    "${APT_SOURCE_PACKAGES[@]}" "${APT_CLOAK_RUNTIME_PACKAGES[@]}"
+  apt_install software-properties-common "${APT_SOURCE_PACKAGES[@]}"
   if [ "$PROFILE" != "server" ]; then
     apt_install "${APT_DESKTOP_BUILD_PACKAGES[@]}"
   fi
@@ -372,6 +362,9 @@ install_pinned_source_tools() {
 install_user_tools() {
   local row failed=0
   for row in "${USER_TOOLS[@]}"; do
+    if [ "$GUI_ENABLED" -ne 1 ] && [ "${row%%;*}" = "telegram" ]; then
+      continue
+    fi
     if ! ensure_pinned_source_tool "$row"; then
       failed=1
     fi
@@ -386,6 +379,7 @@ install_user_tools() {
 # This also disables Telegram's self-generated, path-hashed desktop/D-Bus files;
 # the repository-owned .desktop entry below is the only launcher contract.
 rldyour::ubuntu::install_telegram_update_policy() {
+  [ "$GUI_ENABLED" -eq 1 ] || return 0
   local launcher="$HOME/.local/bin/telegram-desktop"
   local namespace="$HOME/.local/share/rldyour/telegram"
   local policy_dir="$HOME/.local/share/TelegramDesktop/externalupdater.d"
@@ -446,7 +440,7 @@ rldyour::ubuntu::install_telegram_update_policy() {
 
 # Install the application and symbolic tray icons that Telegram normally
 # publishes from InstallLauncher(). The updater-disabled build deliberately
-# skips that function, so each upstream asset is pinned to the v7.0.7 source
+# skips that function, so each upstream asset is pinned to the v7.0.9 source
 # commit and verified before atomic publication. Divergent local icons are
 # preserved and fail closed instead of being overwritten.
 rldyour::ubuntu::install_telegram_desktop_assets() {
@@ -474,7 +468,7 @@ rldyour::ubuntu::install_telegram_desktop_assets() {
       if [ "$RLDYOUR_DRY_RUN" -eq 0 ]; then
         chmod 0644 "$target" || return 1
       fi
-      rldyour::log "ok" "$(basename "$target") already matches Telegram v7.0.7"
+      rldyour::log "ok" "$(basename "$target") already matches Telegram v7.0.9"
       continue
     fi
 
@@ -1085,14 +1079,8 @@ ensure_uv() {
   "$HOME/.local/bin/uv" --version | grep -Fq "uv ${UV_VERSION}"
 }
 
-# Go and Rust back gopls and rust-analyzer. Both are desktop-only: the server
-# profile is `container-execution-only`, so a compiler on the host would be
-# exactly the local build capability that policy removes.
+# Go, Rust, and Dart are source-analysis hosts on every profile.
 install_compiled_language_hosts() {
-  if [ "$PROFILE" = "server" ]; then
-    rldyour::log "info" "compiled-language LSP hosts skipped: profile=$PROFILE builds run in Docker"
-    return 0
-  fi
   ensure_go
   ensure_rust
   ensure_dart
@@ -1566,11 +1554,7 @@ install_bun_lsps() {
   done
 }
 
-install_ai_runtimes() {
-  # Delegate the active harness set (codex) to its authoritative NDDev module; no
-  # AI CLI is installed inline or through a bun/npm global path.
-  rldyour::install_selected_harnesses
-}
+install_ai_runtimes() { rldyour::install_vendor_ai_clis; }
 
 # Set by install_gui_apps when a required desktop step failed. Reported at the
 # end of main so a cosmetic-looking layer cannot strand the layers behind it,
@@ -1584,17 +1568,14 @@ install_gui_apps() {
   fi
   rldyour::section "Install verified Ubuntu GUI applications"
   apt_install fonts-jetbrains-mono || rldyour::log "warn" "fonts-jetbrains-mono unavailable"
-  # The active harness set (codex) is owned by its GDS module; the ZCode desktop
-  # app is owned by nddev-harnesses, not by this bootstrap.
-  rldyour::log "info" "harness desktop apps are owned by their own repositories; no GUI harness is installed here."
-  # Desktop customization: GNOME dock, Russian layout, BrowserOS, Firefox removal.
+  # Desktop customization: GNOME dock, Russian layout, Chrome, Firefox removal.
   rldyour::section "Configure Ubuntu desktop (dock, keyboard, browser)"
   local desktop_script
   desktop_script="$(dirname "${BASH_SOURCE[0]}")/desktop.sh"
   if [ -f "$desktop_script" ]; then
     # desktop.sh now distinguishes a cosmetic step from a required one and
     # returns non-zero only for the latter. Swallowing that into a warning is
-    # what let a desktop missing BrowserOS, or still carrying Firefox, report a
+    # what let a desktop missing required applications, or still carrying Firefox, report a
     # successful apply and then pass strict verification.
     if ! rldyour::run bash "$desktop_script"; then
       GUI_LAYER_FAILED=1
@@ -1607,7 +1588,7 @@ run_server_layer() {
   local resolved_user=""
   # No Docker work for the plain desktop profile. Server and desktop-builds
   # both reach this function; desktop-builds installs Docker-only via --skip-baseline.
-  if [ "$DOCKER_MODE" = "none" ]; then
+  if [ "$PROFILE" = "desktop" ]; then
     return 0
   fi
   if [ "$SKIP_SYSTEM" -eq 1 ]; then
@@ -1615,7 +1596,10 @@ run_server_layer() {
   fi
   if ! is_supported_ubuntu; then
     if [ "$RLDYOUR_DRY_RUN" -eq 1 ]; then
-      rldyour::log "info" "[DRY-RUN] Ubuntu server layer: Docker=$DOCKER_MODE, UFW=$ENABLE_UFW, SSH hardening=$HARDEN_SSH, Fail2ban=$WITH_FAIL2BAN"
+      rldyour::section "Ubuntu server module"
+      rldyour::log "info" "[DRY-RUN] Docker Engine ($DOCKER_MODE)"
+      [ "$PROFILE" != "desktop-builds" ] || rldyour::log "info" "[DRY-RUN] server baseline skipped"
+      rldyour::log "info" "[DRY-RUN] UFW=$ENABLE_UFW, SSH hardening=$HARDEN_SSH, Fail2ban=$WITH_FAIL2BAN"
       return 0
     fi
     rldyour::log "error" "server layer requires Ubuntu 24.04 or 26.04"
@@ -1642,7 +1626,7 @@ verify_apply() {
     rldyour::log "info" "plan complete; verification runs only after apply"
   elif [ "$SKIP_CHECKS" -eq 0 ]; then
     RLDYOUR_PROFILE="$PROFILE" RLDYOUR_GUI_ENABLED="$GUI_ENABLED" \
-      RLDYOUR_DOCKER_MODE="$DOCKER_MODE" RLDYOUR_BROWSER_REQUIRED=1 \
+      RLDYOUR_DOCKER_MODE="$DOCKER_MODE" \
       RLDYOUR_SERVER_ENABLE_UFW="$ENABLE_UFW" \
       RLDYOUR_SERVER_HARDEN_SSH="$HARDEN_SSH" \
       RLDYOUR_SERVER_ENABLE_FAIL2BAN="$WITH_FAIL2BAN" \
@@ -1684,34 +1668,31 @@ main() {
   [ "$SKIP_LSPS" -eq 1 ] || install_bun_lsps
   [ "$SKIP_LSPS" -eq 1 ] || install_compiled_language_hosts
 
-  # This layer is mandatory on every profile and must precede independently
-  # optional/user-owned tools. A preserved unmanaged desktop convenience may
-  # still make the apply fail, but can no longer strand the CDP/portal repair.
-  rldyour::install_browser_providers
-
-  # User-selected desktop tools (herdr, telegram) and .desktop launchers. Desktop
-  # and desktop-builds profiles only — these are operator conveniences. Attempt
-  # every declared tool before surfacing an aggregate failure so an unmanaged
-  # herdr cannot prevent Telegram's independent repair/migration.
-  if [ "$PROFILE" != "server" ]; then
-    if ! install_user_tools; then
-      user_tools_failed=1
-    fi
-    rldyour::ubuntu::install_telegram_update_policy
-    rldyour::ubuntu::install_telegram_desktop_assets
+  # Herdr is useful locally and over SSH, so it is installed on every profile.
+  # Telegram and desktop integration remain GUI-only.
+  if ! install_user_tools; then
+    user_tools_failed=1
+  fi
+  if [ "$GUI_ENABLED" -eq 1 ]; then
     install_desktop_entries
-    # GNOME drops a favorite as soon as its desktop file disappears. Migrate
-    # the favorite while every recognized old ID still resolves, then retire
-    # the legacy/generated files and refresh the desktop database once more.
-    rldyour::ubuntu::configure_telegram_desktop_integration
-    rldyour::ubuntu::retire_telegram_legacy_managed_entry
-    rldyour::ubuntu::retire_telegram_generated_integrations
-    rldyour::ubuntu::retire_telegram_userapp_entries
-    rldyour::ubuntu::configure_telegram_desktop_integration
-    if [ "$user_tools_failed" -ne 0 ]; then
-      rldyour::log "error" "one or more user tools remain unmanaged or divergent; all user-tool repairs were attempted"
-      return 1
-    fi
+    case "$(uname -m)" in
+      x86_64|amd64)
+        rldyour::ubuntu::install_telegram_update_policy
+        rldyour::ubuntu::install_telegram_desktop_assets
+        # Migrate the favorite before retiring legacy/generated launchers.
+        rldyour::ubuntu::configure_telegram_desktop_integration
+        rldyour::ubuntu::retire_telegram_legacy_managed_entry
+        rldyour::ubuntu::retire_telegram_generated_integrations
+        rldyour::ubuntu::retire_telegram_userapp_entries
+        rldyour::ubuntu::configure_telegram_desktop_integration
+        ;;
+    esac
+  else
+    rldyour::log "info" "desktop entries skipped: gui disabled"
+  fi
+  if [ "$user_tools_failed" -ne 0 ]; then
+    rldyour::log "error" "one or more user tools remain unmanaged or divergent; all repairs were attempted"
+    return 1
   fi
 
   install_gui_apps
@@ -1722,8 +1703,7 @@ main() {
   # state this repository does not own: a stale builder profile under the harness
   # target, or a checkout whose modes came from the caller's umask. Under
   # `set -euo pipefail` an abort here used to strand every layer behind it - the
-  # language servers, the compiled hosts, the pinned scanners, and the browser
-  # stack - which is how a desktop ended up missing 24 of the 46 commands
+  # language servers, compiled hosts, and pinned scanners
   # verify.sh requires. Ordering it last keeps the failure fatal, which it must be,
   # while making it fatal to itself instead of to the whole device.
   [ "$SKIP_AI" -eq 1 ] || install_ai_runtimes

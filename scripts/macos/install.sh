@@ -17,13 +17,12 @@ SKIP_CHECKS="${RLDYOUR_SKIP_CHECKS:-0}"
 GUI_ENABLED="${RLDYOUR_GUI_ENABLED:-1}"
 LOCAL_EXECUTION_POLICY="${RLDYOUR_LOCAL_EXECUTION_POLICY:-source-lsp-only}"
 
-# One owner per harness (RVR-P1-004): the active harness set is codex, installed
-# by its dedicated authoritative NDDev module via
-# rldyour::install_selected_harnesses. Bootstrap pins no AI CLI versions here.
-# zcode is contract-delegated to nddev-harnesses.
 HOMEBREW_PKG_VERSION="6.0.9"
 HOMEBREW_PKG_SHA256="525599bd2dcbda29857120234336b0103ad5283a3dc8511f72066eeb917abd3c"
 HOMEBREW_INSTALLER_TEAM="927JGANW46"
+HERDR_VERSION="0.8.0"
+HERDR_MACOS_AARCH64_SHA256="d53a9f93fccfdfcc55632927bf51002f5add0aa7990bcdf508ffbd84ac658178"
+HERDR_MACOS_AARCH64_URL="https://github.com/herdrdev/herdr/releases/download/v0.8.0/herdr-macos-aarch64"
 
 # Source/LSP-only workstation baseline. No Docker, project build orchestration,
 # test runner, or local project runtime. Homebrew's LLVM distribution is present
@@ -61,7 +60,7 @@ BUN_LSP_PACKAGES=(
   "gh-actions-language-server@0.0.3"
 )
 
-GUI_CASKS=(ghostty cmux chatgpt codex-app claude)
+GUI_CASKS=(ghostty cmux google-chrome chatgpt claude rustdesk telegram)
 
 usage() {
   cat <<'EOF'
@@ -130,8 +129,136 @@ install_source_packages() {
   if [ "$RLDYOUR_DRY_RUN" -eq 1 ]; then
     rldyour::log "info" "[DRY-RUN] disable Dart telemetry reporting through 'dart --disable-analytics'"
   else
-    rldyour::ensure_dart_telemetry_disabled "$(command -v dart)" || return 1
+    local managed_dart
+    managed_dart="$(brew --prefix dart-sdk)/bin/dart"
+    rldyour::ensure_dart_telemetry_disabled "$managed_dart" || return 1
   fi
+}
+
+ensure_herdr() {
+  rldyour::section "Ensure verified Herdr ${HERDR_VERSION}"
+  local root="$HOME/.local/share/rldyour/herdr/${HERDR_VERSION}"
+  local target="$root/herdr"
+  local receipt="$root/.receipt"
+  local launcher="$HOME/.local/bin/herdr"
+  local marker="# Managed by macos-ubuntu-bootstrap: macos-herdr-runtime-v1"
+  local current stage stage_root actual reported_version link_tmp
+  local expected_receipt="$marker
+version=${HERDR_VERSION}
+sha256=${HERDR_MACOS_AARCH64_SHA256}
+source=${HERDR_MACOS_AARCH64_URL}"
+
+  if [ "$RLDYOUR_DRY_RUN" -eq 1 ]; then
+    rldyour::log "info" "[DRY-RUN] install verified ${HERDR_MACOS_AARCH64_URL} -> ${target}, publish receipt and managed launcher ${launcher}"
+    return 0
+  fi
+
+  local system machine root_mode target_mode receipt_mode
+  system="$(uname -s)" || {
+    rldyour::log "error" "could not determine the operating system for Herdr installation"
+    return 1
+  }
+  machine="$(uname -m)" || {
+    rldyour::log "error" "could not determine the architecture for Herdr installation"
+    return 1
+  }
+  if [ "$system" != Darwin ] || [ "$machine" != arm64 ]; then
+    rldyour::log "error" "Herdr ${HERDR_VERSION} has no managed macOS artifact for ${system}/${machine}"
+    return 1
+  fi
+
+  if [ -e "$launcher" ] || [ -L "$launcher" ]; then
+    [ -L "$launcher" ] || {
+      rldyour::log "error" "unmanaged Herdr launcher exists; preserved: ${launcher}"
+      return 1
+    }
+    current="$(readlink "$launcher")"
+    case "$current" in
+      "$HOME/.local/share/rldyour/herdr/"*) ;;
+      *)
+        rldyour::log "error" "Herdr launcher points outside its managed namespace; preserved: ${launcher}"
+        return 1
+        ;;
+    esac
+  fi
+
+  if [ -e "$root" ] || [ -L "$root" ]; then
+    if [ ! -d "$root" ] || [ -L "$root" ]; then
+      rldyour::log "error" "managed Herdr root has an unsupported shape; preserved: ${root}"
+      return 1
+    fi
+    [ "$(find "$root" -mindepth 1 -maxdepth 1 -print | LC_ALL=C sort)" = "$(printf '%s\n%s\n' "$receipt" "$target" | LC_ALL=C sort)" ] || {
+      rldyour::log "error" "managed Herdr root contains missing or additional paths; preserved: ${root}"
+      return 1
+    }
+    if [ ! -f "$target" ] || [ -L "$target" ] || [ ! -x "$target" ]; then
+      rldyour::log "error" "managed Herdr target has an unsupported shape; preserved: ${target}"
+      return 1
+    fi
+    if [ ! -f "$receipt" ] || [ -L "$receipt" ] || [ "$(cat "$receipt")" != "$expected_receipt" ]; then
+      rldyour::log "error" "managed Herdr receipt is missing or divergent; preserved: ${root}"
+      return 1
+    fi
+    actual="$(rldyour::sha256_file "$target")" || return 1
+    [ "$actual" = "$HERDR_MACOS_AARCH64_SHA256" ] || {
+      rldyour::log "error" "managed Herdr target checksum diverged; preserved: ${target}"
+      return 1
+    }
+    root_mode="$(rldyour::file_mode "$root")" || return 1
+    target_mode="$(rldyour::file_mode "$target")" || return 1
+    receipt_mode="$(rldyour::file_mode "$receipt")" || return 1
+    if [ "$root_mode" != 755 ] || [ "$target_mode" != 755 ] || [ "$receipt_mode" != 600 ]; then
+      rldyour::log "error" "managed Herdr permissions diverged; preserved: ${root}"
+      return 1
+    fi
+    reported_version="$("$target" --version 2>/dev/null | sed -E 's/^[^0-9]*([0-9]+\.[0-9]+\.[0-9]+).*/\1/' | head -n 1)"
+    [ "$reported_version" = "$HERDR_VERSION" ] || {
+      rldyour::log "error" "managed Herdr reports ${reported_version:-no version}, expected ${HERDR_VERSION}; preserved: ${root}"
+      return 1
+    }
+  else
+    stage="$(mktemp -d)" || return 1
+    stage_root="$stage/${HERDR_VERSION}"
+    mkdir "$stage_root" || { rm -rf "$stage"; return 1; }
+    chmod 0755 "$stage_root" || { rm -rf "$stage"; return 1; }
+    if ! rldyour::download_verified_file \
+      "$HERDR_MACOS_AARCH64_URL" "$HERDR_MACOS_AARCH64_SHA256" "$stage_root/herdr"; then
+      rm -rf "$stage"
+      rldyour::log "error" "official Herdr ${HERDR_VERSION} asset is unavailable or failed checksum verification"
+      return 1
+    fi
+    actual="$(rldyour::sha256_file "$stage_root/herdr")" || { rm -rf "$stage"; return 1; }
+    [ "$actual" = "$HERDR_MACOS_AARCH64_SHA256" ] || {
+      rm -rf "$stage"
+      rldyour::log "error" "downloaded Herdr checksum diverged before publication"
+      return 1
+    }
+    chmod 0755 "$stage_root/herdr" || { rm -rf "$stage"; return 1; }
+    reported_version="$("$stage_root/herdr" --version 2>/dev/null | sed -E 's/^[^0-9]*([0-9]+\.[0-9]+\.[0-9]+).*/\1/' | head -n 1)"
+    [ "$reported_version" = "$HERDR_VERSION" ] || {
+      rm -rf "$stage"
+      rldyour::log "error" "verified Herdr asset reports ${reported_version:-no version}, expected ${HERDR_VERSION}"
+      return 1
+    }
+    printf '%s\n' "$expected_receipt" >"$stage_root/.receipt" || { rm -rf "$stage"; return 1; }
+    chmod 0600 "$stage_root/.receipt" || { rm -rf "$stage"; return 1; }
+    rldyour::_managed_tree_permissions validate "$stage_root" || { rm -rf "$stage"; return 1; }
+    mkdir -p "${root%/*}" || { rm -rf "$stage"; return 1; }
+    mv "$stage_root" "$root" || { rm -rf "$stage"; return 1; }
+    rmdir "$stage" 2>/dev/null || rm -rf "$stage"
+  fi
+
+  mkdir -p "$HOME/.local/bin" || return 1
+  link_tmp="$(mktemp "$HOME/.local/bin/.herdr-link.XXXXXX")" || return 1
+  rm -f "$link_tmp"
+  ln -s "$target" "$link_tmp" || return 1
+  mv -f "$link_tmp" "$launcher" || { rm -f "$link_tmp"; return 1; }
+  hash -r
+  [ "$(command -v herdr)" = "$launcher" ] || {
+    rldyour::log "error" "managed Herdr launcher does not win PATH resolution"
+    return 1
+  }
+  rldyour::log "ok" "verified managed Herdr ${HERDR_VERSION}"
 }
 
 cask_app_path() {
@@ -139,8 +266,10 @@ cask_app_path() {
     ghostty) printf '%s\n' "/Applications/Ghostty.app" ;;
     cmux) printf '%s\n' "/Applications/cmux.app" ;;
     chatgpt) printf '%s\n' "/Applications/ChatGPT.app" ;;
-    codex-app) printf '%s\n' "/Applications/Codex.app" ;;
     claude) printf '%s\n' "/Applications/Claude.app" ;;
+    google-chrome) printf '%s\n' "/Applications/Google Chrome.app" ;;
+    rustdesk) printf '%s\n' "/Applications/RustDesk.app" ;;
+    telegram) printf '%s\n' "/Applications/Telegram.app" ;;
     *) return 1 ;;
   esac
 }
@@ -195,8 +324,7 @@ install_gui_apps() {
   # Attempt every cask, then report. This loop used to call ensure_cask bare
   # under `set -e`, so one unavailable cask -- a Homebrew rename, a notarization
   # change, a network blip -- aborted the whole script and stranded every layer
-  # behind it: the language servers, the MANDATORY browser layer, the harness
-  # layer and verification. That is the same failure this repository already
+  # behind it: language servers, AI CLIs, and verification. That is the same failure this repository already
   # fixed twice on Ubuntu; the optional layer must never be able to take the
   # required ones down with it.
   for cask in "${GUI_CASKS[@]}"; do
@@ -209,15 +337,10 @@ install_gui_apps() {
     GUI_LAYER_FAILED=$failed
     rldyour::log "error" "${failed} GUI cask(s) failed; later layers were still attempted"
   fi
-  rldyour::log "info" "ChatGPT and Codex are installed as separate supported OpenAI desktop applications."
-  rldyour::log "info" "ZCode is owned by the nddev-harnesses repository, not by this bootstrap; see scripts/auth-handoff.sh."
+  rldyour::log "info" "Installed the workstation GUI application set."
 }
 
-install_ai_runtimes() {
-  # Delegate the active harness set (codex) to its authoritative NDDev module; no
-  # AI CLI is installed inline or through a bun/npm global path.
-  rldyour::install_selected_harnesses
-}
+install_ai_runtimes() { rldyour::install_vendor_ai_clis; }
 
 install_bun_lsps() {
   rldyour::section "Install registry-backed language servers"
@@ -257,12 +380,13 @@ verify_apply() {
   if [ "$RLDYOUR_DRY_RUN" -eq 1 ]; then
     rldyour::log "info" "plan complete; verification runs only after apply"
   elif [ "$SKIP_CHECKS" -eq 0 ]; then
-    RLDYOUR_GUI_ENABLED="$GUI_ENABLED" RLDYOUR_BROWSER_REQUIRED=1 \
+    RLDYOUR_GUI_ENABLED="$GUI_ENABLED" \
       bash "$SCRIPT_DIR/verify.sh" --strict
   fi
 }
 
 main() {
+  local mode_label
   if [ "${1:-}" = "--help" ]; then
     usage
     exit 0
@@ -282,13 +406,19 @@ main() {
   fi
 
   rldyour::section "macos-ubuntu-bootstrap (macOS) installer"
-  rldyour::log "info" "mode: $([ "$RLDYOUR_DRY_RUN" -eq 1 ] && echo dry-run || echo apply); gui: $GUI_ENABLED; policy: $LOCAL_EXECUTION_POLICY"
+  if [ "$RLDYOUR_DRY_RUN" -eq 1 ]; then
+    mode_label=dry-run
+  else
+    mode_label=apply
+  fi
+  rldyour::log "info" "mode: ${mode_label}; gui: $GUI_ENABLED; policy: $LOCAL_EXECUTION_POLICY"
 
   if [ "$SKIP_SYSTEM" -eq 0 ]; then
     ensure_homebrew
     rldyour::ensure_path
     if command -v brew >/dev/null 2>&1 || [ "$RLDYOUR_DRY_RUN" -eq 1 ]; then
       install_source_packages
+      ensure_herdr
       install_gui_apps
     elif [ "$STRICT" -eq 1 ]; then
       rldyour::log "error" "Homebrew unavailable after installation"
@@ -303,13 +433,9 @@ main() {
 
   [ "$SKIP_LSPS" -eq 1 ] || install_bun_lsps
 
-  # Mandatory on GUI and no-GUI profiles. No skip/fallback path exists.
-  rldyour::install_browser_providers
   configure_cmux_hooks
 
-  # Harness last, for the reason documented in scripts/ubuntu/install.sh: the layer
-  # delegates to a module whose fail-closed guards depend on local state this
-  # repository does not own, and an abort there must not strand the layers behind it.
+  # Install vendor CLIs after the platform toolchain is available.
   [ "$SKIP_AI" -eq 1 ] || install_ai_runtimes
   if [ "$GUI_LAYER_FAILED" -ne 0 ]; then
     rldyour::log "error" "${GUI_LAYER_FAILED} GUI cask(s) failed; every other layer was still attempted"

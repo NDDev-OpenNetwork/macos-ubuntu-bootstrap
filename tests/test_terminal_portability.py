@@ -1,5 +1,7 @@
+import os
 import re
 import shutil
+import socket
 import subprocess
 from pathlib import Path
 
@@ -140,16 +142,266 @@ def test_materializer_installs_pinned_antidote_and_bundle() -> None:
         "rldyour::materialize_zsh_plugins" in common
         and "install_config_template" in common
     )
-    # Ubuntu path git-clones antidote at the pinned SHA to $HOME/.antidote.
+    # Ubuntu publishes Antidote's tracked payload at the pinned SHA to $HOME/.antidote.
     assert "getantidote/antidote" in common
     assert "4913257e0ae3fee2a77e7189e526fe55b6ff9536" in common
     assert "$HOME/.antidote" in common
-    # Clone home matches antidote's default (XDG_CACHE_HOME) full path style.
+    # Published source home matches Antidote's default full path style.
     assert "${XDG_CACHE_HOME:-$HOME/.cache}/antidote" in common
     assert "github.com/$repo" in common
     # A compiled static bundle is produced for offline startup.
     assert "antidote bundle" in common
     assert ".zsh_plugins.zsh" in common
+
+
+def _git(repo: Path, *arguments: str) -> str:
+    completed = subprocess.run(
+        ["git", "-C", str(repo), *arguments],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    return completed.stdout.strip()
+
+
+def _tracked_payload_fixture(tmp_path: Path) -> tuple[Path, str, socket.socket]:
+    repo = tmp_path / "plugin-source"
+    repo.mkdir()
+    _git(repo, "init", "--quiet")
+    _git(repo, "config", "user.name", "Bootstrap Test")
+    _git(repo, "config", "user.email", "bootstrap-test@example.invalid")
+    (repo / "plugin.zsh").write_bytes(b"source payload\n")
+    executable = repo / "bin" / "plugin-helper"
+    executable.parent.mkdir()
+    executable.write_bytes(b"#!/bin/sh\nexit 0\n")
+    executable.chmod(0o755)
+    (repo / "plugin-link").symlink_to("plugin.zsh")
+    _git(repo, "add", "plugin.zsh", "bin/plugin-helper", "plugin-link")
+    _git(repo, "commit", "--quiet", "-m", "fixture")
+    commit = _git(repo, "rev-parse", "HEAD")
+
+    # A real Unix socket reproduces the macOS hosted failure. It deliberately
+    # lives in mutable Git service metadata, never in the tracked commit tree.
+    subprocess.run(
+        ["git", "-C", str(repo), "fsmonitor--daemon", "stop"],
+        check=False,
+        capture_output=True,
+    )
+    (repo / ".git" / "fsmonitor--daemon.ipc").unlink(missing_ok=True)
+    fsmonitor = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+    previous_directory = Path.cwd()
+    try:
+        os.chdir(repo / ".git")
+        # A relative bind avoids Darwin's short AF_UNIX pathname limit while the
+        # resulting socket still physically resides in the fixture's `.git`.
+        fsmonitor.bind("fsmonitor--daemon.ipc")
+    finally:
+        os.chdir(previous_directory)
+    return repo, commit, fsmonitor
+
+
+def _publish_payload(
+    git_dir: Path,
+    commit: str,
+    destination: Path,
+    source_root: Path | None = None,
+) -> subprocess.CompletedProcess[str]:
+    command = 'source "$1"; rldyour::_publish_pinned_git_payload "$2" "$3" "$4"'
+    arguments = [str(COMMON), str(git_dir), commit, str(destination)]
+    if source_root is not None:
+        command += ' "$5"'
+        arguments.append(str(source_root))
+    return subprocess.run(
+        [
+            "bash",
+            "-c",
+            command,
+            "tracked-payload-test",
+            *arguments,
+        ],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+
+
+def _payload_snapshot(root: Path) -> list[tuple[str, str, int, bytes | str]]:
+    snapshot: list[tuple[str, str, int, bytes | str]] = []
+    for path in sorted(root.rglob("*")):
+        relative = path.relative_to(root).as_posix()
+        mode = path.lstat().st_mode & 0o777
+        if path.is_symlink():
+            snapshot.append((relative, "symlink", mode, path.readlink().as_posix()))
+        elif path.is_dir():
+            snapshot.append((relative, "directory", mode, b""))
+        else:
+            snapshot.append((relative, "file", mode, path.read_bytes()))
+    return snapshot
+
+
+def test_tracked_payload_excludes_real_git_fsmonitor_socket_and_is_deterministic(
+    tmp_path: Path,
+) -> None:
+    repo, commit, fsmonitor = _tracked_payload_fixture(tmp_path)
+    first = tmp_path / "payload-first"
+    second = tmp_path / "payload-second"
+    try:
+        result = _publish_payload(repo / ".git", commit, first)
+        assert result.returncode == 0, result.stderr + result.stdout
+        first_snapshot = _payload_snapshot(first)
+        first_inode = first.stat().st_ino
+
+        # Verification of an already-published payload is a no-op, and an
+        # independent publication from the same commit is byte/mode deterministic.
+        result = _publish_payload(repo / ".git", commit, first)
+        assert result.returncode == 0, result.stderr + result.stdout
+        assert first.stat().st_ino == first_inode
+        result = _publish_payload(repo / ".git", commit, second)
+        assert result.returncode == 0, result.stderr + result.stdout
+    finally:
+        fsmonitor.close()
+
+    assert first_snapshot == _payload_snapshot(first) == _payload_snapshot(second)
+    assert not (first / ".git").exists()
+    assert (first / "plugin.zsh").read_bytes() == b"source payload\n"
+    assert (first / "plugin.zsh").stat().st_mode & 0o777 == 0o644
+    assert (first / "bin" / "plugin-helper").stat().st_mode & 0o777 == 0o755
+    assert (first / "plugin-link").is_symlink()
+    assert (first / "plugin-link").readlink().as_posix() == "plugin.zsh"
+
+
+def test_tracked_payload_fails_closed_on_payload_drift(tmp_path: Path) -> None:
+    repo, commit, fsmonitor = _tracked_payload_fixture(tmp_path)
+    destination = tmp_path / "payload"
+    try:
+        assert _publish_payload(repo / ".git", commit, destination).returncode == 0
+    finally:
+        fsmonitor.close()
+
+    (destination / "plugin.zsh").write_bytes(b"tampered\n")
+    result = _publish_payload(repo / ".git", commit, destination)
+    assert result.returncode != 0
+    assert "tracked file bytes diverged" in result.stderr + result.stdout
+
+    (destination / "plugin.zsh").write_bytes(b"source payload\n")
+    (destination / "bin" / "plugin-helper").unlink()
+    result = _publish_payload(repo / ".git", commit, destination)
+    assert result.returncode != 0
+    assert "file set is missing or contains additional paths" in result.stderr + result.stdout
+
+    (destination / "bin" / "plugin-helper").write_bytes(b"#!/bin/sh\nexit 0\n")
+    (destination / "bin" / "plugin-helper").chmod(0o755)
+    (destination / "extra.zsh").write_bytes(b"extra\n")
+    result = _publish_payload(repo / ".git", commit, destination)
+    assert result.returncode != 0
+    assert "file set is missing or contains additional paths" in result.stderr + result.stdout
+    (destination / "extra.zsh").unlink()
+
+    extra_socket = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+    previous_directory = Path.cwd()
+    try:
+        os.chdir(destination)
+        extra_socket.bind("unexpected.ipc")
+        os.chdir(previous_directory)
+        result = _publish_payload(repo / ".git", commit, destination)
+    finally:
+        os.chdir(previous_directory)
+        extra_socket.close()
+    assert result.returncode != 0
+    assert "unsupported file type" in result.stderr + result.stdout
+
+
+def test_tracked_payload_rejects_tracked_symlink_escape(tmp_path: Path) -> None:
+    repo, _commit, fsmonitor = _tracked_payload_fixture(tmp_path)
+    try:
+        (repo / "plugin-link").unlink()
+        (repo / "plugin-link").symlink_to("../outside")
+        _git(repo, "add", "plugin-link")
+        _git(repo, "commit", "--quiet", "-m", "unsafe tracked symlink")
+        commit = _git(repo, "rev-parse", "HEAD")
+        result = _publish_payload(repo / ".git", commit, tmp_path / "payload")
+    finally:
+        fsmonitor.close()
+    assert result.returncode != 0
+    assert "tracked symlink escapes its payload root" in result.stderr + result.stdout
+
+
+def test_tracked_payload_rejects_unsupported_tracked_git_entry(tmp_path: Path) -> None:
+    repo, commit, fsmonitor = _tracked_payload_fixture(tmp_path)
+    try:
+        # A gitlink without an exact tracked .gitmodules origin is unsupported.
+        # It must never be silently omitted or resolved from ambient Git config.
+        _git(repo, "update-index", "--add", "--cacheinfo", f"160000,{commit},nested")
+        _git(repo, "commit", "--quiet", "-m", "unsupported tracked gitlink")
+        unsupported_commit = _git(repo, "rev-parse", "HEAD")
+        result = _publish_payload(repo / ".git", unsupported_commit, tmp_path / "payload")
+    finally:
+        fsmonitor.close()
+    assert result.returncode != 0
+    assert "gitlinks and .gitmodules paths do not match exactly" in result.stderr + result.stdout
+
+
+def test_tracked_payload_recursively_materializes_exact_declared_submodule(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    child = tmp_path / "child"
+    child.mkdir()
+    _git(child, "init", "--quiet")
+    _git(child, "config", "user.name", "Bootstrap Test")
+    _git(child, "config", "user.email", "bootstrap-test@example.invalid")
+    (child / "child.zsh").write_bytes(b"child payload\n")
+    _git(child, "add", "child.zsh")
+    _git(child, "commit", "--quiet", "-m", "child fixture")
+    child_commit = _git(child, "rev-parse", "HEAD")
+
+    source_root = tmp_path / "objects"
+    child_store = source_root / "github.com" / "example" / "child.git"
+    child_store.parent.mkdir(parents=True)
+    subprocess.run(
+        ["git", "clone", "--quiet", "--bare", str(child), str(child_store)],
+        check=True,
+    )
+    # Keep the regression hermetic while retaining the production HTTPS
+    # identity: Git rewrites only the test transport to this local fixture.
+    monkeypatch.setenv("GIT_CONFIG_COUNT", "1")
+    monkeypatch.setenv("GIT_CONFIG_KEY_0", f"url.file://{child}.insteadOf")
+    monkeypatch.setenv("GIT_CONFIG_VALUE_0", "https://github.com/example/child")
+    subprocess.run(
+        [
+            "git",
+            f"--git-dir={child_store}",
+            "remote",
+            "set-url",
+            "origin",
+            "https://github.com/example/child",
+        ],
+        check=True,
+    )
+
+    parent = tmp_path / "parent"
+    parent.mkdir()
+    _git(parent, "init", "--quiet")
+    _git(parent, "config", "user.name", "Bootstrap Test")
+    _git(parent, "config", "user.email", "bootstrap-test@example.invalid")
+    (parent / "parent.zsh").write_bytes(b"parent payload\n")
+    (parent / ".gitmodules").write_text(
+        '[submodule "child"]\n\tpath = nested\n\turl = https://github.com/example/child\n',
+        encoding="utf-8",
+    )
+    _git(parent, "add", "parent.zsh", ".gitmodules")
+    _git(parent, "update-index", "--add", "--cacheinfo", f"160000,{child_commit},nested")
+    _git(parent, "commit", "--quiet", "-m", "parent fixture")
+    parent_commit = _git(parent, "rev-parse", "HEAD")
+
+    destination = tmp_path / "payload"
+    result = _publish_payload(
+        parent / ".git", parent_commit, destination, source_root=source_root
+    )
+    assert result.returncode == 0, result.stderr + result.stdout
+    assert (destination / "parent.zsh").read_bytes() == b"parent payload\n"
+    assert (destination / "nested" / "child.zsh").read_bytes() == b"child payload\n"
+    assert not any(path.name == ".git" for path in destination.rglob(".git"))
 
 
 def test_static_bundle_preferred_by_zshrc() -> None:

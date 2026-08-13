@@ -19,6 +19,46 @@ print(contract["runtime_support"][sys.argv[2]][sys.argv[3]])
 PY
 }
 
+rldyour::ubuntu_verify::herdr_provenance() {
+  local arch_key version sha root target
+  version="$(python3 - "$REPO_ROOT/config/rldyour-contract.json" <<'PY'
+import json, sys
+with open(sys.argv[1], encoding="utf-8") as handle:
+    print(json.load(handle)["user_tools"]["herdr"]["version"])
+PY
+)"
+  case "$(uname -m)" in
+    x86_64|amd64) arch_key=linux-x86_64 ;;
+    aarch64|arm64) arch_key=linux-aarch64 ;;
+    *) rldyour::log "missing" "Herdr has no managed Ubuntu artifact for $(uname -m)"; return 1 ;;
+  esac
+  sha="$(python3 - "$REPO_ROOT/config/rldyour-contract.json" "$arch_key" <<'PY'
+import json, sys
+with open(sys.argv[1], encoding="utf-8") as handle:
+    print(json.load(handle)["user_tools"]["herdr"]["source"]["assets"][sys.argv[2]]["sha256"])
+PY
+)"
+  root="$HOME/.local/share/rldyour/herdr/${version}"
+  target="$root/herdr"
+  rldyour::ubuntu_verify::runtime_receipt herdr "$version" "$sha" "$root" herdr || {
+    rldyour::log "missing" "Herdr exact managed Ubuntu receipt"
+    return 1
+  }
+  rldyour::ubuntu_verify::managed_link herdr "$target" || {
+    rldyour::log "missing" "Herdr exact managed Ubuntu launcher"
+    return 1
+  }
+  [ "$(command -v herdr)" = "$HOME/.local/bin/herdr" ] || {
+    rldyour::log "missing" "managed Herdr launcher must win Ubuntu PATH resolution"
+    return 1
+  }
+  [ "$(herdr --version 2>/dev/null | sed -E 's/^[^0-9]*([0-9]+\.[0-9]+\.[0-9]+).*/\1/' | head -n 1)" = "$version" ] || {
+    rldyour::log "missing" "Herdr exact managed Ubuntu version ${version}"
+    return 1
+  }
+  rldyour::log "ok" "Herdr exact managed Ubuntu runtime ${version} (${arch_key})"
+}
+
 rldyour::ubuntu_verify::runtime_receipt() {
   local runtime=$1 version=$2 archive_sha256=$3 root=$4
   local receipt="$root/.rldyour-runtime-receipt" relative key expected
@@ -120,100 +160,17 @@ rldyour::ubuntu_verify::telegram_policy() {
       "$HOME/.local/share/dbus-1/services"/org.telegram.desktop._*.service; do
       [ ! -e "$candidate" ] && [ ! -L "$candidate" ] || return 1
     done
-    # GIO userapp entries bound to the Telegram launcher. They do not shadow
-    # the default handler, but they invoke it without the XCB wrapper the
-    # managed entry exists for, so a chooser or a default reset can still start
-    # Telegram in the failing Wayland mode.
     for candidate in "$HOME/.local/share/applications"/userapp-*.desktop; do
-      [ -f "$candidate" ] || continue
-      grep -Eq "^Exec=($launcher|$resolved|telegram-desktop)( |$)" "$candidate" && return 1
+      [ -e "$candidate" ] || [ -L "$candidate" ] || continue
+      if grep -Eq '^Exec=(.*/)?telegram-desktop( |$)' "$candidate" 2>/dev/null; then
+        return 1
+      fi
     done
     if command -v xdg-mime >/dev/null 2>&1; then
       [ "$(xdg-mime query default x-scheme-handler/tg)" = "$desktop_id" ] || return 1
       [ "$(xdg-mime query default x-scheme-handler/tonsite)" = "$desktop_id" ] || return 1
     fi
   fi
-}
-
-# The desktop composer's required outcomes. Strict verification checked none of
-# them, so a desktop that never installed Chrome -- or that still carries the
-# Firefox this bootstrap is supposed to remove -- verified clean. The cosmetic
-# outcomes (dock position, keyboard layout) stay report-only: they depend on a
-# live GNOME session that a verification run does not necessarily have.
-rldyour::ubuntu_verify::desktop_outcomes() {
-  local failed=0
-
-  if command -v dpkg-query >/dev/null 2>&1; then
-    # RustDesk is an optional convenience: reported, never required.
-    if dpkg-query -W -f='${Status}' rustdesk 2>/dev/null |
-      command grep -q "install ok installed"; then
-      rldyour::log "ok" "RustDesk installed (optional)"
-    else
-      rldyour::log "warn" "RustDesk is not installed (optional)"
-    fi
-
-    if dpkg-query -W -f='${Status}' google-chrome-stable 2>/dev/null |
-      command grep -q "install ok installed"; then
-      rldyour::log "ok" "Google Chrome installed"
-    else
-      rldyour::log "missing" "Google Chrome is declared in desktop_apps but not installed"
-      failed=1
-    fi
-
-    if dpkg -l firefox 2>/dev/null | command grep -q '^ii'; then
-      rldyour::log "missing" "apt Firefox is still present; the desktop layer must remove it"
-      failed=1
-    else
-      rldyour::log "ok" "apt Firefox absent"
-    fi
-  fi
-
-  if command -v snap >/dev/null 2>&1; then
-    if snap list firefox >/dev/null 2>&1; then
-      rldyour::log "missing" "snap Firefox is still present; the desktop layer must remove it"
-      failed=1
-    else
-      rldyour::log "ok" "snap Firefox absent"
-    fi
-  fi
-
-  # Two repository paths are in the wild for the same product: Google's own
-  # cron writes `linux/chrome/deb`, while a source created through Ubuntu's
-  # repolib tooling uses `linux/chrome-stable/deb`. Match the common prefix so
-  # either is recognised. The `|| true` is load-bearing: grep exits 1 when it
-  # finds nothing, and under `set -o pipefail` that would abort the whole
-  # verifier on any device without Chrome.
-  local chrome_source chrome_keyring chrome_primary
-  chrome_source="$(command grep -rlF 'dl.google.com/linux/chrome' \
-    /etc/apt/sources.list /etc/apt/sources.list.d/ 2>/dev/null | head -1 || true)"
-  if [ -n "$chrome_source" ]; then
-    chrome_keyring="$(command sed -n -E 's/^[[:space:]]*Signed-By:[[:space:]]*//p; s/.*\[[^]]*signed-by=([^] ]+).*/\1/p' \
-      "$chrome_source" | head -1)"
-    chrome_primary="$(gpg --batch --show-keys --with-colons "$chrome_keyring" 2>/dev/null |
-      awk -F: '$1 == "pub" { c++; a = 1; next } $1 == "fpr" && a { f = toupper($10); a = 0 }
-               END { if (c == 1 && f != "") print f }')"
-    if [ "$chrome_primary" = "EB4C1BFD4F042F6DDDCCEC917721F63BD38B4796" ]; then
-      rldyour::log "ok" "Chrome apt source signed by the verified Google key"
-    else
-      rldyour::log "missing" "Chrome apt source is not signed by the verified Google key: ${chrome_source}"
-      failed=1
-    fi
-  fi
-
-  # Report-only: absence here is a cosmetic gap, not a wrong device. Probe the
-  # source a GNOME session actually reads. `localectl` reports the system X11
-  # keymap, which a Wayland session ignores entirely -- checking only that is
-  # how a desktop with no usable Russian layout still looked configured.
-  if command -v gsettings >/dev/null 2>&1; then
-    if gsettings get org.gnome.desktop.input-sources sources 2>/dev/null |
-      command grep -q "'ru'"; then
-      rldyour::log "ok" "GNOME input sources include ru"
-    else
-      rldyour::log "warn" "GNOME input sources do not include ru"
-    fi
-  fi
-
-  return "$failed"
 }
 
 STRICT=0
@@ -234,14 +191,14 @@ done
 rldyour::ensure_path
 rldyour::section "Verify Ubuntu $PROFILE profile"
 rldyour::ubuntu_verify::tool_host_provenance
+rldyour::ubuntu_verify::herdr_provenance
 
 required_cmds=(
   git curl node bun uv python3 shellcheck shfmt clangd
   pyright pyright-langserver basedpyright ruff
   tsc vtsls yaml-language-server bash-language-server docker-langserver
   vscode-html-language-server vscode-css-language-server vscode-json-language-server taplo
-  codex
-  cloak-chromium cloakbrowser-cdp-health chrome-devtools-mcp playwright-cli
+  codex claude grok cx cl gk
 )
 for cmd in "${required_cmds[@]}"; do
   rldyour::require_cmd "$cmd" required
@@ -258,14 +215,6 @@ uv --version 2>/dev/null | head -n 1 | grep -Eq '^uv 0\.11\.30([[:space:]]|$)' |
   rldyour::log "missing" "uv exact managed Ubuntu version 0.11.30"
   exit 1
 }
-# The active harness set (codex) is owned by its GDS module. Deep harness proof
-# (exact CLI version, setup catalog) is delegated to the module's own status; here
-# we only require the CLI to resolve on PATH (checked above). zcode is
-# contract-delegated to nddev-harnesses and is deliberately not required.
-cloakbrowser-cdp-health
-chrome-devtools-mcp --version | grep -Fq "1.6.0"
-playwright-cli --version | grep -Fq "0.1.17"
-"$SCRIPT_DIR/../verify-browser-runtime.sh" --json
 rldyour::verify_terminal_environment
 
 if [ "$PROFILE" != "server" ]; then
@@ -274,32 +223,28 @@ if [ "$PROFILE" != "server" ]; then
   for cmd in go gopls rustc cargo rust-analyzer dart; do
     rldyour::require_cmd "$cmd" required
   done
-  # Pinned upstream CLI artifacts: the four CI-parity scanners, the Markdown
-  # language server, the git pager that ensure_git_delta_config configures, the
-  # structured YAML/AST utilities, the estate's command runner, and the file
-  # encryption pair.
-  for cmd in gitleaks osv-scanner actionlint hadolint markdown-oxide delta yq ast-grep \
-    just age age-keygen; do
+  # Pinned source-analysis tools: the four CI-parity scanners, the Markdown
+  # language server, the git pager that ensure_git_delta_config configures, and
+  # the structured YAML/AST utilities.
+  for cmd in gitleaks osv-scanner actionlint hadolint markdown-oxide delta yq ast-grep just age age-keygen; do
     rldyour::require_cmd "$cmd" required
   done
   # User-selected desktop tools (herdr, telegram). Installed by install_user_tools
   # using the same managed-symlink + receipt contract as pinned source tools; a
   # failed install must not stay invisible.
   rldyour::require_cmd herdr required
-  # Telegram publishes an x86_64 portable build only, so an arm64 desktop
-  # legitimately has none and must not be failed for it.
-  case "$(uname -m)" in
-    x86_64|amd64)
-      rldyour::require_cmd telegram-desktop required
-      rldyour::ubuntu_verify::telegram_policy || {
-        rldyour::log "missing" "Telegram updater isolation and XCB launcher contract"
-        exit 1
-      }
-      ;;
-    *)
-      rldyour::log "info" "Telegram skipped: upstream publishes no $(uname -m) build"
-      ;;
-  esac
+  if [ "$GUI_ENABLED" -eq 1 ]; then
+    case "$(uname -m)" in
+      x86_64|amd64)
+        rldyour::require_cmd telegram-desktop required
+        rldyour::ubuntu_verify::telegram_policy || {
+          rldyour::log "missing" "Telegram updater isolation and XCB launcher contract"
+          exit 1
+        }
+        ;;
+      *) rldyour::log "info" "Telegram skipped: upstream publishes no $(uname -m) build" ;;
+    esac
+  fi
   # cmake-language-server ships in PYTHON_SOURCE_TOOLS but was never verified,
   # so a failed install stayed invisible on Ubuntu while macOS gated on it.
   rldyour::require_cmd cmake-language-server required
@@ -323,16 +268,7 @@ if [ "$PROFILE" != "server" ]; then
     rldyour::log "missing" "'dart mcp-server' transport for the dart-flutter MCP server"
     exit 1
   }
-  # Telemetry stays off by policy. Prove it from the config the SDK maintains
-  # rather than trusting that the installer ran, and reject a conflicting
-  # `reporting=1` instead of reasoning about upstream duplicate-key precedence.
-  dart_telemetry_config="$HOME/.dart-tool/dart-flutter-telemetry.config"
-  if [ ! -f "$dart_telemetry_config" ] || [ -L "$dart_telemetry_config" ] ||
-    ! grep -Fxq 'reporting=0' "$dart_telemetry_config" ||
-    grep -Fxq 'reporting=1' "$dart_telemetry_config"; then
-    rldyour::log "missing" "Dart telemetry provably disabled in ${dart_telemetry_config}"
-    exit 1
-  fi
+  rldyour::observe_dart_telemetry_config
   if [ "$PROFILE" = "desktop" ]; then
     [ "$DOCKER_MODE" = "none" ] || { rldyour::log "error" "desktop Docker mode must be none"; exit 1; }
     if command -v docker >/dev/null 2>&1; then
@@ -346,20 +282,40 @@ if [ "$PROFILE" != "server" ]; then
     rldyour::log "ok" "desktop-builds policy: Docker is present"
   fi
   if [ "$GUI_ENABLED" -eq 1 ]; then
-    # Harness desktop apps (e.g. ZCode via nddev-harnesses) are owned and
-    # verified by their own repositories; this bootstrap installs no GUI harness
-    # package to check here.
-    rldyour::log "ok" "desktop GUI harness apps are owned by their own repositories"
-    # "desktop.sh reports its own result" was the reason this block checked
-    # nothing -- while desktop.sh reported success unconditionally. Verify the
-    # outcomes here too: an apply-time report and an independent verification
-    # are not the same evidence.
-    rldyour::ubuntu_verify::desktop_outcomes || {
-      rldyour::log "missing" "required Ubuntu desktop customization outcomes"
-      exit 1
+    command -v google-chrome-stable >/dev/null 2>&1 || { rldyour::log "missing" "Google Chrome stable"; exit 1; }
+    command -v rustdesk >/dev/null 2>&1 || { rldyour::log "missing" "RustDesk"; exit 1; }
+    chrome_source="$(grep -RslE 'dl.google.com/linux/chrome(/|-stable/)deb' /etc/apt/sources.list /etc/apt/sources.list.d 2>/dev/null || true)"
+    [ -n "$chrome_source" ] || { rldyour::log "missing" "Google Chrome apt source"; exit 1; }
+    chrome_fingerprints="$(gpg --show-keys --with-colons /etc/apt/keyrings/rldyour-google-chrome.asc 2>/dev/null | awk -F: '$1 == \"fpr\" { print $10 }')"
+    [ "$(printf '%s\n' "$chrome_fingerprints" | grep -Fxc 'EB4C1BFD4F042F6DDDCCEC917721F63BD38B4796')" -eq 1 ] || {
+      rldyour::log "missing" "verified Google Chrome signing key"; exit 1;
     }
+    if command -v firefox >/dev/null 2>&1 || { command -v snap >/dev/null 2>&1 && snap list firefox >/dev/null 2>&1; }; then
+      rldyour::log "missing" "Firefox must be absent from the Ubuntu GUI profile"
+      exit 1
+    fi
   fi
 else
+  rldyour::require_cmd herdr required
+  for cmd in go gopls rustc cargo rust-analyzer dart; do
+    rldyour::require_cmd "$cmd" required
+  done
+  for cmd in gitleaks osv-scanner actionlint hadolint markdown-oxide delta yq ast-grep just age age-keygen cmake-language-server; do
+    rldyour::require_cmd "$cmd" required
+  done
+  [ "$(go version 2>/dev/null | awk '{ print $3 }')" = "go1.26.5" ] || {
+    rldyour::log "missing" "Go exact managed Ubuntu version 1.26.5"; exit 1;
+  }
+  [ "$(rustc --version 2>/dev/null | awk '{ print $2 }')" = "1.97.1" ] || {
+    rldyour::log "missing" "Rust exact managed Ubuntu version 1.97.1"; exit 1;
+  }
+  [ "$(dart --version 2>&1 | awk 'NR == 1 { print $4 }')" = "3.12.2" ] || {
+    rldyour::log "missing" "Dart exact managed Ubuntu version 3.12.2"; exit 1;
+  }
+  dart mcp-server --version >/dev/null 2>&1 || {
+    rldyour::log "missing" "'dart mcp-server' transport for the dart-flutter MCP server"; exit 1;
+  }
+  rldyour::observe_dart_telemetry_config
   args=(--docker-mode "$DOCKER_MODE")
   [ "${RLDYOUR_SERVER_ENABLE_UFW:-0}" -eq 1 ] && args+=(--expect-ufw)
   [ "${RLDYOUR_SERVER_HARDEN_SSH:-0}" -eq 1 ] && args+=(--expect-ssh-hardening)

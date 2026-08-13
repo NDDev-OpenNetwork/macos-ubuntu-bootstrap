@@ -37,7 +37,8 @@ zstyle ':completion:*' cache-path "$HOME/.zcompcache"
 zstyle ':completion:*' menu no            # fzf-tab replaces the menu
 
 # ── 4. Plugins via antidote (offline static bundle) ─────────────────────────
-# The installer pre-clones every plugin at its pinned SHA and compiles
+# The installer publishes every plugin's verified tracked payload at its pinned
+# SHA and compiles
 # ~/.zsh_plugins.zsh; sourcing that compiled file is pure `source`/`fpath` with
 # zero network and no antidote runtime. If the compiled bundle is absent we start
 # with NO plugins and fail closed — we never invoke antidote's network loader at
@@ -79,8 +80,8 @@ elif command -v batcat >/dev/null 2>&1; then
   alias cat='batcat'
 fi
 command -v lazygit >/dev/null 2>&1 && alias lg='lazygit'
-# Harness launchers cl / cx / oc are real executables in ~/.local/bin
-# (installed by rldyour-ai-cli-tools) — not aliases, so agents can exec them.
+# Harness launchers cx / cl / gk are real executables in ~/.local/bin and start
+# Codex, Claude Code, and Grok Build in their vendor-supported full-auto modes.
 if command -v abbr >/dev/null; then
   if command -v git >/dev/null 2>&1; then
     abbr -S -qq gs='git status'     2>/dev/null

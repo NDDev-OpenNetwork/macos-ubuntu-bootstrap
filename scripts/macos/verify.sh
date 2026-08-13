@@ -7,6 +7,10 @@ SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck disable=SC1091
 source "$SCRIPT_DIR/../lib/common.sh"
 
+HERDR_VERSION="0.8.0"
+HERDR_MACOS_AARCH64_SHA256="d53a9f93fccfdfcc55632927bf51002f5add0aa7990bcdf508ffbd84ac658178"
+HERDR_MACOS_AARCH64_URL="https://github.com/herdrdev/herdr/releases/download/v0.8.0/herdr-macos-aarch64"
+
 STRICT=0
 GUI_ENABLED="${RLDYOUR_GUI_ENABLED:-1}"
 for arg in "$@"; do
@@ -31,8 +35,8 @@ required_cmds=(
   tsc vtsls yaml-language-server bash-language-server docker-langserver
   vscode-html-language-server vscode-css-language-server vscode-json-language-server
   taplo marksman terraform-ls cmake-language-server
-  codex
-  cloak-chromium cloakbrowser-cdp-health chrome-devtools-mcp playwright-cli
+  herdr
+  codex claude grok cx cl gk
 )
 for cmd in "${required_cmds[@]}"; do
   rldyour::require_cmd "$cmd" required
@@ -55,6 +59,54 @@ rldyour::require_cmd_min_version bun 1.3 --version
 rldyour::require_cmd_min_version starship 1.0 --version
 rldyour::require_cmd_min_version atuin 18.0 --version
 rldyour::require_cmd_min_version carapace 1.0 --version
+herdr_root="$HOME/.local/share/rldyour/herdr/${HERDR_VERSION}"
+herdr_target="$herdr_root/herdr"
+herdr_receipt="$herdr_root/.receipt"
+herdr_launcher="$HOME/.local/bin/herdr"
+if [ -L "$herdr_root" ] || [ ! -d "$herdr_root" ] || \
+  [ "$(find "$herdr_root" -mindepth 1 -maxdepth 1 -print | LC_ALL=C sort)" != "$(printf '%s\n%s\n' "$herdr_receipt" "$herdr_target" | LC_ALL=C sort)" ]; then
+  rldyour::log "missing" "Herdr exact managed root shape"
+  exit 1
+fi
+if [ ! -f "$herdr_target" ] || [ -L "$herdr_target" ] || [ ! -x "$herdr_target" ]; then
+  rldyour::log "missing" "managed Herdr target: ${herdr_target}"
+  exit 1
+fi
+[ "$(rldyour::sha256_file "$herdr_target")" = "$HERDR_MACOS_AARCH64_SHA256" ] || {
+  rldyour::log "missing" "Herdr exact managed macOS artifact checksum"
+  exit 1
+}
+if [ ! -L "$herdr_launcher" ] || [ "$(readlink "$herdr_launcher")" != "$herdr_target" ]; then
+  rldyour::log "missing" "Herdr exact managed launcher"
+  exit 1
+fi
+[ "$(command -v herdr)" = "$herdr_launcher" ] || {
+  rldyour::log "missing" "managed Herdr launcher must win PATH resolution"
+  exit 1
+}
+herdr_expected_receipt="# Managed by macos-ubuntu-bootstrap: macos-herdr-runtime-v1
+version=${HERDR_VERSION}
+sha256=${HERDR_MACOS_AARCH64_SHA256}
+source=${HERDR_MACOS_AARCH64_URL}"
+if [ ! -f "$herdr_receipt" ] || [ -L "$herdr_receipt" ] || \
+  [ "$(cat "$herdr_receipt")" != "$herdr_expected_receipt" ]; then
+  rldyour::log "missing" "Herdr exact managed receipt"
+  exit 1
+fi
+herdr_root_mode="$(rldyour::file_mode "$herdr_root")" || exit 1
+herdr_target_mode="$(rldyour::file_mode "$herdr_target")" || exit 1
+herdr_receipt_mode="$(rldyour::file_mode "$herdr_receipt")" || exit 1
+if [ "$herdr_root_mode" != 755 ] || [ "$herdr_target_mode" != 755 ] || \
+  [ "$herdr_receipt_mode" != 600 ]; then
+  rldyour::log "missing" "Herdr exact managed permissions"
+  exit 1
+fi
+rldyour::_managed_tree_permissions validate "$herdr_root" || exit 1
+[ "$("$herdr_target" --version 2>/dev/null | sed -E 's/^[^0-9]*([0-9]+\.[0-9]+\.[0-9]+).*/\1/' | head -n 1)" = "$HERDR_VERSION" ] || {
+  rldyour::log "missing" "Herdr exact managed version ${HERDR_VERSION}"
+  exit 1
+}
+rldyour::log "ok" "Herdr exact managed macOS runtime ${HERDR_VERSION}"
 # Dart backs the analysis server and the `dart-flutter` MCP transport. Homebrew
 # cannot pin an exact patch, so the floor is a major/minor gate plus proof that
 # the mcp-server subcommand exists (a Dart SDK below 3.9 resolves but cannot
@@ -64,18 +116,11 @@ dart mcp-server --version >/dev/null 2>&1 || {
   rldyour::log "missing" "'dart mcp-server' transport for the dart-flutter MCP server"
   exit 1
 }
-# The active harness set (codex) is owned by its GDS module. Deep harness proof
-# (exact CLI version, setup catalog) is delegated to the module's own status; here
-# we only require the CLI to resolve on PATH (checked above). zcode is
-# contract-delegated to nddev-harnesses and is deliberately not required.
-cloakbrowser-cdp-health
-chrome-devtools-mcp --version | grep -Fq "1.6.0"
-playwright-cli --version | grep -Fq "0.1.17"
-"$SCRIPT_DIR/../verify-browser-runtime.sh" --json
+rldyour::observe_dart_telemetry_config
 rldyour::verify_terminal_environment
 
 if [ "$GUI_ENABLED" -eq 1 ]; then
-  for app in Ghostty cmux ChatGPT Codex Claude; do
+  for app in Ghostty cmux "Google Chrome" ChatGPT Claude RustDesk Telegram; do
     [ -d "/Applications/${app}.app" ] || {
       rldyour::log "missing" "required GUI app: /Applications/${app}.app"
       exit 1

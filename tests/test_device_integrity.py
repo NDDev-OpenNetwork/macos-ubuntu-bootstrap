@@ -181,6 +181,15 @@ def test_verify_contract_versions_passes_when_state_matches() -> None:
                 "installed_version": spec["version"],
                 "declared_version": spec["version"],
                 **(
+                    {
+                        "sha256": spec["source"]["assets"][
+                            "macos-aarch64" if di._current_os() == "macos" else "linux-x86_64"
+                        ]["sha256"]
+                    }
+                    if spec.get("source", {}).get("assets")
+                    else {}
+                ),
+                **(
                     {"external_updater_policy_valid": True}
                     if spec.get("external_updater_policy_target")
                     else {}
@@ -227,16 +236,28 @@ def test_verify_contract_versions_detects_absent_runtime() -> None:
         di._verify_contract_versions(state)
 
 
-def test_verify_contract_versions_detects_user_tool_drift() -> None:
+def test_verify_contract_versions_detects_user_tool_drift(monkeypatch: pytest.MonkeyPatch) -> None:
     contract = di.load_contract()
+    monkeypatch.setattr(di, "_applies_to_current_os", lambda spec: True)
+    runtime_support = contract["runtime_support"]
     declared = list(contract.get("user_tools", {}))
     if not declared:
         pytest.skip("contract declares no user tools")
     name = declared[0]
     declared_version = contract["user_tools"][name]["version"]
     state = {
-        "runtime_hosts": {},
-        "pinned_source_tools": {},
+        "runtime_hosts": {
+            runtime_name: {
+                "normalized": di._normalize_version(runtime_support[field], runtime_name),
+                "raw": runtime_support[field],
+                "path": f"/bin/{runtime_name}",
+            }
+            for runtime_name, (_flag, field) in di.RUNTIME_HOSTS.items()
+        },
+        "pinned_source_tools": {
+            tool: spec["version"]
+            for tool, spec in runtime_support[di.PINNED_SOURCE_TOOLS_CONTRACT].items()
+        },
         "user_tools": {
             name: {
                 "installed_version": "0.0.0",
@@ -263,60 +284,60 @@ def test_telegram_presence_probe_never_executes_the_gui(
     def fake_run_version(binary: Path, flag: str) -> str:
         calls.append(binary.name)
         assert flag == "--version"
-        return "herdr 0.7.5"
+        return "herdr 0.8.0"
 
     monkeypatch.setattr(di.shutil, "which", lambda name: str(bin_dir / name))
+    monkeypatch.setattr(di, "_applies_to_current_os", lambda spec: True)
     monkeypatch.setattr(di, "_run_version", fake_run_version)
     state = di._user_tool_state(bin_dir, tmp_path)
 
     assert calls == ["herdr"]
     assert state["telegram"]["raw"] == "presence-only"
-    assert state["telegram"]["installed_version"] == "7.0.7"
+    assert state["telegram"]["installed_version"] == "7.0.9"
 
 
 # ----------------------------- profile awareness -----------------------------
 
 
-def _server_state_node_uv_bun_present() -> dict[str, object]:
-    """A server-shaped state: node/uv/bun match the contract; the desktop-only
-    compiled hosts are absent; no pinned source tools or user tools."""
+def _server_state_all_required_tools_present() -> dict[str, object]:
+    """A server-shaped state matching contract 3.0.1 source-tooling policy."""
     contract = di.load_contract()
     rs = contract["runtime_support"]
     runtime_hosts: dict[str, object] = {}
     for name, (_flag, field) in di.RUNTIME_HOSTS.items():
-        if name in di.COMPILED_LANGUAGE_HOSTS:
-            runtime_hosts[name] = {
-                "normalized": "absent",
-                "raw": "absent",
-                "path": f"/bin/{name}",
-            }
-        else:
-            runtime_hosts[name] = {
-                "normalized": di._normalize_version(rs[field], name),
-                "raw": rs[field],
-                "path": f"/bin/{name}",
-            }
+        runtime_hosts[name] = {
+            "normalized": di._normalize_version(rs[field], name),
+            "raw": rs[field],
+            "path": f"/bin/{name}",
+        }
     return {
         "runtime_hosts": runtime_hosts,
-        "pinned_source_tools": {},
-        "user_tools": {},
+        "pinned_source_tools": {
+            name: spec["version"]
+            for name, spec in rs[di.PINNED_SOURCE_TOOLS_CONTRACT].items()
+        },
+        "user_tools": {
+            "herdr": {
+                "installed_version": contract["user_tools"]["herdr"]["version"],
+                "sha256": contract["user_tools"]["herdr"]["source"]["assets"][
+                    "macos-aarch64" if di._current_os() == "macos" else "linux-x86_64"
+                ]["sha256"],
+            }
+        },
     }
 
 
-def test_server_profile_allows_absent_desktop_only_tools() -> None:
-    """On server, absent compiled hosts / pinned tools / user tools are expected
-    — but the same state must still fail as desktop, proving the gate is real."""
-    state = _server_state_node_uv_bun_present()
-    # Server: must not raise despite go/gopls/rustc/dart absent.
+def test_server_profile_requires_compiled_hosts_pinned_tools_and_herdr() -> None:
+    state = _server_state_all_required_tools_present()
     di._verify_contract_versions(state, profile="server")
-    # Desktop (the pre-fix behavior): the same state is drift.
-    with pytest.raises(di.IntegrityError, match="absent"):
-        di._verify_contract_versions(state, profile="desktop")
+    state["runtime_hosts"]["go"]["normalized"] = "absent"
+    with pytest.raises(di.IntegrityError, match="go: absent"):
+        di._verify_contract_versions(state, profile="server")
 
 
 def test_server_profile_still_requires_node_uv_bun() -> None:
     """node/uv/bun are provisioned on every profile; a server drift still fails."""
-    state = _server_state_node_uv_bun_present()
+    state = _server_state_all_required_tools_present()
     state["runtime_hosts"]["node"]["normalized"] = "0.0.0"
     with pytest.raises(di.IntegrityError, match="node: installed 0.0.0"):
         di._verify_contract_versions(state, profile="server")
@@ -383,13 +404,13 @@ def test_herdr_declared_in_contract_and_install_sh() -> None:
     contract = di.load_contract()
     assert "herdr" in contract["user_tools"], "herdr not in contract user_tools"
     assert (
-        contract["user_tools"]["herdr"]["version"] == "0.7.5"
+        contract["user_tools"]["herdr"]["version"] == "0.8.0"
     ), "herdr version mismatch in contract"
 
     installer = (ROOT / "scripts/ubuntu/install.sh").read_text(encoding="utf-8")
     assert "USER_TOOLS=(" in installer, "USER_TOOLS array missing from install.sh"
     assert (
-        "herdr;0.7.5;raw" in installer
+        "herdr;0.8.0;raw" in installer
     ), "herdr row missing from USER_TOOLS array in install.sh"
 
 
@@ -420,7 +441,7 @@ def test_telegram_runtime_and_launcher_policies_are_explicit() -> None:
         "/applications/org.telegram.desktop.desktop"
     )
     assert desktop["upstream_source_commit"] == (
-        "ee93b401ced86ece3f2582fc2ca4da72dfc4f06a"
+        "a1e89e1f64f08cb058caf1c61ff43f319f98a6ec"
     )
     assert len(desktop["icon_assets"]) == 4
     assert desktop["icon_assets"][0]["target"].endswith(
@@ -662,107 +683,3 @@ def _run_cli(*args: str) -> int:
         return di.main()
     finally:
         sys.argv = old
-
-
-# --------------------------- harness ownership ---------------------------
-#
-# one-owner-per-harness (RVR-P1-004) lived only in prose. Nothing on a device
-# could tell whether `codex` resolved to the target nddev-codex-app publishes
-# or to a second copy from a bun/npm global, and nothing recorded that the
-# delegated on-pause `zcode` was installed anyway.
-
-
-def _fake_harness(root: Path, name: str, target: Path) -> Path:
-    """Publish `name` on a fake PATH as a symlink to `target`."""
-    target.parent.mkdir(parents=True, exist_ok=True)
-    target.write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
-    target.chmod(0o755)
-    bin_dir = root / "fakebin"
-    bin_dir.mkdir(exist_ok=True)
-    link = bin_dir / name
-    link.symlink_to(target)
-    return bin_dir
-
-
-def test_harness_detection_contract_declares_enforcement() -> None:
-    detection = di.load_contract()["harnesses"]["detection"]
-    assert detection["codex"]["enforcement"] == "owned-prefix"
-    assert detection["codex"]["owned_prefix_env"] == "RLDYOUR_CODEX_HOME"
-    assert detection["codex"]["owned_prefix_default"] == "${HOME}/.codex"
-    # A delegated, on-pause harness must never be enforced: bootstrap is
-    # forbidden from installing, removing or adopting it.
-    assert detection["zcode"]["enforcement"] == "observe-only"
-
-
-def test_codex_inside_its_owner_target_is_not_drift(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    owned = tmp_path / ".codex/packages/standalone/current/bin/codex"
-    bin_dir = _fake_harness(tmp_path, "codex", owned)
-    monkeypatch.setenv("PATH", str(bin_dir))
-    monkeypatch.delenv("RLDYOUR_CODEX_HOME", raising=False)
-
-    state = {"harnesses": di._harness_state(tmp_path)}
-    assert state["harnesses"]["codex"]["inside_owned_prefix"] == "True"
-    assert di._verify_harness_ownership(state) == []
-
-
-def test_codex_from_a_package_manager_global_is_drift(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    """The exact shape the contract forbids: a second owner publishing codex."""
-    stray = tmp_path / ".bun/install/global/node_modules/.bin/codex"
-    bin_dir = _fake_harness(tmp_path, "codex", stray)
-    monkeypatch.setenv("PATH", str(bin_dir))
-    monkeypatch.delenv("RLDYOUR_CODEX_HOME", raising=False)
-
-    state = {"harnesses": di._harness_state(tmp_path)}
-    assert state["harnesses"]["codex"]["inside_owned_prefix"] == "False"
-    drifts = di._verify_harness_ownership(state)
-    assert len(drifts) == 1
-    assert "outside its owner's target" in drifts[0]
-
-
-def test_codex_home_override_moves_the_owned_prefix(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    elsewhere = tmp_path / "opt/codex-home"
-    owned = elsewhere / "bin/codex"
-    bin_dir = _fake_harness(tmp_path, "codex", owned)
-    monkeypatch.setenv("PATH", str(bin_dir))
-    monkeypatch.setenv("RLDYOUR_CODEX_HOME", str(elsewhere))
-
-    state = {"harnesses": di._harness_state(tmp_path)}
-    assert state["harnesses"]["codex"]["owned_prefix"] == str(elsewhere)
-    assert di._verify_harness_ownership(state) == []
-
-
-def test_installed_zcode_is_recorded_but_never_enforced(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    installed = tmp_path / "opt/ZCode/zcode"
-    bin_dir = _fake_harness(tmp_path, "zcode", installed)
-    monkeypatch.setenv("PATH", str(bin_dir))
-
-    state = {"harnesses": di._harness_state(tmp_path)}
-    entry = state["harnesses"]["zcode"]
-    assert entry["present"] == "True"
-    assert entry["resolved"] == str(installed)
-    # Recorded as evidence, never acted on.
-    assert "owned_prefix" not in entry
-    assert di._verify_harness_ownership(state) == []
-
-
-def test_absent_harness_is_neither_recorded_nor_drift(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    monkeypatch.setenv("PATH", str(tmp_path / "empty"))
-    state = {"harnesses": di._harness_state(tmp_path)}
-    assert state["harnesses"]["codex"] == {"present": "False"}
-    assert di._verify_harness_ownership(state) == []
-
-
-def test_receipt_carries_the_harness_inventory() -> None:
-    state = di.collect_state(home=Path.home(), profile="desktop")
-    assert "harnesses" in state
-    assert set(state["harnesses"]) == {"codex", "zcode"}

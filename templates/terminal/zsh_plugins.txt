@@ -1,9 +1,9 @@
-# antidote manifest — order matters. The installer pre-clones every repo at the
-# pinned commit below and compiles this into one static file (~/.zsh_plugins.zsh)
+# antidote manifest — order matters. The installer publishes every repo's exact
+# tracked pinned payload and compiles this into one static file (~/.zsh_plugins.zsh)
 # that shell startup sources with zero network. Regenerate after edits with:
 # antidote bundle < this file. Managed template: macos-ubuntu-bootstrap
 # (templates/terminal/zsh_plugins.txt). Each `# pin <40-hex-sha>` is read by the
-# materializer (scripts/lib/common.sh) to checkout an exact, reproducible commit.
+# materializer (scripts/lib/common.sh) to publish an exact, reproducible payload.
 romkatv/zsh-defer  # pin 53a26e287fbbe2dcebb3aa1801546c6de32416fa
 Aloxaf/fzf-tab  # pin 24105b15714bfec37989ed5c5b6e60f572253019
 zsh-users/zsh-completions kind:fpath  # pin 9903bae60284072de3fa0e3e20965f22368c5694

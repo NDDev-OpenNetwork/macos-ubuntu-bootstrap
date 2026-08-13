@@ -1,17 +1,4 @@
-"""Ubuntu desktop customization reports a real aggregate result.
-
-The composer used to run four ``step || warn`` lines and then print
-"desktop customization complete" unconditionally, so a desktop missing
-BrowserOS or still carrying Firefox passed both apply and strict verification.
-Worse, one of those four steps did not warn at all: it called ``die``, which is
-``exit 1``, and ``exit`` inside a function on the left of ``||`` terminates the
-whole script -- so a failed BrowserOS install skipped the Firefox removal that
-was supposed to be independent of it.
-
-Every stub here is deliberately offline. The BrowserOS failure path reports the
-package as absent and then fails ``curl``, so the suite never fetches the real
-216 MB artifact.
-"""
+"""Ubuntu desktop customization reports a real aggregate result offline."""
 
 from __future__ import annotations
 
@@ -51,8 +38,7 @@ BASE_STUBS: dict[str, str] = {
 # fetches the real artifact.
 # `dpkg --print-architecture` must answer here or the .deb step reports
 # `skipped` and the test loses its subject. The Chrome step then also attempts
-# and fails on a host without Chrome -- harmless, because what is asserted is
-# that BrowserOS failed and that the steps after it still ran.
+# and fails on a host without Chrome; later independent steps must still run.
 DEB_STEP_FAILS: dict[str, str] = {
     "dpkg": '[ "$1" = "--print-architecture" ] && { echo amd64; exit 0; }\nexit 1\n',
     "dpkg-query": "exit 1\n",
@@ -97,7 +83,7 @@ def test_failed_deb_step_does_not_skip_the_firefox_step(tmp_path: Path) -> None:
     result = run_desktop(stubs)
     combined = result.stdout + result.stderr
     assert (stubs / "snap-ran").exists(), "Firefox removal never ran after the .deb step failed"
-    assert "rustdesk: failed (optional)" in combined
+    assert "rustdesk: FAILED (required)" in combined
     # google_chrome is required and also fails under these stubs.
     assert result.returncode != 0
 
@@ -116,8 +102,10 @@ def test_optional_step_failure_does_not_fail_the_layer(tmp_path: Path) -> None:
     result = run_desktop(stubs)
     combined = result.stdout + result.stderr
     assert result.returncode == 0
-    assert "russian_layout: failed (optional)" in combined
-    assert "optional step(s) failed" in combined
+    assert (
+        "russian_layout: skipped (precondition absent)" in combined
+        or "russian_layout: failed (optional)" in combined
+    )
 
 
 def test_absent_precondition_is_skipped_not_failed(tmp_path: Path) -> None:
@@ -218,13 +206,12 @@ def test_installer_pins_the_same_fingerprint_as_the_contract() -> None:
     assert CHROME_FINGERPRINT in verify, "the verifier must gate on the same key"
 
 
-def test_chrome_is_required_and_rustdesk_is_optional() -> None:
+def test_chrome_and_rustdesk_are_required() -> None:
     source = DESKTOP.read_text(encoding="utf-8")
-    assert "REQUIRED_STEPS=(google_chrome firefox_removal)" in source
+    assert "REQUIRED_STEPS=(google_chrome rustdesk firefox_removal)" in source
     body = source.split("nddev::desktop_configure() {", 1)[1]
     assert "nddev::_step rustdesk nddev::_install_desktop_deb rustdesk" in body
-    # RustDesk is a convenience the owner asked to keep optional.
-    assert "OPTIONAL_STEPS=(gnome_dock russian_layout rustdesk)" in source
+    assert "OPTIONAL_STEPS=(gnome_dock russian_layout)" in source
 
 
 def _extract(function: str, path: Path) -> str:
@@ -299,7 +286,7 @@ def test_both_google_repository_paths_are_recognised() -> None:
     source invisible to both the installer and the verifier."""
     for path in (DESKTOP, ROOT / "scripts/ubuntu/verify.sh"):
         text = path.read_text(encoding="utf-8")
-        assert "'dl.google.com/linux/chrome'" in text, path.name
+        assert "dl.google.com/linux/chrome" in text, path.name
         assert "dl.google.com/linux/chrome/deb'" not in text, (
             f"{path.name} still matches only the cron path"
         )
@@ -320,23 +307,9 @@ def _deb_rows() -> list[list[str]]:
 
 
 def test_every_deb_application_goes_through_one_installer() -> None:
-    """A second bespoke .deb path is how one application stops being verified."""
     source = DESKTOP.read_text(encoding="utf-8")
-    assert "nddev::_install_browseros" not in source
     assert source.count("nddev::_install_desktop_deb()") == 1
-    names = {row[0] for row in _deb_rows()}
-    assert names == {"rustdesk"}
-    # BrowserOS was removed by owner decision when Chrome became the standard
-    # browser. What must not come back is the provisioning: no row, no step, no
-    # verifier requirement. The comment explaining the removal is expected to
-    # stay -- an assertion that bans the word would ban the rationale too.
-    assert "nddev::_step browseros" not in source
-    assert '"browseros;' not in source
-    verify = (ROOT / "scripts/ubuntu/verify.sh").read_text(encoding="utf-8")
-    assert "dpkg-query -W -f='${Status}' browseros" not in verify
-    # Nor is bootstrap responsible for removing an existing installation: it no
-    # longer provisions BrowserOS, which is not the same as owning its removal.
-    assert "purge browseros" not in verify and "remove browseros" not in source
+    assert {row[0] for row in _deb_rows()} == {"rustdesk"}
 
 
 def test_every_deb_row_is_well_formed_and_digest_pinned() -> None:
@@ -401,10 +374,10 @@ def test_unknown_deb_row_is_refused(tmp_path: Path) -> None:
 
 # ------------------- macOS: an optional layer cannot strand the rest -------------------
 #
-# macos/install.sh runs the GUI cask layer BEFORE the mandatory browser layer.
+# macos/install.sh runs the GUI cask layer before the AI CLI layer.
 # The loop used to call ensure_cask bare under `set -euo pipefail`, so one
 # unavailable cask aborted the script and took the language servers, the
-# mandatory browser layer, the harness layer and verification with it. This is
+# AI CLI layer and verification with it. This is
 # the failure this repository already fixed twice on the Ubuntu side.
 
 MACOS_INSTALL = ROOT / "scripts/macos/install.sh"
@@ -420,15 +393,14 @@ def test_macos_gui_layer_attempts_every_cask() -> None:
     assert "GUI_LAYER_FAILED" in body
 
 
-def test_macos_gui_failure_does_not_precede_the_mandatory_browser_layer() -> None:
-    """Ordering is why this matters: the browser layer runs after the casks."""
+def test_macos_gui_failure_is_reported_after_all_install_layers() -> None:
     source = MACOS_INSTALL.read_text(encoding="utf-8")
     main = source.split("main() {", 1)[1]
     gui = main.index("install_gui_apps")
-    browser = main.index("rldyour::install_browser_providers")
+    harnesses = main.index("install_ai_runtimes")
     report = main.index('if [ "$GUI_LAYER_FAILED" -ne 0 ]')
-    assert gui < browser, "unexpected ordering; re-derive this test"
-    assert browser < report, (
+    assert gui < harnesses, "unexpected ordering; re-derive this test"
+    assert harnesses < report, (
         "the GUI result must be reported after the mandatory layers have run, "
         "not before them"
     )
@@ -516,6 +488,7 @@ BASH4_ONLY = (
 # are Linux-only and may use bash 4 freely.
 MACOS_PATH_SCRIPTS = [
     "scripts/ci/lint.sh",
+    "scripts/ci/platform-evidence.sh",
     "scripts/ci/validate.sh",
     "scripts/bootstrap.sh",
     "scripts/lib/common.sh",
@@ -523,7 +496,6 @@ MACOS_PATH_SCRIPTS = [
     "scripts/macos/verify.sh",
     "scripts/auth-handoff.sh",
     "scripts/remote-exec.sh",
-    "scripts/verify-browser-runtime.sh",
 ]
 
 

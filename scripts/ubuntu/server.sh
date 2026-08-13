@@ -323,7 +323,7 @@ EOF
 rldyour::ubuntu_server::install_baseline() {
   rldyour::section "Ubuntu server baseline"
   rldyour::ubuntu_server::apt_update
-  rldyour::ubuntu_server::apt_install ca-certificates curl gnupg openssh-server unattended-upgrades
+  rldyour::ubuntu_server::apt_install ca-certificates curl gnupg iproute2 openssh-server unattended-upgrades
   rldyour::ubuntu_server::configure_unattended_upgrades
 
   if command -v systemctl >/dev/null 2>&1; then
@@ -337,6 +337,11 @@ rldyour::ubuntu_server::install_baseline() {
 # 22, conflict with a custom listener, or lock out a remote session.
 rldyour::ubuntu_server::ensure_ssh_activation() {
   local provider=""
+
+  if [ "${RLDYOUR_DRY_RUN:-1}" -eq 1 ]; then
+    rldyour::log "info" "[DRY-RUN] preserve and activate the packaged ssh.service or ssh.socket provider after installation"
+    return 0
+  fi
 
   if systemctl is-active --quiet ssh.service; then
     rldyour::log "ok" "ssh.service is active; preserving service activation"
@@ -1560,10 +1565,19 @@ EOF
     rollback_fail2ban || true
     return 1
   fi
-  if ! rldyour::ubuntu_server::as_root systemctl enable --now fail2ban.service ||
-    ! rldyour::ubuntu_server::as_root systemctl restart fail2ban.service ||
-    ! systemctl is-active --quiet fail2ban.service ||
-    ! rldyour::ubuntu_server::as_root fail2ban-client status sshd >/dev/null; then
+  local ready=0
+  if rldyour::ubuntu_server::as_root systemctl enable fail2ban.service &&
+    rldyour::ubuntu_server::as_root systemctl restart fail2ban.service; then
+    for _ in {1..20}; do
+      if systemctl is-active --quiet fail2ban.service &&
+        rldyour::ubuntu_server::as_root fail2ban-client status sshd >/dev/null 2>&1; then
+        ready=1
+        break
+      fi
+      sleep 0.5
+    done
+  fi
+  if [ "$ready" -ne 1 ]; then
     rldyour::log "error" "Fail2ban failed to activate the managed sshd jail; restoring the previous state"
     rollback_fail2ban || true
     return 1

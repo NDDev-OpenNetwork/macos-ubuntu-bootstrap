@@ -35,13 +35,13 @@ Default:
   - Docker: rootful on Ubuntu server/desktop-builds, none on desktop; rootless is explicit
 
 Profiles:
-  - desktop:        source editing, LSP/quality tools, AI CLIs, mandatory headless
-                    CloakBrowser, and optional GUI apps. No Docker or project runtime.
+  - desktop:        source editing, LSP/quality tools, three vendor AI CLIs, and
+                    optional GUI apps. No Docker or project runtime.
   - desktop-builds: Ubuntu-only — everything desktop has, PLUS Docker rootful for
                     local builds/tests. Receives the server Docker layer without the
                     server baseline (no openssh-server, unattended-upgrades, or chrony).
   - server:         Ubuntu-only headless build/runtime host with Docker, AI CLIs,
-                    LSPs, mandatory CloakBrowser, and safe server verification.
+                    LSPs, terminal tooling, and safe server verification.
 
 Safety:
   --harden-ssh and --enable-ufw are never implied. They require an explicit
@@ -92,10 +92,6 @@ while [ "$#" -gt 0 ]; do
     --skip-lsps)
       SKIP_LSPS=1
       shift
-      ;;
-    --skip-browser)
-      echo "--skip-browser is unsupported: CloakBrowser is mandatory and has no stock-browser fallback" >&2
-      exit 2
       ;;
     --skip-checks)
       SKIP_CHECKS=1
@@ -235,7 +231,6 @@ export RLDYOUR_STRICT=$STRICT
 export RLDYOUR_SKIP_SYSTEM=$SKIP_SYSTEM
 export RLDYOUR_SKIP_AI=$SKIP_AI
 export RLDYOUR_SKIP_LSPS=$SKIP_LSPS
-export RLDYOUR_BROWSER_REQUIRED=1
 export RLDYOUR_SKIP_CHECKS=$SKIP_CHECKS
 export RLDYOUR_HARDEN_SSH=$HARDEN_SSH
 export RLDYOUR_ENABLE_UFW=$ENABLE_UFW

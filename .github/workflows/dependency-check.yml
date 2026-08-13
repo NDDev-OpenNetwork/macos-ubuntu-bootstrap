@@ -29,7 +29,7 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: Validate one-owner-per-harness delegation
+      - name: Validate verified vendor CLI installation
         shell: bash
         run: |
           set -euo pipefail
@@ -43,50 +43,25 @@ jobs:
           ]
           common = Path("scripts/lib/common.sh")
 
-          # The active harness set is codex, installed by its authoritative NDDev
-          # module, never inline and never through a bun/npm global path or a
-          # frozen AI-CLI bundle. zcode is delegated to nddev-harnesses (ADR 0006)
-          # because its target cannot be adopted unattended.
-          removed_globals = [
-              "@anthropic-ai/claude-code",
-              "opencode-ai",
-              "@mimo-ai/cli",
-              "install_ai_cli_bundle",
-              "install_antigravity_artifact",
-          ]
-          for path in installers + [common]:
-              data = path.read_text(encoding="utf-8")
-              for marker in removed_globals:
-                  if marker in data:
-                      raise SystemExit(f"removed harness install path present in {path}: {marker}")
-
-          if Path("templates/ai-cli").exists():
-              raise SystemExit("the frozen AI-CLI bundle template must be removed")
-
           for path in installers:
               data = path.read_text(encoding="utf-8")
               if "install_ai_runtimes" not in data:
-                  raise SystemExit(f"harness entrypoint missing in {path}")
+                  raise SystemExit(f"vendor CLI entrypoint missing in {path}")
           common_data = common.read_text(encoding="utf-8")
-          for func in (
-              "rldyour::install_selected_harnesses",
-              "rldyour::install_codex_harness",
-              "RLDYOUR_CODEX_MODULE",
+          for marker in (
+              "rldyour::install_vendor_ai_clis",
+              "RLDYOUR_CODEX_VERSION",
+              "RLDYOUR_CODEX_SHA512",
+              "RLDYOUR_CLAUDE_INSTALLER_SHA256",
+              "RLDYOUR_GROK_INSTALLER_SHA256",
+              "rldyour::download_verified_file",
           ):
-              if func not in common_data:
-                  raise SystemExit(f"harness delegation symbol missing in {common}: {func}")
-          # ADR 0006: no zcode install path may return, in any form.
-          for banned in ("rldyour::install_zcode_harness", "RLDYOUR_ZCODE_MODULE"):
-              if banned in common_data:
-                  raise SystemExit(f"zcode is delegated out of bootstrap: {banned} must not return")
+              if marker not in common_data:
+                  raise SystemExit(f"verified vendor CLI marker missing in {common}: {marker}")
+          if "curl -fsSL https://" in common_data and "| sh" in common_data:
+              raise SystemExit("vendor installers must be downloaded and verified before execution")
 
-          # A streamed Antigravity installer was always forbidden and stays gone.
-          streamed_installer = "antigravity.google/cli/install.sh"
-          for path in installers:
-              if streamed_installer in path.read_text(encoding="utf-8"):
-                  raise SystemExit(f"streamed installer is forbidden in {path}")
-
-          print("harness delegation is one-owner-per-harness: codex via its GDS module; zcode delegated to nddev-harnesses")
+          print("Codex, Claude Code, and Grok vendor CLI pins are verified")
           PY
 
       - name: Validate dependency-check intent

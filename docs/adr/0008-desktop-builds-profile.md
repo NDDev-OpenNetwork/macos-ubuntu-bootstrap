@@ -27,8 +27,8 @@ policy **`local-dev-with-builds`**.
 
 ### What desktop-builds receives
 
-Everything the plain `desktop` profile has (terminal, LSP, AI CLIs, CloakBrowser,
-compiled-language hosts, user tools, GUI overlay) **plus Docker Engine rootful**
+Everything the desktop profile receives (compiled-language hosts, user tools,
+and the optional GUI overlay) **plus Docker Engine rootful**
 installed via the existing `server.sh` Docker functions — but with
 `--skip-baseline`, so the server baseline (openssh-server, unattended-upgrades,
 chrony) is NOT installed.

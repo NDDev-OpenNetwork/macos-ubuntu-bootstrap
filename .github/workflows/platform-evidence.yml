@@ -1,0 +1,171 @@
+name: platform-evidence
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/platform-evidence.yml"
+      - "scripts/**"
+      - "config/**"
+      - "templates/**"
+      - "VERSION"
+  workflow_dispatch:
+    inputs:
+      sha:
+        description: "Exact commit SHA to verify; must be reachable from this repository."
+        required: true
+        type: string
+
+permissions: {}
+
+concurrency:
+  group: platform-evidence-${{ github.event.pull_request.number || inputs.sha }}
+  cancel-in-progress: false
+
+jobs:
+  macos-native:
+    if: github.event_name == 'workflow_dispatch' || github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: macos-15
+    strategy:
+      fail-fast: false
+      matrix:
+        lane: [macos-gui, macos-no-gui]
+    steps:
+      - name: Checkout exact public commit without credentials
+        env:
+          EVIDENCE_SHA: ${{ github.event.pull_request.head.sha || inputs.sha }}
+        run: |
+          set -euo pipefail
+          git init .
+          git remote add origin "https://github.com/${GITHUB_REPOSITORY}.git"
+          git fetch --depth=1 origin "$EVIDENCE_SHA"
+          git checkout --detach "$EVIDENCE_SHA"
+      - name: Native Apple Silicon apply and strict verification
+        env:
+          EVIDENCE_SHA: ${{ github.event.pull_request.head.sha || inputs.sha }}
+        run: bash scripts/ci/platform-evidence.sh "${{ matrix.lane }}" "$RUNNER_TEMP/evidence"
+      - name: Upload sanitized evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: platform-${{ matrix.lane }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/evidence
+          if-no-files-found: error
+          retention-days: 1
+
+  ubuntu-native:
+    if: github.event_name == 'workflow_dispatch' || github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-24.04
+            lane: ubuntu-desktop-no-gui
+          - runner: ubuntu-24.04-arm
+            lane: ubuntu-desktop-no-gui
+          - runner: ubuntu-24.04-arm
+            lane: ubuntu-arm-gui-refusal
+    steps:
+      - name: Checkout exact public commit without credentials
+        env:
+          EVIDENCE_SHA: ${{ github.event.pull_request.head.sha || inputs.sha }}
+        run: |
+          set -euo pipefail
+          git init .
+          git remote add origin "https://github.com/${GITHUB_REPOSITORY}.git"
+          git fetch --depth=1 origin "$EVIDENCE_SHA"
+          git checkout --detach "$EVIDENCE_SHA"
+      - name: Native Ubuntu evidence
+        env:
+          EVIDENCE_SHA: ${{ github.event.pull_request.head.sha || inputs.sha }}
+        run: bash scripts/ci/platform-evidence.sh "${{ matrix.lane }}" "$RUNNER_TEMP/evidence"
+      - name: Upload sanitized evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: platform-${{ matrix.runner }}-${{ matrix.lane }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/evidence
+          if-no-files-found: error
+          retention-days: 1
+
+  ubuntu-systemd-sandbox:
+    if: github.event_name == 'workflow_dispatch' || github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      max-parallel: 2
+      matrix:
+        runner: [ubuntu-24.04, ubuntu-24.04-arm]
+        lane:
+          - sandbox-desktop-builds-rootful
+          - sandbox-server-none
+          - sandbox-server-rootful
+          - sandbox-server-rootless
+        exclude:
+          - runner: ubuntu-24.04-arm
+            lane: sandbox-server-rootless
+    steps:
+      - name: Checkout exact public commit without credentials
+        env:
+          EVIDENCE_SHA: ${{ github.event.pull_request.head.sha || inputs.sha }}
+        run: |
+          set -euo pipefail
+          git init .
+          git remote add origin "https://github.com/${GITHUB_REPOSITORY}.git"
+          git fetch --depth=1 origin "$EVIDENCE_SHA"
+          git checkout --detach "$EVIDENCE_SHA"
+      - name: Disposable systemd apply and strict verification
+        env:
+          EVIDENCE_SHA: ${{ github.event.pull_request.head.sha || inputs.sha }}
+        run: bash scripts/ci/platform-evidence.sh "${{ matrix.lane }}" "$RUNNER_TEMP/evidence"
+      - name: Upload sanitized evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: platform-${{ matrix.runner }}-${{ matrix.lane }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/evidence
+          if-no-files-found: error
+          retention-days: 1
+
+  ubuntu-safeguards:
+    if: github.event_name == 'workflow_dispatch' || github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout exact public commit without credentials
+        env:
+          EVIDENCE_SHA: ${{ github.event.pull_request.head.sha || inputs.sha }}
+        run: |
+          set -euo pipefail
+          git init .
+          git remote add origin "https://github.com/${GITHUB_REPOSITORY}.git"
+          git fetch --depth=1 origin "$EVIDENCE_SHA"
+          git checkout --detach "$EVIDENCE_SHA"
+      - name: Disposable SSH, UFW, and Fail2ban apply evidence
+        env:
+          EVIDENCE_SHA: ${{ github.event.pull_request.head.sha || inputs.sha }}
+        run: bash scripts/ci/platform-evidence.sh sandbox-server-hardening "$RUNNER_TEMP/evidence"
+      - name: Upload sanitized evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: platform-ubuntu-24.04-server-safeguards-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/evidence
+          if-no-files-found: error
+          retention-days: 1
+
+  evidence-gate:
+    if: always()
+    runs-on: ubuntu-24.04
+    needs: [macos-native, ubuntu-native, ubuntu-systemd-sandbox, ubuntu-safeguards]
+    steps:
+      - name: Require every evidence lane
+        env:
+          MACOS_RESULT: ${{ needs.macos-native.result }}
+          UBUNTU_NATIVE_RESULT: ${{ needs.ubuntu-native.result }}
+          UBUNTU_SANDBOX_RESULT: ${{ needs.ubuntu-systemd-sandbox.result }}
+          UBUNTU_SAFEGUARDS_RESULT: ${{ needs.ubuntu-safeguards.result }}
+        run: |
+          set -euo pipefail
+          for result in "$MACOS_RESULT" "$UBUNTU_NATIVE_RESULT" "$UBUNTU_SANDBOX_RESULT" "$UBUNTU_SAFEGUARDS_RESULT"; do
+            [ "$result" = success ] || exit 1
+          done

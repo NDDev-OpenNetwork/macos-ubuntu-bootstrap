@@ -17,6 +17,7 @@ def _run_policy(home: Path, *, dry_run: bool = False) -> subprocess.CompletedPro
     env = os.environ.copy()
     env["HOME"] = str(home)
     env["RLDYOUR_DRY_RUN"] = "1" if dry_run else "0"
+    env["RLDYOUR_GUI_ENABLED"] = "1"
     env.pop("XDG_DATA_HOME", None)
     return subprocess.run(
         [
@@ -108,7 +109,7 @@ def _run_retire_integrations(
 
 
 def _managed_telegram(home: Path) -> tuple[Path, Path]:
-    real = home / ".local/share/rldyour/telegram/7.0.7/Telegram/Telegram"
+    real = home / ".local/share/rldyour/telegram/7.0.9/Telegram/Telegram"
     real.parent.mkdir(parents=True)
     real.write_text("#!/usr/bin/env sh\nexit 0\n", encoding="utf-8")
     real.chmod(0o755)
@@ -169,6 +170,7 @@ def test_user_tool_install_attempts_telegram_after_an_earlier_failure(
     env["HOME"] = str(tmp_path)
     env["RLDYOUR_DRY_RUN"] = "0"
     env["CALLS_FILE"] = str(calls)
+    env["RLDYOUR_GUI_ENABLED"] = "1"
     result = subprocess.run(
         [
             "bash",
@@ -193,13 +195,6 @@ install_user_tools
     assert calls.read_text(encoding="utf-8").splitlines() == ["herdr", "telegram"]
 
 
-def test_mandatory_browser_repair_precedes_optional_user_tools() -> None:
-    source = INSTALL.read_text(encoding="utf-8")
-    main = source.split("main() {", 1)[1]
-    assert main.index("rldyour::install_browser_providers") < main.index(
-        "if ! install_user_tools"
-    )
-
 
 def test_telegram_favorite_migrates_before_legacy_launchers_are_retired() -> None:
     source = INSTALL.read_text(encoding="utf-8")
@@ -217,7 +212,7 @@ def test_telegram_favorite_migrates_before_legacy_launchers_are_retired() -> Non
     assert configure < retire_generated
 
 
-def test_telegram_desktop_assets_are_pinned_to_the_v707_source_commit() -> None:
+def test_telegram_desktop_assets_are_pinned_to_the_v709_source_commit() -> None:
     contract = json.loads(
         (ROOT / "config/rldyour-contract.json").read_text(encoding="utf-8")
     )
@@ -225,7 +220,7 @@ def test_telegram_desktop_assets_are_pinned_to_the_v707_source_commit() -> None:
     installer = INSTALL.read_text(encoding="utf-8")
 
     assert desktop["upstream_source_commit"] == (
-        "ee93b401ced86ece3f2582fc2ca4da72dfc4f06a"
+        "a1e89e1f64f08cb058caf1c61ff43f319f98a6ec"
     )
     assert len(desktop["icon_assets"]) == 4
     for asset in desktop["icon_assets"]:
@@ -371,7 +366,7 @@ def test_divergent_generated_telegram_integration_is_preserved(
 
 
 def _managed_launcher(home: Path) -> None:
-    binary = home / ".local/share/rldyour/telegram/7.0.7/Telegram/Telegram"
+    binary = home / ".local/share/rldyour/telegram/7.0.9/Telegram/Telegram"
     binary.parent.mkdir(parents=True, exist_ok=True)
     binary.write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
     binary.chmod(0o755)

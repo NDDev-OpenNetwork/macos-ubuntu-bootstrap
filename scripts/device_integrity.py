@@ -67,17 +67,6 @@ PINNED_SOURCE_TOOLS_CONTRACT = "ubuntu_pinned_source_tools"
 # targets block and scripts/bootstrap.sh.
 VALID_PROFILES = ("desktop", "desktop-builds", "server")
 
-# Runtime hosts provisioned only on the desktop and desktop-builds profiles.
-# scripts/ubuntu/install.sh gates these behind install_compiled_language_hosts,
-# which returns early on the server profile (execution_policy
-# container-execution-only) and also skips the pinned source tools, user tools,
-# and desktop entries. node/uv/bun are deliberately NOT here: the mandatory Bun
-# browser stack needs them, so they are installed on every profile. Requiring a
-# server device to carry the desktop-only set is what forced a permanent
-# NOT_PROVEN on a fully-correct server.
-COMPILED_LANGUAGE_HOSTS = frozenset({"go", "gopls", "rustc", "dart"})
-
-
 class IntegrityError(RuntimeError):
     """A device runtime invariant was not proven."""
 
@@ -120,8 +109,7 @@ def _applies_to_current_os(spec: dict[str, Any]) -> bool:
 
     Entries without an ``os`` field apply to all platforms (backward
     compatibility). Entries with ``os: ["linux"]`` are skipped on macOS, so a
-    Linux-only tool like herdr does not cause a NOT_PROVEN on macOS where it is
-    never installed.
+    Linux-only tool does not cause a NOT_PROVEN where it is never installed.
     """
     declared_oses = spec.get("os")
     if not declared_oses:
@@ -197,7 +185,7 @@ def safe_directory(path: Path, *, enforce_private_mode: bool = True) -> None:
     ``enforce_private_mode`` additionally refuses a group- or world-writable
     directory. Container directories under ``~/.local/share/rldyour`` are
     routinely ``775`` because the device's umask is ``0002``; the managed
-    runtimes inside them (browser-stack, cloakbrowser) are ``700``. We refuse a
+    managed runtime trees inside them are ``700``. We refuse a
     symlink or foreign-owned directory unconditionally, but follow the same
     private-mode opt-out the Git-source hashes use for containers.
     """
@@ -377,8 +365,14 @@ def _user_tool_state(bin_dir: Path, home: Path) -> dict[str, dict[str, Any]]:
             "path": binary,
         }
         path = Path(binary)
-        if path.exists() and not path.is_symlink():
-            entry["sha256"] = sha256_file(path)
+        if path.exists() or path.is_symlink():
+            try:
+                resolved = path.resolve(strict=True)
+            except (FileNotFoundError, RuntimeError):
+                resolved = path
+            if resolved.is_file() and not resolved.is_symlink():
+                entry["resolved"] = str(resolved)
+                entry["sha256"] = sha256_file(resolved)
 
         policy_target = spec.get("external_updater_policy_target")
         policy_marker = spec.get("external_updater_policy_marker")
@@ -651,14 +645,9 @@ def _verify_contract_versions(state: dict[str, Any], *, profile: str = "desktop"
     compares against literals hardcoded in bash, which can drift from the
     contract. Here the contract is the single source of truth.
 
-    ``profile`` scopes the required set the way the installer does. The server
-    profile (container-execution-only) never provisions the compiled-language
-    hosts, pinned source tools, user tools, or desktop entries, so requiring
-    them there is a false drift — the whole reason a correct server used to fail.
-    node/uv/bun stay required on every profile because the mandatory browser
-    stack depends on them. The default is ``desktop``, the strict superset.
+    ``profile`` scopes profile-specific user tools. Runtime hosts and pinned
+    source tools are required on every Ubuntu profile by contract 3.0.1.
     """
-    server = profile == "server"
     contract = load_contract()
     runtime_support = contract.get("runtime_support", {})
     drifts: list[str] = []
@@ -666,10 +655,6 @@ def _verify_contract_versions(state: dict[str, Any], *, profile: str = "desktop"
     for name, _flag, field in [
         (n, RUNTIME_HOSTS[n][0], RUNTIME_HOSTS[n][1]) for n in RUNTIME_HOSTS
     ]:
-        # Compiled-language hosts are desktop-only; the server installer skips
-        # them, so their absence there is expected, not drift.
-        if server and name in COMPILED_LANGUAGE_HOSTS:
-            continue
         declared = runtime_support.get(field)
         if declared is None:
             continue
@@ -683,43 +668,56 @@ def _verify_contract_versions(state: dict[str, Any], *, profile: str = "desktop"
         elif installed != declared_norm:
             drifts.append(f"{name}: installed {installed} != contract {declared}")
 
-    # Pinned source tools, user tools, and desktop entries are all desktop-only
-    # (install_compiled_language_hosts and the `PROFILE != server` gate in
-    # install.sh). Skip them entirely on the server profile.
-    if not server:
-        declared_tools = runtime_support.get(PINNED_SOURCE_TOOLS_CONTRACT, {})
-        installed_tools = state.get("pinned_source_tools", {})
-        for name, spec in declared_tools.items():
-            declared = spec.get("version")
-            installed = installed_tools.get(name)
-            if installed is None:
-                drifts.append(f"{name}: absent (contract declares {declared})")
-            elif installed != declared:
-                drifts.append(f"{name}: installed {installed} != contract {declared}")
+    declared_tools = runtime_support.get(PINNED_SOURCE_TOOLS_CONTRACT, {})
+    installed_tools = state.get("pinned_source_tools", {})
+    for name, spec in declared_tools.items():
+        declared = spec.get("version")
+        installed = installed_tools.get(name)
+        if installed is None:
+            drifts.append(f"{name}: absent (contract declares {declared})")
+        elif installed != declared:
+            drifts.append(f"{name}: installed {installed} != contract {declared}")
 
-        declared_user_tools = contract.get("user_tools", {})
-        installed_user_tools = state.get("user_tools", {})
-        for name, spec in declared_user_tools.items():
-            if not _applies_to_current_os(spec):
-                continue
-            declared = spec.get("version")
-            installed = installed_user_tools.get(name, {}).get("installed_version")
-            if installed is None or installed == "absent":
-                drifts.append(f"{name}: absent (contract declares {declared})")
-            elif installed != declared:
-                drifts.append(f"{name}: installed {installed} != contract {declared}")
-            if (
-                spec.get("external_updater_policy_target")
-                and installed_user_tools.get(name, {}).get(
-                    "external_updater_policy_valid"
+    declared_user_tools = contract.get("user_tools", {})
+    installed_user_tools = state.get("user_tools", {})
+    for name, spec in declared_user_tools.items():
+        if not _applies_to_current_os(spec):
+            continue
+        if profile not in spec.get("profiles", VALID_PROFILES):
+            continue
+        # The receipt schema has no GUI dimension. GUI-only tools are proven by
+        # the strict platform verifier, not guessed from a profile name.
+        if spec.get("gui_required"):
+            continue
+        declared = spec.get("version")
+        installed = installed_user_tools.get(name, {}).get("installed_version")
+        if installed is None or installed == "absent":
+            drifts.append(f"{name}: absent (contract declares {declared})")
+        elif installed != declared:
+            drifts.append(f"{name}: installed {installed} != contract {declared}")
+        source = spec.get("source", {})
+        assets = source.get("assets", {}) if isinstance(source, dict) else {}
+        if assets:
+            system = _current_os()
+            machine = os.uname().machine
+            normalized_machine = {
+                "arm64": "aarch64",
+                "aarch64": "aarch64",
+                "x86_64": "x86_64",
+                "amd64": "x86_64",
+            }.get(machine, machine)
+            asset_key = f"macos-{normalized_machine}" if system == "macos" else f"linux-{normalized_machine}"
+            expected_asset = assets.get(asset_key)
+            observed_sha = installed_user_tools.get(name, {}).get("sha256")
+            if not isinstance(expected_asset, dict):
+                drifts.append(f"{name}: contract has no asset for {asset_key}")
+            elif observed_sha != expected_asset.get("sha256"):
+                drifts.append(
+                    f"{name}: installed SHA-256 {observed_sha or 'absent'} != "
+                    f"contract {expected_asset.get('sha256')}"
                 )
-                is not True
-            ):
-                drifts.append(f"{name}: external updater policy is absent or divergent")
 
-    # Harness ownership is profile-independent: the active harness set is
-    # installed on every profile, so this check sits outside the desktop-only
-    # block above.
+    # Harness ownership is profile-independent.
     drifts.extend(_verify_harness_ownership(state))
 
     if drifts:

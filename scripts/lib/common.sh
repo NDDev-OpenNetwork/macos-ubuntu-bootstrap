@@ -371,6 +371,56 @@ rldyour::_isolated_python() {
   env -u PYTHONPATH -u PYTHONHOME "$python_bin" -I "$@"
 }
 
+# Print a normalized octal permission mode for one existing path. BSD stat and
+# GNU stat assign incompatible meanings to `-f`, so select the supported host
+# contract before invoking either syntax. The kernel probe is isolated from
+# shell function/PATH overrides used by cross-platform installer tests.
+rldyour::_kernel_name() {
+  rldyour::_isolated_python python3 - <<'PY'
+import os
+
+print(os.uname().sysname)
+PY
+}
+
+rldyour::file_mode() {
+  local path=${1:?file mode path is required}
+  local kernel raw normalized
+
+  if [ ! -e "$path" ] && [ ! -L "$path" ]; then
+    rldyour::log "error" "cannot inspect permissions of missing path: ${path}" >&2
+    return 1
+  fi
+  kernel="$(rldyour::_kernel_name)" || {
+    rldyour::log "error" "could not determine host kernel for permission inspection" >&2
+    return 1
+  }
+  case "$kernel" in
+    Darwin)
+      raw="$(stat -f '%Lp' "$path")" || {
+        rldyour::log "error" "BSD stat failed to inspect permissions: ${path}" >&2
+        return 1
+      }
+      ;;
+    Linux)
+      raw="$(stat -c '%a' -- "$path")" || {
+        rldyour::log "error" "GNU stat failed to inspect permissions: ${path}" >&2
+        return 1
+      }
+      ;;
+    *)
+      rldyour::log "error" "unsupported host kernel for permission inspection: ${kernel:-empty}" >&2
+      return 1
+      ;;
+  esac
+  if ! [[ "$raw" =~ ^[0-7]{3,4}$ ]]; then
+    rldyour::log "error" "${kernel} stat returned malformed permission mode for ${path}: ${raw:-empty}" >&2
+    return 1
+  fi
+  printf -v normalized '%03o' "$((8#$raw))" || return 1
+  printf '%s\n' "$normalized"
+}
+
 rldyour::ensure_dart_telemetry_disabled() {
   local binary=$1
   if [ ! -x "$binary" ]; then

@@ -153,10 +153,19 @@ source=${HERDR_MACOS_AARCH64_URL}"
     return 0
   fi
 
-  [ "$(uname -s)" = Darwin ] && [ "$(uname -m)" = arm64 ] || {
-    rldyour::log "error" "Herdr ${HERDR_VERSION} has no managed macOS artifact for $(uname -s)/$(uname -m)"
+  local system machine root_mode target_mode receipt_mode
+  system="$(uname -s)" || {
+    rldyour::log "error" "could not determine the operating system for Herdr installation"
     return 1
   }
+  machine="$(uname -m)" || {
+    rldyour::log "error" "could not determine the architecture for Herdr installation"
+    return 1
+  }
+  if [ "$system" != Darwin ] || [ "$machine" != arm64 ]; then
+    rldyour::log "error" "Herdr ${HERDR_VERSION} has no managed macOS artifact for ${system}/${machine}"
+    return 1
+  fi
 
   if [ -e "$launcher" ] || [ -L "$launcher" ]; then
     [ -L "$launcher" ] || {
@@ -174,33 +183,34 @@ source=${HERDR_MACOS_AARCH64_URL}"
   fi
 
   if [ -e "$root" ] || [ -L "$root" ]; then
-    [ -d "$root" ] && [ ! -L "$root" ] || {
+    if [ ! -d "$root" ] || [ -L "$root" ]; then
       rldyour::log "error" "managed Herdr root has an unsupported shape; preserved: ${root}"
       return 1
-    }
+    fi
     [ "$(find "$root" -mindepth 1 -maxdepth 1 -print | LC_ALL=C sort)" = "$(printf '%s\n%s\n' "$receipt" "$target" | LC_ALL=C sort)" ] || {
       rldyour::log "error" "managed Herdr root contains missing or additional paths; preserved: ${root}"
       return 1
     }
-    [ -f "$target" ] && [ ! -L "$target" ] && [ -x "$target" ] || {
+    if [ ! -f "$target" ] || [ -L "$target" ] || [ ! -x "$target" ]; then
       rldyour::log "error" "managed Herdr target has an unsupported shape; preserved: ${target}"
       return 1
-    }
-    [ -f "$receipt" ] && [ ! -L "$receipt" ] && [ "$(cat "$receipt")" = "$expected_receipt" ] || {
+    fi
+    if [ ! -f "$receipt" ] || [ -L "$receipt" ] || [ "$(cat "$receipt")" != "$expected_receipt" ]; then
       rldyour::log "error" "managed Herdr receipt is missing or divergent; preserved: ${root}"
       return 1
-    }
+    fi
     actual="$(rldyour::sha256_file "$target")" || return 1
     [ "$actual" = "$HERDR_MACOS_AARCH64_SHA256" ] || {
       rldyour::log "error" "managed Herdr target checksum diverged; preserved: ${target}"
       return 1
     }
-    [ "$(stat -f '%Lp' "$root")" = 755 ] && \
-      [ "$(stat -f '%Lp' "$target")" = 755 ] && \
-      [ "$(stat -f '%Lp' "$receipt")" = 600 ] || {
+    root_mode="$(rldyour::file_mode "$root")" || return 1
+    target_mode="$(rldyour::file_mode "$target")" || return 1
+    receipt_mode="$(rldyour::file_mode "$receipt")" || return 1
+    if [ "$root_mode" != 755 ] || [ "$target_mode" != 755 ] || [ "$receipt_mode" != 600 ]; then
       rldyour::log "error" "managed Herdr permissions diverged; preserved: ${root}"
       return 1
-    }
+    fi
     reported_version="$("$target" --version 2>/dev/null | sed -E 's/^[^0-9]*([0-9]+\.[0-9]+\.[0-9]+).*/\1/' | head -n 1)"
     [ "$reported_version" = "$HERDR_VERSION" ] || {
       rldyour::log "error" "managed Herdr reports ${reported_version:-no version}, expected ${HERDR_VERSION}; preserved: ${root}"
@@ -376,6 +386,7 @@ verify_apply() {
 }
 
 main() {
+  local mode_label
   if [ "${1:-}" = "--help" ]; then
     usage
     exit 0
@@ -395,7 +406,12 @@ main() {
   fi
 
   rldyour::section "macos-ubuntu-bootstrap (macOS) installer"
-  rldyour::log "info" "mode: $([ "$RLDYOUR_DRY_RUN" -eq 1 ] && echo dry-run || echo apply); gui: $GUI_ENABLED; policy: $LOCAL_EXECUTION_POLICY"
+  if [ "$RLDYOUR_DRY_RUN" -eq 1 ]; then
+    mode_label=dry-run
+  else
+    mode_label=apply
+  fi
+  rldyour::log "info" "mode: ${mode_label}; gui: $GUI_ENABLED; policy: $LOCAL_EXECUTION_POLICY"
 
   if [ "$SKIP_SYSTEM" -eq 0 ]; then
     ensure_homebrew

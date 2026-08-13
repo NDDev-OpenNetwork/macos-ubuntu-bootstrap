@@ -63,23 +63,23 @@ herdr_root="$HOME/.local/share/rldyour/herdr/${HERDR_VERSION}"
 herdr_target="$herdr_root/herdr"
 herdr_receipt="$herdr_root/.receipt"
 herdr_launcher="$HOME/.local/bin/herdr"
-[ ! -L "$herdr_root" ] && [ -d "$herdr_root" ] && \
-  [ "$(find "$herdr_root" -mindepth 1 -maxdepth 1 -print | LC_ALL=C sort)" = "$(printf '%s\n%s\n' "$herdr_receipt" "$herdr_target" | LC_ALL=C sort)" ] || {
+if [ -L "$herdr_root" ] || [ ! -d "$herdr_root" ] || \
+  [ "$(find "$herdr_root" -mindepth 1 -maxdepth 1 -print | LC_ALL=C sort)" != "$(printf '%s\n%s\n' "$herdr_receipt" "$herdr_target" | LC_ALL=C sort)" ]; then
   rldyour::log "missing" "Herdr exact managed root shape"
   exit 1
-}
-[ -f "$herdr_target" ] && [ ! -L "$herdr_target" ] && [ -x "$herdr_target" ] || {
+fi
+if [ ! -f "$herdr_target" ] || [ -L "$herdr_target" ] || [ ! -x "$herdr_target" ]; then
   rldyour::log "missing" "managed Herdr target: ${herdr_target}"
   exit 1
-}
+fi
 [ "$(rldyour::sha256_file "$herdr_target")" = "$HERDR_MACOS_AARCH64_SHA256" ] || {
   rldyour::log "missing" "Herdr exact managed macOS artifact checksum"
   exit 1
 }
-[ -L "$herdr_launcher" ] && [ "$(readlink "$herdr_launcher")" = "$herdr_target" ] || {
+if [ ! -L "$herdr_launcher" ] || [ "$(readlink "$herdr_launcher")" != "$herdr_target" ]; then
   rldyour::log "missing" "Herdr exact managed launcher"
   exit 1
-}
+fi
 [ "$(command -v herdr)" = "$herdr_launcher" ] || {
   rldyour::log "missing" "managed Herdr launcher must win PATH resolution"
   exit 1
@@ -88,17 +88,19 @@ herdr_expected_receipt="# Managed by macos-ubuntu-bootstrap: macos-herdr-runtime
 version=${HERDR_VERSION}
 sha256=${HERDR_MACOS_AARCH64_SHA256}
 source=${HERDR_MACOS_AARCH64_URL}"
-[ -f "$herdr_receipt" ] && [ ! -L "$herdr_receipt" ] && \
-  [ "$(cat "$herdr_receipt")" = "$herdr_expected_receipt" ] || {
+if [ ! -f "$herdr_receipt" ] || [ -L "$herdr_receipt" ] || \
+  [ "$(cat "$herdr_receipt")" != "$herdr_expected_receipt" ]; then
   rldyour::log "missing" "Herdr exact managed receipt"
   exit 1
-}
-[ "$(stat -f '%Lp' "$herdr_root")" = 755 ] && \
-  [ "$(stat -f '%Lp' "$herdr_target")" = 755 ] && \
-  [ "$(stat -f '%Lp' "$herdr_receipt")" = 600 ] || {
+fi
+herdr_root_mode="$(rldyour::file_mode "$herdr_root")" || exit 1
+herdr_target_mode="$(rldyour::file_mode "$herdr_target")" || exit 1
+herdr_receipt_mode="$(rldyour::file_mode "$herdr_receipt")" || exit 1
+if [ "$herdr_root_mode" != 755 ] || [ "$herdr_target_mode" != 755 ] || \
+  [ "$herdr_receipt_mode" != 600 ]; then
   rldyour::log "missing" "Herdr exact managed permissions"
   exit 1
-}
+fi
 rldyour::_managed_tree_permissions validate "$herdr_root" || exit 1
 [ "$("$herdr_target" --version 2>/dev/null | sed -E 's/^[^0-9]*([0-9]+\.[0-9]+\.[0-9]+).*/\1/' | head -n 1)" = "$HERDR_VERSION" ] || {
   rldyour::log "missing" "Herdr exact managed version ${HERDR_VERSION}"

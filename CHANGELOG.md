@@ -7,6 +7,8 @@ remains available in immutable Git tags.
 
 ### Fixed
 
+- Made Herdr permission verification deterministic across BSD/macOS and GNU/Linux
+  test hosts, with explicit fail-closed shell control flow and repeat-apply coverage.
 - Installed the exact receipt-bound Herdr 0.8.0 macOS release artifact instead
   of accepting the older mutable Homebrew formula.
 - Published terminal plugins from verified pinned Git commit trees instead of

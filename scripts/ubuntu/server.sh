@@ -1565,10 +1565,19 @@ EOF
     rollback_fail2ban || true
     return 1
   fi
-  if ! rldyour::ubuntu_server::as_root systemctl enable fail2ban.service ||
-    ! rldyour::ubuntu_server::as_root systemctl restart fail2ban.service ||
-    ! systemctl is-active --quiet fail2ban.service ||
-    ! rldyour::ubuntu_server::as_root fail2ban-client status sshd >/dev/null; then
+  local ready=0
+  if rldyour::ubuntu_server::as_root systemctl enable fail2ban.service &&
+    rldyour::ubuntu_server::as_root systemctl restart fail2ban.service; then
+    for _ in {1..20}; do
+      if systemctl is-active --quiet fail2ban.service &&
+        rldyour::ubuntu_server::as_root fail2ban-client status sshd >/dev/null 2>&1; then
+        ready=1
+        break
+      fi
+      sleep 0.5
+    done
+  fi
+  if [ "$ready" -ne 1 ]; then
     rldyour::log "error" "Fail2ban failed to activate the managed sshd jail; restoring the previous state"
     rollback_fail2ban || true
     return 1

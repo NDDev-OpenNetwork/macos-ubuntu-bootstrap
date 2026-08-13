@@ -200,6 +200,7 @@ def test_server_contract_contains_rollback_and_context_guards() -> None:
     assert "fail2ban-client status sshd" in server
     assert "systemctl enable --now fail2ban.service" not in server
     assert "systemctl restart fail2ban.service" in server
+    assert "for _ in {1..20}" in server
     assert 'sshd -T -C "$context"' in server
     assert "AuthenticationMethods publickey" in server
     assert "probe_as_root ssh-keygen -l" in server

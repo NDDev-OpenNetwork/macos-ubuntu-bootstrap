@@ -488,6 +488,7 @@ BASH4_ONLY = (
 # are Linux-only and may use bash 4 freely.
 MACOS_PATH_SCRIPTS = [
     "scripts/ci/lint.sh",
+    "scripts/ci/platform-evidence.sh",
     "scripts/ci/validate.sh",
     "scripts/bootstrap.sh",
     "scripts/lib/common.sh",

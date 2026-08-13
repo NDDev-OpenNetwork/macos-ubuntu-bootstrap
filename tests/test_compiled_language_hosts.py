@@ -102,15 +102,12 @@ def test_rust_tree_is_permission_normalized_before_its_receipt() -> None:
     assert normalize < receipt, "the tree must be normalized before its receipt is written"
 
 
-def test_dart_telemetry_is_disabled_through_one_shared_fail_closed_helper() -> None:
-    """The SDK reports telemetry by default, which contradicts the same boundary
-    set through the SDK's own switch (the config is upstream-maintained, never
-    hand-written), proven rather than assumed, and shared by both platforms."""
+def test_dart_telemetry_uses_the_documented_command_and_optional_diagnostic() -> None:
+    """The documented command is the contract. The unified-analytics config is
+    an upstream implementation detail that can remain absent in CI."""
     common = (ROOT / "scripts/lib/common.sh").read_text(encoding="utf-8")
     assert "rldyour::ensure_dart_telemetry_disabled() {" in common
     assert 'env -u CI "$binary" --disable-analytics' in common
-    # Proven, not assumed: a conflicting enable line fails instead of being
-    # averaged away by upstream duplicate-key resolution.
     assert "grep -Fxq 'reporting=0'" in common
     assert "grep -Fxq 'reporting=1'" in common
     for installer in ("scripts/ubuntu/install.sh", "scripts/macos/install.sh"):
@@ -121,8 +118,52 @@ def test_dart_telemetry_is_disabled_through_one_shared_fail_closed_helper() -> N
     # The config is never written by this repository, only read back.
     assert "dart-flutter-telemetry.config" in common
     assert "reporting=0\\n" not in common
-    verify = (ROOT / "scripts/ubuntu/verify.sh").read_text(encoding="utf-8")
-    assert "dart-flutter-telemetry.config" in verify
+    for verifier in ("scripts/ubuntu/verify.sh", "scripts/macos/verify.sh"):
+        body = (ROOT / verifier).read_text(encoding="utf-8")
+        assert "rldyour::observe_dart_telemetry_config" in body
+
+
+def _run_dart_opt_out(tmp_path: Path, body: str, config: str | None = None) -> subprocess.CompletedProcess[str]:
+    dart = tmp_path / "dart"
+    dart.write_text("#!/bin/sh\n" + body + "\n", encoding="utf-8")
+    dart.chmod(0o755)
+    if config is not None:
+        config_path = tmp_path / ".dart-tool/dart-flutter-telemetry.config"
+        config_path.parent.mkdir()
+        config_path.write_text(config, encoding="utf-8")
+    return subprocess.run(
+        ["bash", "-c", f'source scripts/lib/common.sh; rldyour::ensure_dart_telemetry_disabled "{dart}"'],
+        cwd=ROOT,
+        env={**os.environ, "HOME": str(tmp_path), "CI": "true"},
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+
+
+def test_dart_opt_out_accepts_materialized_disabled_config(tmp_path: Path) -> None:
+    result = _run_dart_opt_out(tmp_path, '[ "$1" = --disable-analytics ]', "reporting=0\n")
+    assert result.returncode == 0, result.stderr
+    assert "optional Dart telemetry config reports disabled" in result.stdout
+
+
+def test_dart_opt_out_accepts_ci_noop_without_internal_config(tmp_path: Path) -> None:
+    result = _run_dart_opt_out(tmp_path, '[ "$1" = --disable-analytics ]')
+    assert result.returncode == 0, result.stderr
+    assert "optional Dart telemetry config was not materialized" in result.stdout
+
+
+def test_dart_opt_out_fails_when_documented_command_fails(tmp_path: Path) -> None:
+    result = _run_dart_opt_out(tmp_path, "exit 19")
+    assert result.returncode != 0
+    assert "Dart telemetry state is unknown" in result.stdout + result.stderr
+
+
+def test_dart_verifiers_reject_wrong_versions() -> None:
+    ubuntu = (ROOT / "scripts/ubuntu/verify.sh").read_text(encoding="utf-8")
+    macos = (ROOT / "scripts/macos/verify.sh").read_text(encoding="utf-8")
+    assert '"$(dart --version 2>&1 | awk \'NR == 1 { print $4 }\')" = "3.12.2"' in ubuntu
+    assert "rldyour::require_cmd_min_version dart 3.12 --version" in macos
 
 
 def test_dart_host_serves_both_the_analysis_server_and_the_mcp_transport() -> None:

@@ -65,6 +65,7 @@ dart mcp-server --version >/dev/null 2>&1 || {
   rldyour::log "missing" "'dart mcp-server' transport for the dart-flutter MCP server"
   exit 1
 }
+rldyour::observe_dart_telemetry_config
 rldyour::verify_terminal_environment
 
 if [ "$GUI_ENABLED" -eq 1 ]; then

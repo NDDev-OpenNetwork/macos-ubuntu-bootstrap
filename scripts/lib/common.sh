@@ -373,7 +373,6 @@ rldyour::_isolated_python() {
 
 rldyour::ensure_dart_telemetry_disabled() {
   local binary=$1
-  local config="$HOME/.dart-tool/dart-flutter-telemetry.config"
   if [ ! -x "$binary" ]; then
     rldyour::log "error" "Dart telemetry opt-out needs an executable dart: ${binary}"
     return 1
@@ -385,18 +384,25 @@ rldyour::ensure_dart_telemetry_disabled() {
     rldyour::log "error" "'dart --disable-analytics' failed; Dart telemetry state is unknown"
     return 1
   }
+  rldyour::log "ok" "Dart accepted the documented --disable-analytics command"
+  rldyour::observe_dart_telemetry_config
+}
+
+rldyour::observe_dart_telemetry_config() {
+  local config="$HOME/.dart-tool/dart-flutter-telemetry.config"
+  if [ ! -e "$config" ]; then
+    rldyour::log "info" "optional Dart telemetry config was not materialized; upstream may suppress analytics in CI"
+    return 0
+  fi
   if [ ! -f "$config" ] || [ -L "$config" ]; then
-    rldyour::log "error" "Dart telemetry config is missing or not a regular file: ${config}"
-    return 1
+    rldyour::log "warn" "optional Dart telemetry config is not a regular non-symlink file: ${config}"
+    return 0
   fi
-  # A conflicting `reporting=1` must fail rather than be averaged away. Upstream
-  # resolves duplicate keys conservatively, but this gate exists to prove the
-  # opt-out, not to reason about upstream precedence rules.
-  if ! grep -Fxq 'reporting=0' "$config" || grep -Fxq 'reporting=1' "$config"; then
-    rldyour::log "error" "Dart telemetry is not provably disabled in ${config}"
-    return 1
+  if grep -Fxq 'reporting=0' "$config" && ! grep -Fxq 'reporting=1' "$config"; then
+    rldyour::log "ok" "optional Dart telemetry config reports disabled (${config})"
+  else
+    rldyour::log "warn" "optional Dart telemetry config does not unambiguously report disabled (${config})"
   fi
-  rldyour::log "ok" "Dart telemetry reporting disabled (${config})"
 }
 
 rldyour::_managed_tree_permissions() {

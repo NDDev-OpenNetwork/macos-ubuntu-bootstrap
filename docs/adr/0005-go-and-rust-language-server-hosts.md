@@ -26,6 +26,9 @@ and server remains `container-execution-only` for project execution.
 
 - Every profile can resolve Go, Rust, and Dart sources consistently.
 - The server verifier and device-integrity receipt must prove the exact hosts,
-  pinned source tools, Dart MCP transport, and disabled Dart telemetry.
+  pinned source tools, Dart MCP transport, and the successful documented
+  `dart --disable-analytics` opt-out. The unified-analytics config file is an
+  optional upstream diagnostic: CI may suppress analytics without materializing
+  it, so absence is observed but does not invalidate an installation.
 - A compiler being present is not permission to run project builds outside the
   profile policy; server project execution stays in Docker.

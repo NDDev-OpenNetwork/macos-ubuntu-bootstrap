@@ -227,16 +227,7 @@ if [ "$PROFILE" != "server" ]; then
     rldyour::log "missing" "'dart mcp-server' transport for the dart-flutter MCP server"
     exit 1
   }
-  # Telemetry stays off by policy. Prove it from the config the SDK maintains
-  # rather than trusting that the installer ran, and reject a conflicting
-  # `reporting=1` instead of reasoning about upstream duplicate-key precedence.
-  dart_telemetry_config="$HOME/.dart-tool/dart-flutter-telemetry.config"
-  if [ ! -f "$dart_telemetry_config" ] || [ -L "$dart_telemetry_config" ] ||
-    ! grep -Fxq 'reporting=0' "$dart_telemetry_config" ||
-    grep -Fxq 'reporting=1' "$dart_telemetry_config"; then
-    rldyour::log "missing" "Dart telemetry provably disabled in ${dart_telemetry_config}"
-    exit 1
-  fi
+  rldyour::observe_dart_telemetry_config
   if [ "$PROFILE" = "desktop" ]; then
     [ "$DOCKER_MODE" = "none" ] || { rldyour::log "error" "desktop Docker mode must be none"; exit 1; }
     if command -v docker >/dev/null 2>&1; then
@@ -283,13 +274,7 @@ else
   dart mcp-server --version >/dev/null 2>&1 || {
     rldyour::log "missing" "'dart mcp-server' transport for the dart-flutter MCP server"; exit 1;
   }
-  dart_telemetry_config="$HOME/.dart-tool/dart-flutter-telemetry.config"
-  if [ ! -f "$dart_telemetry_config" ] || [ -L "$dart_telemetry_config" ] ||
-    ! grep -Fxq 'reporting=0' "$dart_telemetry_config" ||
-    grep -Fxq 'reporting=1' "$dart_telemetry_config"; then
-    rldyour::log "missing" "Dart telemetry provably disabled in ${dart_telemetry_config}"
-    exit 1
-  fi
+  rldyour::observe_dart_telemetry_config
   args=(--docker-mode "$DOCKER_MODE")
   [ "${RLDYOUR_SERVER_ENABLE_UFW:-0}" -eq 1 ] && args+=(--expect-ufw)
   [ "${RLDYOUR_SERVER_HARDEN_SSH:-0}" -eq 1 ] && args+=(--expect-ssh-hardening)

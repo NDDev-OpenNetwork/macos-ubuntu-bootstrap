@@ -378,7 +378,10 @@ rldyour::ensure_dart_telemetry_disabled() {
     rldyour::log "error" "Dart telemetry opt-out needs an executable dart: ${binary}"
     return 1
   fi
-  "$binary" --disable-analytics >/dev/null 2>&1 || {
+  # Dart's unified analytics becomes a no-op when CI is set and therefore does
+  # not persist the owner opt-out. Clear only that process-local marker so the
+  # official switch materializes state that remains valid outside CI.
+  env -u CI "$binary" --disable-analytics >/dev/null 2>&1 || {
     rldyour::log "error" "'dart --disable-analytics' failed; Dart telemetry state is unknown"
     return 1
   }

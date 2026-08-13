@@ -108,7 +108,7 @@ def test_dart_telemetry_is_disabled_through_one_shared_fail_closed_helper() -> N
     hand-written), proven rather than assumed, and shared by both platforms."""
     common = (ROOT / "scripts/lib/common.sh").read_text(encoding="utf-8")
     assert "rldyour::ensure_dart_telemetry_disabled() {" in common
-    assert '"$binary" --disable-analytics' in common
+    assert 'env -u CI "$binary" --disable-analytics' in common
     # Proven, not assumed: a conflicting enable line fails instead of being
     # averaged away by upstream duplicate-key resolution.
     assert "grep -Fxq 'reporting=0'" in common

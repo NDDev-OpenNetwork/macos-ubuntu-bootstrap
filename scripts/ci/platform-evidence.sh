@@ -168,7 +168,8 @@ run_sandbox_hardening() {
     'install -d -m 0700 -o dev -g dev /home/dev/.ssh; ssh-keygen -q -t ed25519 -N "" -f /home/dev/.ssh/evidence; cat /home/dev/.ssh/evidence.pub >/home/dev/.ssh/authorized_keys; chown dev:dev /home/dev/.ssh/authorized_keys; chmod 0600 /home/dev/.ssh/authorized_keys'
   container_exec_dev "cd /repo && SSH_CONNECTION='192.0.2.10 50000 192.0.2.20 22' RLDYOUR_SERVER_SSH_USER=dev bash scripts/bootstrap.sh --platform ubuntu --profile server --no-gui --docker-mode none --harden-ssh --enable-ufw --with-fail2ban --plan --strict"
   container_exec_dev "cd /repo && SSH_CONNECTION='192.0.2.10 50000 192.0.2.20 22' RLDYOUR_SERVER_SSH_USER=dev bash scripts/bootstrap.sh --platform ubuntu --profile server --no-gui --docker-mode none --harden-ssh --enable-ufw --with-fail2ban --apply --strict"
-  container_exec_dev "cd /repo && RLDYOUR_PROFILE=server RLDYOUR_GUI_ENABLED=0 RLDYOUR_DOCKER_MODE=none RLDYOUR_SERVER_ENABLE_UFW=1 RLDYOUR_SERVER_HARDEN_SSH=1 RLDYOUR_SERVER_ENABLE_FAIL2BAN=1 bash scripts/ubuntu/verify.sh --strict"
+  container_exec_dev "cd /repo && RLDYOUR_PROFILE=server RLDYOUR_GUI_ENABLED=0 RLDYOUR_DOCKER_MODE=none bash scripts/ubuntu/verify.sh --strict"
+  container_exec_dev "cd /repo && bash scripts/ubuntu/verify-server.sh --docker-mode none --expect-ufw --expect-ssh-hardening --expect-fail2ban --ssh-port 22 --ssh-user dev"
 }
 
 assert_exact_source

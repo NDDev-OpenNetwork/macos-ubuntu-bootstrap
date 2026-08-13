@@ -338,6 +338,11 @@ rldyour::ubuntu_server::install_baseline() {
 rldyour::ubuntu_server::ensure_ssh_activation() {
   local provider=""
 
+  if [ "${RLDYOUR_DRY_RUN:-1}" -eq 1 ]; then
+    rldyour::log "info" "[DRY-RUN] preserve and activate the packaged ssh.service or ssh.socket provider after installation"
+    return 0
+  fi
+
   if systemctl is-active --quiet ssh.service; then
     rldyour::log "ok" "ssh.service is active; preserving service activation"
     return 0

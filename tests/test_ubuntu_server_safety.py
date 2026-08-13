@@ -219,3 +219,12 @@ def test_server_contract_contains_rollback_and_context_guards() -> None:
     assert installer.count("rldyour::run sudo") == 2
     assert "sudo apt-get" not in installer
     assert "sudo install" not in installer
+
+
+def test_ssh_activation_plan_does_not_require_preinstalled_units() -> None:
+    result = run_server_function(
+        "RLDYOUR_DRY_RUN=1\n"
+        "rldyour::ubuntu_server::ensure_ssh_activation\n"
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert "[DRY-RUN] preserve and activate" in result.stdout

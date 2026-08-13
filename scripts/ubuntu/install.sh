@@ -1690,11 +1690,6 @@ main() {
   else
     rldyour::log "info" "desktop entries skipped: gui disabled"
   fi
-  if [ "$user_tools_failed" -ne 0 ]; then
-    rldyour::log "error" "one or more user tools remain unmanaged or divergent; all repairs were attempted"
-    return 1
-  fi
-
   install_gui_apps
   run_server_layer
 
@@ -1707,8 +1702,22 @@ main() {
   # verify.sh requires. Ordering it last keeps the failure fatal, which it must be,
   # while making it fatal to itself instead of to the whole device.
   [ "$SKIP_AI" -eq 1 ] || install_ai_runtimes
+
+  # Every optional-layer failure is reported here, once, after every layer has
+  # been attempted. The user-tool result used to be reported earlier, before
+  # install_gui_apps, run_server_layer and install_ai_runtimes -- so a single
+  # divergent Herdr, which is a user tool on every profile including server,
+  # left a server without Docker, without the vendor AI CLIs and without
+  # verification, while the message claimed every repair had been attempted.
+  # A failure here must stay fatal to the run; it must not be fatal to the
+  # layers behind it.
+  if [ "$user_tools_failed" -ne 0 ]; then
+    rldyour::log "error" "one or more user tools remain unmanaged or divergent; every other layer was still attempted"
+  fi
   if [ "$GUI_LAYER_FAILED" -ne 0 ]; then
     rldyour::log "error" "desktop customization failed a required step; every other layer was still attempted"
+  fi
+  if [ "$user_tools_failed" -ne 0 ] || [ "$GUI_LAYER_FAILED" -ne 0 ]; then
     return 1
   fi
   verify_apply

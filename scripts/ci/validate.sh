@@ -104,6 +104,27 @@ bash "$REPO_ROOT/scripts/bootstrap.sh" --platform ubuntu --profile server --dock
 bash "$REPO_ROOT/scripts/bootstrap.sh" --platform ubuntu --profile desktop-builds --gui "${COMMON_PLAN[@]}"
 bash "$REPO_ROOT/scripts/bootstrap.sh" --platform ubuntu --profile desktop-builds --no-gui "${COMMON_PLAN[@]}"
 
+# The lanes above pass every --skip flag, so they exercise argument parsing and
+# composition only: run_server_layer returns early under --skip-system, and no
+# installer layer is ever entered. Plan mode is read-only, so the full plan path
+# runs here too -- against a throwaway HOME, which also fails the lane if a plan
+# ever starts writing to it again.
+FULL_PLAN_HOME="$(mktemp -d)"
+trap 'rm -rf "$FULL_PLAN_HOME"' EXIT
+for target in "macos --profile desktop --gui" "macos --profile desktop --no-gui" \
+  "ubuntu --profile desktop --no-gui" "ubuntu --profile desktop-builds --no-gui" \
+  "ubuntu --profile server --docker-mode rootful" \
+  "ubuntu --profile server --docker-mode none"; do
+  # shellcheck disable=SC2086
+  HOME="$FULL_PLAN_HOME" bash "$REPO_ROOT/scripts/bootstrap.sh" --platform $target --plan >/dev/null
+done
+if [ -n "$(find "$FULL_PLAN_HOME" -mindepth 1 -print -quit)" ]; then
+  echo "plan mode wrote to the home directory it only describes:" >&2
+  find "$FULL_PLAN_HOME" -mindepth 1 >&2
+  exit 1
+fi
+echo "full-plan-readonly-ok"
+
 if bash "$REPO_ROOT/scripts/bootstrap.sh" --platform ubuntu --plan >/dev/null 2>&1; then
   echo "Ubuntu profile inference unexpectedly succeeded" >&2
   exit 1

@@ -88,6 +88,11 @@ APT_SOURCE_PACKAGES=(
 
 APT_DESKTOP_BUILD_PACKAGES=(build-essential)
 
+# Declared by the contract as ubuntu_apt_packages.desktop_gui_fonts. It used
+# to be installed as a bare literal inside install_gui_apps, so the package
+# parity test could not see it and the contract did not know it existed.
+APT_DESKTOP_GUI_FONTS=(fonts-jetbrains-mono)
+
 
 # Registry-backed language servers + source checks, pinned to exact versions
 # for reproducibility (RVR-P2-003). Two package identities are corrected here:
@@ -1578,7 +1583,7 @@ install_gui_apps() {
     return 0
   fi
   rldyour::section "Install verified Ubuntu GUI applications"
-  apt_install fonts-jetbrains-mono || rldyour::log "warn" "fonts-jetbrains-mono unavailable"
+  apt_install "${APT_DESKTOP_GUI_FONTS[@]}" || rldyour::log "warn" "desktop GUI fonts unavailable"
   # Desktop customization: GNOME dock, Russian layout, Chrome, Firefox removal.
   rldyour::section "Configure Ubuntu desktop (dock, keyboard, browser)"
   local desktop_script

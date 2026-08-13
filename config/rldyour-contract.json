@@ -350,7 +350,8 @@
       "categories": "Development",
       "wm_class": "Ptyxis",
       "profiles": [
-        "desktop"
+        "desktop",
+        "desktop-builds"
       ],
       "os": [
         "ubuntu"
@@ -391,7 +392,8 @@
       },
       "dbus_activatable": false,
       "profiles": [
-        "desktop"
+        "desktop",
+        "desktop-builds"
       ],
       "os": [
         "ubuntu"
@@ -437,6 +439,9 @@
     ],
     "desktop_build": [
       "build-essential"
+    ],
+    "desktop_gui_fonts": [
+      "fonts-jetbrains-mono"
     ],
     "desktop_apps": [
       {

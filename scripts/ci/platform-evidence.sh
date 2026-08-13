@@ -120,7 +120,7 @@ start_systemd_container() {
 FROM ubuntu:24.04
 ENV DEBIAN_FRONTEND=noninteractive
 RUN apt-get update \
- && apt-get install -y --no-install-recommends ca-certificates curl dbus-user-session openssh-client sudo systemd systemd-sysv \
+ && apt-get install -y --no-install-recommends ca-certificates curl dbus-user-session openssh-server python3 sudo systemd systemd-sysv \
  && apt-get clean \
  && rm -rf /var/lib/apt/lists/* \
  && useradd -m -s /bin/bash dev \

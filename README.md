@@ -71,3 +71,12 @@ python3 -m pytest
 Real platform behavior must also be verified on the corresponding macOS or
 Ubuntu host; container checks are not evidence for launchd, systemd, GNOME,
 SSH, firewall, Docker daemon, or macOS application behavior.
+
+The machine-readable support and proof boundary is
+[`config/support-evidence-matrix.json`](config/support-evidence-matrix.json).
+It distinguishes required core behavior from optional real-host capabilities
+and prevents hosted or container evidence from being promoted to a stronger
+tier. A successful evidence lane may contain typed `NOT_PROVEN` observations
+only for optional capabilities; every required capability must be `PROVEN`.
+See the [support/evidence reference](docs/reference/support-evidence.md) for the
+typed tiers, current hosted coverage, and explicit real-host gaps.

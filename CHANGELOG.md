@@ -5,6 +5,10 @@ remains available in immutable Git tags.
 
 ## [Unreleased]
 
+- Added a canonical machine-readable clean-system support/evidence matrix and
+  made hosted evidence fail closed when a required capability is unproven or a
+  runner/lane architecture is outside the declared proof boundary.
+
 ### Fixed
 
 - Made Herdr permission verification deterministic across BSD/macOS and GNU/Linux

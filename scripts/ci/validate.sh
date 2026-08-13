@@ -110,13 +110,21 @@ bash "$REPO_ROOT/scripts/bootstrap.sh" --platform ubuntu --profile desktop-build
 # runs here too -- against a throwaway HOME, which also fails the lane if a plan
 # ever starts writing to it again.
 FULL_PLAN_HOME="$(mktemp -d)"
-trap 'rm -rf "$FULL_PLAN_HOME"' EXIT
+FULL_PLAN_LOG="$(mktemp)"
+trap 'rm -rf "$FULL_PLAN_HOME" "$FULL_PLAN_LOG"' EXIT
 for target in "macos --profile desktop --gui" "macos --profile desktop --no-gui" \
   "ubuntu --profile desktop --no-gui" "ubuntu --profile desktop-builds --no-gui" \
   "ubuntu --profile server --docker-mode rootful" \
   "ubuntu --profile server --docker-mode none"; do
+  # A plan reports through rldyour::log, which writes to stdout, so discarding
+  # stdout would discard the reason a lane failed. Capture it and print it.
   # shellcheck disable=SC2086
-  HOME="$FULL_PLAN_HOME" bash "$REPO_ROOT/scripts/bootstrap.sh" --platform $target --plan >/dev/null
+  if ! HOME="$FULL_PLAN_HOME" bash "$REPO_ROOT/scripts/bootstrap.sh" \
+    --platform $target --plan >"$FULL_PLAN_LOG" 2>&1; then
+    echo "full plan failed: --platform $target --plan" >&2
+    cat "$FULL_PLAN_LOG" >&2
+    exit 1
+  fi
 done
 if [ -n "$(find "$FULL_PLAN_HOME" -mindepth 1 -print -quit)" ]; then
   echo "plan mode wrote to the home directory it only describes:" >&2

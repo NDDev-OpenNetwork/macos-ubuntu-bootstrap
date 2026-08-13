@@ -92,6 +92,7 @@ def test_plan_creates_nothing_in_the_home_it_describes(
         check=False,
         env={**os.environ, "HOME": str(home)},
     )
-    assert result.returncode == 0, result.stderr[-2000:]
+    # rldyour::log writes to stdout, so a failure explains itself there.
+    assert result.returncode == 0, (result.stdout + result.stderr)[-3000:]
     created = sorted(str(path.relative_to(home)) for path in home.rglob("*"))
     assert created == [], f"plan mutated the home directory: {created}"

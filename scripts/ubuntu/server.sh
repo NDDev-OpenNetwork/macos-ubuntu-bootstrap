@@ -1565,7 +1565,7 @@ EOF
     rollback_fail2ban || true
     return 1
   fi
-  if ! rldyour::ubuntu_server::as_root systemctl enable --now fail2ban.service ||
+  if ! rldyour::ubuntu_server::as_root systemctl enable fail2ban.service ||
     ! rldyour::ubuntu_server::as_root systemctl restart fail2ban.service ||
     ! systemctl is-active --quiet fail2ban.service ||
     ! rldyour::ubuntu_server::as_root fail2ban-client status sshd >/dev/null; then

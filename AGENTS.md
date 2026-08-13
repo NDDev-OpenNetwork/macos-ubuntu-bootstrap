@@ -8,6 +8,11 @@ platform installers/verifiers, `config/rldyour-contract.json`, `README.md`, and
 `SECURITY.md`. Keep implementation, verification, contract, tests, docs,
 `VERSION`, and `CHANGELOG.md` synchronized.
 
+`config/support-evidence-matrix.json` owns clean-system support compositions,
+typed evidence tiers, and required-versus-optional proof. Device-integrity
+receipts report the state of one installed device; they do not redefine platform
+support or promote container/structural observations to native-host evidence.
+
 ## Contract 3.0.1
 
 - macOS supports `desktop`, with optional GUI, no Docker, and source-analysis

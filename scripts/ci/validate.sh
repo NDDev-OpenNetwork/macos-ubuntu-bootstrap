@@ -78,6 +78,8 @@ require_dir "$REPO_ROOT/docs"
 require_file "$REPO_ROOT/.github/workflows/ci.yml"
 require_file "$REPO_ROOT/scripts/bootstrap.sh"
 require_file "$REPO_ROOT/scripts/auth-handoff.sh"
+require_file "$REPO_ROOT/scripts/support_evidence.py"
+require_file "$REPO_ROOT/config/support-evidence-matrix.json"
 require_file "$REPO_ROOT/scripts/ci/validate.sh"
 require_file "$REPO_ROOT/scripts/ci/lint.sh"
 require_file "$REPO_ROOT/scripts/lib/common.sh"
@@ -87,6 +89,8 @@ require_file "$REPO_ROOT/scripts/ubuntu/install.sh"
 require_file "$REPO_ROOT/scripts/ubuntu/server.sh"
 require_file "$REPO_ROOT/scripts/ubuntu/verify.sh"
 require_file "$REPO_ROOT/scripts/ubuntu/verify-server.sh"
+
+python3 "$REPO_ROOT/scripts/support_evidence.py" validate
 
 bash "$REPO_ROOT/scripts/ci/lint.sh"
 

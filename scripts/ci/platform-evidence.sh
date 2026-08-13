@@ -15,40 +15,41 @@ LOG="$OUTPUT_DIR/run.log"
 exec > >(tee "$LOG") 2>&1
 
 record_metadata() {
-  EVIDENCE_LANE="$LANE" EVIDENCE_OUTPUT="$OUTPUT_DIR/evidence.json" python3 - <<'PY'
+  local lane_contract
+  lane_contract="$(python3 "$REPO_ROOT/scripts/support_evidence.py" resolve --lane "$LANE")" || return 1
+  EVIDENCE_LANE="$LANE" EVIDENCE_LANE_CONTRACT="$lane_contract" \
+    EVIDENCE_OUTPUT="$OUTPUT_DIR/evidence.json" python3 - <<'PY'
 import json
 import os
 import platform
 from pathlib import Path
 
 lane = os.environ["EVIDENCE_LANE"]
-evidence_type = "native_host"
-unproven = ["reboot_persistence"]
-if lane.startswith("sandbox-"):
-    evidence_type = "disposable_systemd_container"
-    unproven = ["reboot_persistence", "vm_or_bare_metal_boundary"]
-if lane == "sandbox-server-hardening":
-    unproven += ["second_session_ssh", "external_firewall_connectivity"]
-if lane == "ubuntu-arm-gui-refusal":
-    evidence_type = "native_host_expected_fail_closed"
-    unproven = []
-if lane == "macos-gui":
-    unproven += ["interactive_gui_launch", "authenticated_app_login"]
+contract = json.loads(os.environ["EVIDENCE_LANE_CONTRACT"])
 
 payload = {
-    "schema_version": 1,
+    "schema_version": 2,
     "repository": os.environ.get("GITHUB_REPOSITORY", "local"),
     "run_id": os.environ.get("GITHUB_RUN_ID", "local"),
     "run_attempt": os.environ.get("GITHUB_RUN_ATTEMPT", "local"),
     "job": os.environ.get("GITHUB_JOB", "local"),
-    "evidence_type": evidence_type,
+    "evidence_tier": contract["tier"],
+    "environment": contract["environment"],
     "lane": lane,
+    "capabilities": contract["capabilities"],
+    "composition": {
+        key: contract[key]
+        for key in ("os", "release", "architecture", "profile", "gui", "docker", "privilege", "interaction")
+    },
     "sha": os.environ["EVIDENCE_SHA"],
     "runner_name": os.environ.get("RUNNER_NAME", "local"),
     "runner_os": os.environ.get("RUNNER_OS", platform.system()),
     "runner_arch": os.environ.get("RUNNER_ARCH", platform.machine()),
     "uname": platform.uname()._asdict(),
-    "unproven": unproven,
+    "not_proven": sorted(
+        capability["id"] for capability in contract["capabilities"]
+        if capability["status"] == "NOT_PROVEN"
+    ),
 }
 Path(os.environ["EVIDENCE_OUTPUT"]).write_text(
     json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8"
@@ -63,9 +64,11 @@ finalize_evidence() {
   fi
   EVIDENCE_RC="$rc" EVIDENCE_FINISHED_EPOCH="$(date +%s)" \
     EVIDENCE_STARTED_EPOCH="$EVIDENCE_STARTED_EPOCH" \
+    EVIDENCE_SUPPORT_SCRIPT="$REPO_ROOT/scripts/support_evidence.py" \
     EVIDENCE_OUTPUT="$OUTPUT_DIR/evidence.json" python3 - <<'PY'
 import json
 import os
+import sys
 from pathlib import Path
 
 path = Path(os.environ["EVIDENCE_OUTPUT"])
@@ -78,6 +81,9 @@ payload.update({
     "result": "success" if int(os.environ["EVIDENCE_RC"]) == 0 else "failure",
     "started_epoch": started,
 })
+sys.path.insert(0, str(Path(os.environ["EVIDENCE_SUPPORT_SCRIPT"]).parent))
+import support_evidence
+support_evidence.finalize_evidence(payload, payload["result"])
 path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
 PY
   echo "evidence lane=$LANE result=$([ "$rc" -eq 0 ] && echo success || echo failure) duration_seconds=$(($(date +%s) - EVIDENCE_STARTED_EPOCH))"

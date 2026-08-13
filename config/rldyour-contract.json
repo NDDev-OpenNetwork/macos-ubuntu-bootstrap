@@ -5,6 +5,12 @@
     "version": "3.0.1"
   },
   "verified_on": "2026-08-13",
+  "support_evidence": {
+    "path": "config/support-evidence-matrix.json",
+    "schema_version": 1,
+    "required_capability_policy": "successful evidence requires PROVEN",
+    "optional_unproven_policy": "typed stronger tier and tracking issue required"
+  },
   "targets": {
     "macos": {
       "architectures": [

@@ -181,6 +181,15 @@ def test_verify_contract_versions_passes_when_state_matches() -> None:
                 "installed_version": spec["version"],
                 "declared_version": spec["version"],
                 **(
+                    {
+                        "sha256": spec["source"]["assets"][
+                            "macos-aarch64" if di._current_os() == "macos" else "linux-x86_64"
+                        ]["sha256"]
+                    }
+                    if spec.get("source", {}).get("assets")
+                    else {}
+                ),
+                **(
                     {"external_updater_policy_valid": True}
                     if spec.get("external_updater_policy_target")
                     else {}
@@ -308,7 +317,12 @@ def _server_state_all_required_tools_present() -> dict[str, object]:
             for name, spec in rs[di.PINNED_SOURCE_TOOLS_CONTRACT].items()
         },
         "user_tools": {
-            "herdr": {"installed_version": contract["user_tools"]["herdr"]["version"]}
+            "herdr": {
+                "installed_version": contract["user_tools"]["herdr"]["version"],
+                "sha256": contract["user_tools"]["herdr"]["source"]["assets"][
+                    "macos-aarch64" if di._current_os() == "macos" else "linux-x86_64"
+                ]["sha256"],
+            }
         },
     }
 

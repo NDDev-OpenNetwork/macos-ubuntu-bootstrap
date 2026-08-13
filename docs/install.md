@@ -20,9 +20,13 @@ through verified downloads. `cx`, `cl`, and `gk` launch them without approval or
 permission prompts. Authentication is performed afterward with
 `scripts/auth-handoff.sh` and is never automated by bootstrap.
 
-Herdr is a required terminal tool on macOS and every Ubuntu profile. macOS uses
-the official Homebrew formula; Ubuntu installs the pinned x86_64/aarch64 binary
-from the `herdrdev/herdr` GitHub release and verifies its runtime receipt.
+Herdr is a required terminal tool on macOS and every Ubuntu profile. Both
+platforms install the pinned architecture-specific binary from the official
+`herdrdev/herdr` GitHub release and verify its checksum, managed launcher,
+runtime receipt, and exact version. Bootstrap does not depend on a lagging
+or subsequently updated Homebrew formula for the managed macOS runtime. The pinned upstream identity,
+independently verified asset hashes, and update policy are recorded in the
+[dependency source register](reference/source-register.md).
 
 GUI profiles install current Google Chrome stable. macOS also installs the
 desktop applications listed in the contract. Ubuntu GUI installs RustDesk and

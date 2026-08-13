@@ -20,6 +20,9 @@ LOCAL_EXECUTION_POLICY="${RLDYOUR_LOCAL_EXECUTION_POLICY:-source-lsp-only}"
 HOMEBREW_PKG_VERSION="6.0.9"
 HOMEBREW_PKG_SHA256="525599bd2dcbda29857120234336b0103ad5283a3dc8511f72066eeb917abd3c"
 HOMEBREW_INSTALLER_TEAM="927JGANW46"
+HERDR_VERSION="0.8.0"
+HERDR_MACOS_AARCH64_SHA256="d53a9f93fccfdfcc55632927bf51002f5add0aa7990bcdf508ffbd84ac658178"
+HERDR_MACOS_AARCH64_URL="https://github.com/herdrdev/herdr/releases/download/v0.8.0/herdr-macos-aarch64"
 
 # Source/LSP-only workstation baseline. No Docker, project build orchestration,
 # test runner, or local project runtime. Homebrew's LLVM distribution is present
@@ -39,7 +42,7 @@ BREW_SOURCE_PACKAGES=(
   yamllint markdownlint-cli2 prettier
   ripgrep fd eza bat git-delta jq yq ast-grep
   starship atuin fzf zoxide carapace antidote zsh-completions
-  gh lazygit yazi xh jaq jnv duckdb difftastic tmux herdr
+  gh lazygit yazi xh jaq jnv duckdb difftastic tmux
 )
 
 # Registry-backed language servers, pinned to exact versions for reproducibility
@@ -130,6 +133,122 @@ install_source_packages() {
     managed_dart="$(brew --prefix dart-sdk)/bin/dart"
     rldyour::ensure_dart_telemetry_disabled "$managed_dart" || return 1
   fi
+}
+
+ensure_herdr() {
+  rldyour::section "Ensure verified Herdr ${HERDR_VERSION}"
+  local root="$HOME/.local/share/rldyour/herdr/${HERDR_VERSION}"
+  local target="$root/herdr"
+  local receipt="$root/.receipt"
+  local launcher="$HOME/.local/bin/herdr"
+  local marker="# Managed by macos-ubuntu-bootstrap: macos-herdr-runtime-v1"
+  local current stage stage_root actual reported_version link_tmp
+  local expected_receipt="$marker
+version=${HERDR_VERSION}
+sha256=${HERDR_MACOS_AARCH64_SHA256}
+source=${HERDR_MACOS_AARCH64_URL}"
+
+  if [ "$RLDYOUR_DRY_RUN" -eq 1 ]; then
+    rldyour::log "info" "[DRY-RUN] install verified ${HERDR_MACOS_AARCH64_URL} -> ${target}, publish receipt and managed launcher ${launcher}"
+    return 0
+  fi
+
+  [ "$(uname -s)" = Darwin ] && [ "$(uname -m)" = arm64 ] || {
+    rldyour::log "error" "Herdr ${HERDR_VERSION} has no managed macOS artifact for $(uname -s)/$(uname -m)"
+    return 1
+  }
+
+  if [ -e "$launcher" ] || [ -L "$launcher" ]; then
+    [ -L "$launcher" ] || {
+      rldyour::log "error" "unmanaged Herdr launcher exists; preserved: ${launcher}"
+      return 1
+    }
+    current="$(readlink "$launcher")"
+    case "$current" in
+      "$HOME/.local/share/rldyour/herdr/"*) ;;
+      *)
+        rldyour::log "error" "Herdr launcher points outside its managed namespace; preserved: ${launcher}"
+        return 1
+        ;;
+    esac
+  fi
+
+  if [ -e "$root" ] || [ -L "$root" ]; then
+    [ -d "$root" ] && [ ! -L "$root" ] || {
+      rldyour::log "error" "managed Herdr root has an unsupported shape; preserved: ${root}"
+      return 1
+    }
+    [ "$(find "$root" -mindepth 1 -maxdepth 1 -print | LC_ALL=C sort)" = "$(printf '%s\n%s\n' "$receipt" "$target" | LC_ALL=C sort)" ] || {
+      rldyour::log "error" "managed Herdr root contains missing or additional paths; preserved: ${root}"
+      return 1
+    }
+    [ -f "$target" ] && [ ! -L "$target" ] && [ -x "$target" ] || {
+      rldyour::log "error" "managed Herdr target has an unsupported shape; preserved: ${target}"
+      return 1
+    }
+    [ -f "$receipt" ] && [ ! -L "$receipt" ] && [ "$(cat "$receipt")" = "$expected_receipt" ] || {
+      rldyour::log "error" "managed Herdr receipt is missing or divergent; preserved: ${root}"
+      return 1
+    }
+    actual="$(rldyour::sha256_file "$target")" || return 1
+    [ "$actual" = "$HERDR_MACOS_AARCH64_SHA256" ] || {
+      rldyour::log "error" "managed Herdr target checksum diverged; preserved: ${target}"
+      return 1
+    }
+    [ "$(stat -f '%Lp' "$root")" = 755 ] && \
+      [ "$(stat -f '%Lp' "$target")" = 755 ] && \
+      [ "$(stat -f '%Lp' "$receipt")" = 600 ] || {
+      rldyour::log "error" "managed Herdr permissions diverged; preserved: ${root}"
+      return 1
+    }
+    reported_version="$("$target" --version 2>/dev/null | sed -E 's/^[^0-9]*([0-9]+\.[0-9]+\.[0-9]+).*/\1/' | head -n 1)"
+    [ "$reported_version" = "$HERDR_VERSION" ] || {
+      rldyour::log "error" "managed Herdr reports ${reported_version:-no version}, expected ${HERDR_VERSION}; preserved: ${root}"
+      return 1
+    }
+  else
+    stage="$(mktemp -d)" || return 1
+    stage_root="$stage/${HERDR_VERSION}"
+    mkdir "$stage_root" || { rm -rf "$stage"; return 1; }
+    chmod 0755 "$stage_root" || { rm -rf "$stage"; return 1; }
+    if ! rldyour::download_verified_file \
+      "$HERDR_MACOS_AARCH64_URL" "$HERDR_MACOS_AARCH64_SHA256" "$stage_root/herdr"; then
+      rm -rf "$stage"
+      rldyour::log "error" "official Herdr ${HERDR_VERSION} asset is unavailable or failed checksum verification"
+      return 1
+    fi
+    actual="$(rldyour::sha256_file "$stage_root/herdr")" || { rm -rf "$stage"; return 1; }
+    [ "$actual" = "$HERDR_MACOS_AARCH64_SHA256" ] || {
+      rm -rf "$stage"
+      rldyour::log "error" "downloaded Herdr checksum diverged before publication"
+      return 1
+    }
+    chmod 0755 "$stage_root/herdr" || { rm -rf "$stage"; return 1; }
+    reported_version="$("$stage_root/herdr" --version 2>/dev/null | sed -E 's/^[^0-9]*([0-9]+\.[0-9]+\.[0-9]+).*/\1/' | head -n 1)"
+    [ "$reported_version" = "$HERDR_VERSION" ] || {
+      rm -rf "$stage"
+      rldyour::log "error" "verified Herdr asset reports ${reported_version:-no version}, expected ${HERDR_VERSION}"
+      return 1
+    }
+    printf '%s\n' "$expected_receipt" >"$stage_root/.receipt" || { rm -rf "$stage"; return 1; }
+    chmod 0600 "$stage_root/.receipt" || { rm -rf "$stage"; return 1; }
+    rldyour::_managed_tree_permissions validate "$stage_root" || { rm -rf "$stage"; return 1; }
+    mkdir -p "${root%/*}" || { rm -rf "$stage"; return 1; }
+    mv "$stage_root" "$root" || { rm -rf "$stage"; return 1; }
+    rmdir "$stage" 2>/dev/null || rm -rf "$stage"
+  fi
+
+  mkdir -p "$HOME/.local/bin" || return 1
+  link_tmp="$(mktemp "$HOME/.local/bin/.herdr-link.XXXXXX")" || return 1
+  rm -f "$link_tmp"
+  ln -s "$target" "$link_tmp" || return 1
+  mv -f "$link_tmp" "$launcher" || { rm -f "$link_tmp"; return 1; }
+  hash -r
+  [ "$(command -v herdr)" = "$launcher" ] || {
+    rldyour::log "error" "managed Herdr launcher does not win PATH resolution"
+    return 1
+  }
+  rldyour::log "ok" "verified managed Herdr ${HERDR_VERSION}"
 }
 
 cask_app_path() {
@@ -283,6 +402,7 @@ main() {
     rldyour::ensure_path
     if command -v brew >/dev/null 2>&1 || [ "$RLDYOUR_DRY_RUN" -eq 1 ]; then
       install_source_packages
+      ensure_herdr
       install_gui_apps
     elif [ "$STRICT" -eq 1 ]; then
       rldyour::log "error" "Homebrew unavailable after installation"

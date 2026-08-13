@@ -109,8 +109,7 @@ def _applies_to_current_os(spec: dict[str, Any]) -> bool:
 
     Entries without an ``os`` field apply to all platforms (backward
     compatibility). Entries with ``os: ["linux"]`` are skipped on macOS, so a
-    Linux-only tool like herdr does not cause a NOT_PROVEN on macOS where it is
-    never installed.
+    Linux-only tool does not cause a NOT_PROVEN where it is never installed.
     """
     declared_oses = spec.get("os")
     if not declared_oses:
@@ -366,8 +365,14 @@ def _user_tool_state(bin_dir: Path, home: Path) -> dict[str, dict[str, Any]]:
             "path": binary,
         }
         path = Path(binary)
-        if path.exists() and not path.is_symlink():
-            entry["sha256"] = sha256_file(path)
+        if path.exists() or path.is_symlink():
+            try:
+                resolved = path.resolve(strict=True)
+            except (FileNotFoundError, RuntimeError):
+                resolved = path
+            if resolved.is_file() and not resolved.is_symlink():
+                entry["resolved"] = str(resolved)
+                entry["sha256"] = sha256_file(resolved)
 
         policy_target = spec.get("external_updater_policy_target")
         policy_marker = spec.get("external_updater_policy_marker")
@@ -690,6 +695,27 @@ def _verify_contract_versions(state: dict[str, Any], *, profile: str = "desktop"
             drifts.append(f"{name}: absent (contract declares {declared})")
         elif installed != declared:
             drifts.append(f"{name}: installed {installed} != contract {declared}")
+        source = spec.get("source", {})
+        assets = source.get("assets", {}) if isinstance(source, dict) else {}
+        if assets:
+            system = _current_os()
+            machine = os.uname().machine
+            normalized_machine = {
+                "arm64": "aarch64",
+                "aarch64": "aarch64",
+                "x86_64": "x86_64",
+                "amd64": "x86_64",
+            }.get(machine, machine)
+            asset_key = f"macos-{normalized_machine}" if system == "macos" else f"linux-{normalized_machine}"
+            expected_asset = assets.get(asset_key)
+            observed_sha = installed_user_tools.get(name, {}).get("sha256")
+            if not isinstance(expected_asset, dict):
+                drifts.append(f"{name}: contract has no asset for {asset_key}")
+            elif observed_sha != expected_asset.get("sha256"):
+                drifts.append(
+                    f"{name}: installed SHA-256 {observed_sha or 'absent'} != "
+                    f"contract {expected_asset.get('sha256')}"
+                )
 
     # Harness ownership is profile-independent.
     drifts.extend(_verify_harness_ownership(state))

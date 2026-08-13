@@ -17,6 +17,7 @@ ROOT = Path(__file__).resolve().parents[1]
 CONTRACT = json.loads((ROOT / "config/rldyour-contract.json").read_text(encoding="utf-8"))
 UBUNTU_INSTALL = (ROOT / "scripts/ubuntu/install.sh").read_text(encoding="utf-8")
 MACOS_INSTALL = (ROOT / "scripts/macos/install.sh").read_text(encoding="utf-8")
+MACOS_VERIFY = (ROOT / "scripts/macos/verify.sh").read_text(encoding="utf-8")
 
 
 def test_release_metadata_matches_contract_version() -> None:
@@ -152,12 +153,34 @@ def test_user_tools_match_the_contract() -> None:
     for name, row in rows.items():
         spec = declared[name]
         assert row[1] == spec["version"], f"{name}: version drift ({row[1]} vs {spec['version']})"
-        # herdr uses per-arch sha256 dict; telegram uses a single archive_sha256
-        # (same hash for both arch slots in the bash array since the tarball is
-        # x86_64-only and the arm64 slot is a mirror for the parser).
-        if "sha256" in spec:
-            assert row[6] == spec["sha256"]["x86_64"], f"{name}: x64 SHA-256 drift"
-            assert row[7] == spec["sha256"]["aarch64"], f"{name}: arm64 SHA-256 drift"
+        # Herdr uses the canonical per-platform source asset table; Telegram
+        # uses a single archive_sha256.
+        if name == "herdr":
+            assets = spec["source"]["assets"]
+            assert row[6] == assets["linux-x86_64"]["sha256"], f"{name}: x64 SHA-256 drift"
+            assert row[7] == assets["linux-aarch64"]["sha256"], f"{name}: arm64 SHA-256 drift"
+            assert row[8] == assets["linux-x86_64"]["url"], f"{name}: x64 URL drift"
+            assert row[9] == assets["linux-aarch64"]["url"], f"{name}: arm64 URL drift"
         elif "archive_sha256" in spec:
             assert row[6] == spec["archive_sha256"], f"{name}: archive SHA-256 drift"
             assert row[7] in {"", spec["archive_sha256"]}, f"{name}: archive SHA-256 (arm64 slot) drift"
+
+
+def test_macos_herdr_asset_matches_contract_and_bypasses_homebrew() -> None:
+    herdr = CONTRACT["user_tools"]["herdr"]
+    macos = herdr["source"]["assets"]["macos-aarch64"]
+    assert herdr["install_method"]["macos"] == "verified-github-release-binary"
+    assert _constant(MACOS_INSTALL, "HERDR_VERSION") == herdr["version"]
+    assert _constant(MACOS_INSTALL, "HERDR_MACOS_AARCH64_SHA256") == macos["sha256"]
+    assert _constant(MACOS_INSTALL, "HERDR_MACOS_AARCH64_URL") == macos["url"]
+    assert _constant(MACOS_VERIFY, "HERDR_VERSION") == herdr["version"]
+    assert _constant(MACOS_VERIFY, "HERDR_MACOS_AARCH64_SHA256") == macos["sha256"]
+    assert _constant(MACOS_VERIFY, "HERDR_MACOS_AARCH64_URL") == macos["url"]
+    assert "herdr" not in _parse_bash_array(MACOS_INSTALL, "BREW_SOURCE_PACKAGES")
+    assert "ensure_herdr" in MACOS_INSTALL.split("main() {", 1)[1]
+    assert herdr["source"]["tag"] == f"v{herdr['version']}"
+    assert herdr["source"]["tag_object"] == "857196dee1ce98df53efdd3f437aa2ac8a75b608"
+    assert herdr["source"]["commit"] == "346411fa21afd297f5ed3b3fa56f9e3fbf7654b7"
+    assert herdr["source"]["verified_at"] == "2026-08-13"
+    assert "never invoke mutable herdr update" in herdr["update_policy"]
+    assert "herdr update" not in MACOS_INSTALL

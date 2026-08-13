@@ -7,6 +7,8 @@ remains available in immutable Git tags.
 
 ### Fixed
 
+- Installed the exact receipt-bound Herdr 0.8.0 macOS release artifact instead
+  of accepting the older mutable Homebrew formula.
 - Published terminal plugins from verified pinned Git commit trees instead of
   exposing mutable checkout metadata to the executable Antidote source layer.
 - Made Ubuntu server verification and device receipts prove the complete

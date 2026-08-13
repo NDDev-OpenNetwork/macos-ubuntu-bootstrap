@@ -188,8 +188,9 @@ PINNED_SOURCE_TOOLS=(
 # downloading the artifact.
 #
 # herdr ships its own `herdr update` command that fetches https://herdr.dev/latest.json;
-# the bootstrap pins the version here so a fresh device is reproducible without
-# trusting the live manifest at install time.
+# that live manifest is discovery-only. The canonical source tag, URLs, and
+# architecture hashes live in config/rldyour-contract.json and parity tests bind
+# this shell row to them; installation never resolves mutable `latest` state.
 USER_TOOLS=(
   "herdr;0.8.0;raw;herdr;herdr;herdr;b872ea7e40fa2cb17e857ac9b62b1bf26db7b403c622f5d2f3f5b35f6e9acd28;f647ac66468d9efbc642fe534fb284468f0aea60641606fc008dfc0d82a3ca87;https://github.com/herdrdev/herdr/releases/download/v0.8.0/herdr-linux-x86_64;https://github.com/herdrdev/herdr/releases/download/v0.8.0/herdr-linux-aarch64"
   # Telegram Desktop official portable build. Only Telegram/Telegram is

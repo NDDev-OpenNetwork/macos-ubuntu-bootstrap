@@ -19,6 +19,46 @@ print(contract["runtime_support"][sys.argv[2]][sys.argv[3]])
 PY
 }
 
+rldyour::ubuntu_verify::herdr_provenance() {
+  local arch_key version sha root target
+  version="$(python3 - "$REPO_ROOT/config/rldyour-contract.json" <<'PY'
+import json, sys
+with open(sys.argv[1], encoding="utf-8") as handle:
+    print(json.load(handle)["user_tools"]["herdr"]["version"])
+PY
+)"
+  case "$(uname -m)" in
+    x86_64|amd64) arch_key=linux-x86_64 ;;
+    aarch64|arm64) arch_key=linux-aarch64 ;;
+    *) rldyour::log "missing" "Herdr has no managed Ubuntu artifact for $(uname -m)"; return 1 ;;
+  esac
+  sha="$(python3 - "$REPO_ROOT/config/rldyour-contract.json" "$arch_key" <<'PY'
+import json, sys
+with open(sys.argv[1], encoding="utf-8") as handle:
+    print(json.load(handle)["user_tools"]["herdr"]["source"]["assets"][sys.argv[2]]["sha256"])
+PY
+)"
+  root="$HOME/.local/share/rldyour/herdr/${version}"
+  target="$root/herdr"
+  rldyour::ubuntu_verify::runtime_receipt herdr "$version" "$sha" "$root" herdr || {
+    rldyour::log "missing" "Herdr exact managed Ubuntu receipt"
+    return 1
+  }
+  rldyour::ubuntu_verify::managed_link herdr "$target" || {
+    rldyour::log "missing" "Herdr exact managed Ubuntu launcher"
+    return 1
+  }
+  [ "$(command -v herdr)" = "$HOME/.local/bin/herdr" ] || {
+    rldyour::log "missing" "managed Herdr launcher must win Ubuntu PATH resolution"
+    return 1
+  }
+  [ "$(herdr --version 2>/dev/null | sed -E 's/^[^0-9]*([0-9]+\.[0-9]+\.[0-9]+).*/\1/' | head -n 1)" = "$version" ] || {
+    rldyour::log "missing" "Herdr exact managed Ubuntu version ${version}"
+    return 1
+  }
+  rldyour::log "ok" "Herdr exact managed Ubuntu runtime ${version} (${arch_key})"
+}
+
 rldyour::ubuntu_verify::runtime_receipt() {
   local runtime=$1 version=$2 archive_sha256=$3 root=$4
   local receipt="$root/.rldyour-runtime-receipt" relative key expected
@@ -151,6 +191,7 @@ done
 rldyour::ensure_path
 rldyour::section "Verify Ubuntu $PROFILE profile"
 rldyour::ubuntu_verify::tool_host_provenance
+rldyour::ubuntu_verify::herdr_provenance
 
 required_cmds=(
   git curl node bun uv python3 shellcheck shfmt clangd

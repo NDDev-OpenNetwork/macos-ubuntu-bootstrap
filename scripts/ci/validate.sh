@@ -112,9 +112,13 @@ bash "$REPO_ROOT/scripts/bootstrap.sh" --platform ubuntu --profile desktop-build
 FULL_PLAN_HOME="$(mktemp -d)"
 FULL_PLAN_LOG="$(mktemp)"
 trap 'rm -rf "$FULL_PLAN_HOME" "$FULL_PLAN_LOG"' EXIT
+# Docker-carrying compositions are deliberately absent: install_docker_packages
+# reads the host's own package set and refuses a partial Docker CE installation,
+# which is correct for apply and makes the lane's outcome depend on the runner
+# image rather than on this repository. That branch is covered by the
+# disposable systemd-container evidence lanes. Everything else runs here.
 for target in "macos --profile desktop --gui" "macos --profile desktop --no-gui" \
-  "ubuntu --profile desktop --no-gui" "ubuntu --profile desktop-builds --no-gui" \
-  "ubuntu --profile server --docker-mode rootful" \
+  "ubuntu --profile desktop --no-gui" \
   "ubuntu --profile server --docker-mode none"; do
   # A plan reports through rldyour::log, which writes to stdout, so discarding
   # stdout would discard the reason a lane failed. Capture it and print it.

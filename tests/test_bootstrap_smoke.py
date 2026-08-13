@@ -68,11 +68,14 @@ def test_ubuntu_profile_is_explicit() -> None:
 
 
 @pytest.mark.parametrize(
-    "profile,gui",
-    [("server", []), ("desktop", ["--no-gui"]), ("desktop-builds", ["--no-gui"])],
+    "extra",
+    [
+        ["--profile", "desktop", "--no-gui"],
+        ["--profile", "server", "--docker-mode", "none"],
+    ],
 )
 def test_plan_creates_nothing_in_the_home_it_describes(
-    tmp_path: Path, profile: str, gui: list[str]
+    tmp_path: Path, extra: list[str]
 ) -> None:
     """`--plan` is documented as read-only; prove it against a throwaway HOME.
 
@@ -80,12 +83,15 @@ def test_plan_creates_nothing_in_the_home_it_describes(
     ~/.bun/install/global and ~/.cache/uv because the "is this pin already
     installed?" probes are package-manager commands that initialize their own
     store before they can answer.
+
+    Docker-carrying compositions are excluded: install_docker_packages refuses a
+    partial Docker CE package set, so their outcome depends on the host image
+    rather than on plan behaviour.
     """
     home = tmp_path / "home"
     home.mkdir()
     result = subprocess.run(
-        ["bash", "scripts/bootstrap.sh", "--platform", "ubuntu",
-         "--profile", profile, *gui, "--plan"],
+        ["bash", "scripts/bootstrap.sh", "--platform", "ubuntu", *extra, "--plan"],
         cwd=ROOT,
         capture_output=True,
         text=True,

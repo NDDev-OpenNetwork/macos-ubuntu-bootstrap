@@ -96,6 +96,7 @@ rldyour::ubuntu_server_verify::base() {
   rldyour::ubuntu_server_verify::package ca-certificates
   rldyour::ubuntu_server_verify::package curl
   rldyour::ubuntu_server_verify::package gnupg
+  rldyour::ubuntu_server_verify::package iproute2
   rldyour::ubuntu_server_verify::package openssh-server
   rldyour::ubuntu_server_verify::package unattended-upgrades
   rldyour::ubuntu_server_verify::check "unattended security updates enabled" rldyour::ubuntu_server_verify::unattended_upgrades_enabled

@@ -323,7 +323,7 @@ EOF
 rldyour::ubuntu_server::install_baseline() {
   rldyour::section "Ubuntu server baseline"
   rldyour::ubuntu_server::apt_update
-  rldyour::ubuntu_server::apt_install ca-certificates curl gnupg openssh-server unattended-upgrades
+  rldyour::ubuntu_server::apt_install ca-certificates curl gnupg iproute2 openssh-server unattended-upgrades
   rldyour::ubuntu_server::configure_unattended_upgrades
 
   if command -v systemctl >/dev/null 2>&1; then

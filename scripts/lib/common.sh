@@ -246,10 +246,8 @@ rldyour::ensure_path() {
     "$HOME/.bun/bin"
     "$HOME/go/bin"
     "$HOME/.rldyour/bin"
-    "$HOME/.mimocode/bin"
-    # nddev-codex-app installs its standalone CLI under its own target and
-    # publishes no link into the managed prefix, so the harness target's bin
-    # directory is the only place `codex` can be resolved from.
+    # The Codex CLI installs into its own target and publishes no link into
+    # the managed prefix, so this is the only place `codex` resolves from.
     "${RLDYOUR_CODEX_HOME:-$HOME/.codex}/bin"
     # Apple Silicon Homebrew. ensure_homebrew installs brew into /opt/homebrew
     # but the Homebrew installer only edits the login shell profile, never the

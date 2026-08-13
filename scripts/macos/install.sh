@@ -123,7 +123,7 @@ install_source_packages() {
     ensure_formula "$formula"
   done
   # `dart-sdk` backs the Dart analysis server and the `dart mcp-server` transport
-  # (ADR 0006). Homebrew cannot pin an exact patch, so unlike Ubuntu there is no
+  # (ADR 0005). Homebrew cannot pin an exact patch, so unlike Ubuntu there is no
   # receipt here — but the telemetry opt-out is identical on both platforms and
   # shares one helper.
   if [ "$RLDYOUR_DRY_RUN" -eq 1 ]; then

@@ -4,7 +4,7 @@ They back gopls, rust-analyzer, and the Dart analysis server over the estate's
 sources. Server project builds still belong in Docker; host toolchains are
 installed only to make source analysis and local verification available.
 
-Dart carries a second obligation (ADR 0006): the same archive provides the
+Dart carries a second obligation (ADR 0005): the same archive provides the
 `dart mcp-server` transport that the rldyour-mcps `dart-flutter` server executes,
 so the host is what makes a declared MCP server startable at all.
 """
@@ -167,7 +167,7 @@ def test_dart_verifiers_reject_wrong_versions() -> None:
 
 
 def test_dart_host_serves_both_the_analysis_server_and_the_mcp_transport() -> None:
-    """ADR 0006. The reason Dart is admitted is that one archive backs source
+    """ADR 0005. The reason Dart is admitted is that one archive backs source
     analysis and the `dart-flutter` MCP server. Verification must prove the
     subcommand exists, not just that a `dart` binary resolves — an SDK that
     resolves but cannot serve MCP is the exact defect this replaced."""

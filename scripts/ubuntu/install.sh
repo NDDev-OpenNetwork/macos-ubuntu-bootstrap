@@ -55,7 +55,7 @@ RUST_VERSION="1.97.1"
 RUST_CHANNEL_DATE="2026-07-16"
 RUST_SHA256_X86_64="88f28fa9af20594179f85d6df67078dfd6fa93e2f6da5e1e9b0ac4997988ca4f"
 RUST_SHA256_AARCH64="9a7a2c336b4787f1b72f6bab7c35d5b7af2fd03cbd39b4fc721466a70d402a7d"
-# Dart is the third desktop language-server host (ADR 0006), on the same footing
+# Dart is the third desktop language-server host (ADR 0005), on the same footing
 # as Go and Rust. One self-contained SDK archive carries `dart language-server`
 # (the analysis server) and `dart mcp-server` (the Dart/Flutter MCP transport the
 # rldyour-mcps marketplace declares), so a single tracked hash covers both. The
@@ -1244,7 +1244,7 @@ ensure_rust() {
   }
 }
 
-# Dart SDK host (ADR 0006). The stable channel publishes one self-contained zip
+# Dart SDK host (ADR 0005). The stable channel publishes one self-contained zip
 # per architecture whose only top-level entry is `dart-sdk/`, so the wrapper is
 # stripped exactly the way ensure_rust strips its own. `dart` is the single
 # published link: `dart language-server` backs Dart/Flutter source analysis and

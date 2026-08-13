@@ -105,8 +105,14 @@ ensure_homebrew() {
 
 ensure_formula() {
   local formula="$1"
-  if [ "$RLDYOUR_DRY_RUN" -eq 1 ] && ! command -v brew >/dev/null 2>&1; then
-    rldyour::log "info" "[DRY-RUN] brew install ${formula}"
+  # A plan states the formula it will converge on; it does not ask Homebrew.
+  # The guard used to fire only when brew was ABSENT, so on the machine this
+  # installer actually targets -- where brew is always present -- a plan ran
+  # `brew list` once per formula. That is an execution during a dry run, and
+  # Homebrew materializes ~/Library/Caches/Homebrew/bootsnap on the first call,
+  # so the plan wrote to the home directory it was only describing.
+  if [ "$RLDYOUR_DRY_RUN" -eq 1 ]; then
+    rldyour::log "info" "[DRY-RUN] ensure Homebrew formula: ${formula}"
     return 0
   fi
   if brew list --formula "$formula" >/dev/null 2>&1; then
@@ -295,8 +301,9 @@ verify_existing_cask_app() {
 ensure_cask() {
   local cask="$1"
   local app_path=""
-  if [ "$RLDYOUR_DRY_RUN" -eq 1 ] && ! command -v brew >/dev/null 2>&1; then
-    rldyour::log "info" "[DRY-RUN] brew install --cask ${cask}"
+  # Same contract as ensure_formula: no Homebrew invocation during a plan.
+  if [ "$RLDYOUR_DRY_RUN" -eq 1 ]; then
+    rldyour::log "info" "[DRY-RUN] ensure Homebrew cask: ${cask}"
     return 0
   fi
   if brew list --cask "$cask" >/dev/null 2>&1; then

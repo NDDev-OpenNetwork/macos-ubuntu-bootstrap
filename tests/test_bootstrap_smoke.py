@@ -102,3 +102,40 @@ def test_plan_creates_nothing_in_the_home_it_describes(
     assert result.returncode == 0, (result.stdout + result.stderr)[-3000:]
     created = sorted(str(path.relative_to(home)) for path in home.rglob("*"))
     assert created == [], f"plan mutated the home directory: {created}"
+
+
+def test_macos_plan_never_invokes_homebrew(tmp_path: Path) -> None:
+    """A plan states what it will converge on; it does not ask the package manager.
+
+    The dry-run guard used to fire only when brew was absent, so on the machine
+    this installer targets -- where brew is always present -- a plan ran
+    `brew list` once per formula and per cask. Homebrew materializes
+    ~/Library/Caches/Homebrew/bootsnap on its first call, so the plan wrote to
+    the home directory it was only describing. Proven on a macOS runner by the
+    read-only plan lane in scripts/ci/validate.sh.
+    """
+    home = tmp_path / "home"
+    home.mkdir()
+    fake_bin = tmp_path / "bin"
+    fake_bin.mkdir()
+    calls = tmp_path / "brew-calls"
+    brew = fake_bin / "brew"
+    brew.write_text(
+        f'#!/bin/sh\nprintf "%s\\n" "$*" >>"{calls}"\nexit 0\n', encoding="utf-8"
+    )
+    brew.chmod(0o755)
+
+    result = subprocess.run(
+        ["bash", "scripts/bootstrap.sh", "--platform", "macos",
+         "--profile", "desktop", "--gui", "--plan"],
+        cwd=ROOT,
+        capture_output=True,
+        text=True,
+        check=False,
+        env={**os.environ, "HOME": str(home), "PATH": f"{fake_bin}:{os.environ['PATH']}"},
+    )
+    assert result.returncode == 0, (result.stdout + result.stderr)[-3000:]
+    invocations = calls.read_text(encoding="utf-8").splitlines() if calls.exists() else []
+    assert invocations == [], f"the plan invoked Homebrew: {invocations[:5]}"
+    created = sorted(str(path.relative_to(home)) for path in home.rglob("*"))
+    assert created == [], f"plan mutated the home directory: {created}"

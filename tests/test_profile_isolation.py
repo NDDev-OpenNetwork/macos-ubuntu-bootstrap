@@ -273,6 +273,13 @@ def test_install_sh_has_bash_source_guard() -> None:
     )
 
 
+def test_server_none_still_runs_the_server_baseline() -> None:
+    source = INSTALL.read_text(encoding="utf-8")
+    server_layer = source.split("run_server_layer() {", 1)[1].split("\n}\n", 1)[0]
+    assert 'if [ "$PROFILE" = "desktop" ]; then' in server_layer
+    assert 'if [ "$DOCKER_MODE" = "none" ]; then' not in server_layer
+
+
 def test_macos_install_sh_has_bash_source_guard() -> None:
     """macOS install.sh must also guard its main flow so it is safe to source."""
     macos_install = (ROOT / "scripts/macos/install.sh").read_text(encoding="utf-8")
@@ -281,14 +288,13 @@ def test_macos_install_sh_has_bash_source_guard() -> None:
     )
 
 
-def test_run_server_layer_guards_on_docker_mode() -> None:
-    """run_server_layer must early-return when DOCKER_MODE is none."""
+def test_run_server_layer_skips_only_plain_desktop() -> None:
+    """Server baseline still runs when its explicit Docker mode is none."""
     source = INSTALL.read_text(encoding="utf-8")
     start = source.index("run_server_layer()")
     body = source[start : start + 500]
-    assert '"$DOCKER_MODE" = "none"' in body, (
-        "run_server_layer missing DOCKER_MODE=none guard"
-    )
+    assert '"$PROFILE" = "desktop"' in body
+    assert '"$DOCKER_MODE" = "none"' not in body
 
 
 def test_install_gui_apps_guards_on_server_profile() -> None:

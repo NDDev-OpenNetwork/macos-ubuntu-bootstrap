@@ -1587,7 +1587,7 @@ run_server_layer() {
   local resolved_user=""
   # No Docker work for the plain desktop profile. Server and desktop-builds
   # both reach this function; desktop-builds installs Docker-only via --skip-baseline.
-  if [ "$DOCKER_MODE" = "none" ]; then
+  if [ "$PROFILE" = "desktop" ]; then
     return 0
   fi
   if [ "$SKIP_SYSTEM" -eq 1 ]; then

@@ -578,15 +578,8 @@ EOF
   tmp_key=$(mktemp)
 
   curl --proto '=https' --tlsv1.2 -fsSL https://download.docker.com/linux/ubuntu/gpg -o "$tmp_key"
-  if ! primary_fingerprint=$(gpg --batch --show-keys --with-colons "$tmp_key" |
-    awk -F: '
-      $1 == "pub" { primary_count++; awaiting_primary_fpr=1; next }
-      $1 == "fpr" && awaiting_primary_fpr { primary_fpr=toupper($10); awaiting_primary_fpr=0 }
-      END {
-        if (primary_count != 1 || primary_fpr == "") exit 1
-        print primary_fpr
-      }
-    ') || [ "$primary_fingerprint" != "$expected_fingerprint" ]; then
+  if ! primary_fingerprint=$(rldyour::gpg_primary_fingerprint "$tmp_key") ||
+    [ "$primary_fingerprint" != "$expected_fingerprint" ]; then
     rldyour::log "error" "Docker apt key fingerprint verification failed"
     return 1
   fi

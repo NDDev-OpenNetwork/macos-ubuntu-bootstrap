@@ -316,16 +316,7 @@ nddev::_install_desktop_deb() {
 # one primary key, exact fingerprint, no trust-on-first-use.
 nddev::_chrome_keyring_verifies() {
   local keyring=$1 primary
-  [ -f "$keyring" ] || return 1
-  primary="$(gpg --batch --show-keys --with-colons "$keyring" 2>/dev/null |
-    awk -F: '
-      $1 == "pub" { primary_count++; awaiting=1; next }
-      $1 == "fpr" && awaiting { fpr = toupper($10); awaiting = 0 }
-      END {
-        if (primary_count != 1 || fpr == "") exit 1
-        print fpr
-      }
-    ')" || return 1
+  primary="$(rldyour::gpg_primary_fingerprint "$keyring")" || return 1
   [ "$primary" = "$CHROME_KEY_FINGERPRINT" ]
 }
 

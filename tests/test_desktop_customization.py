@@ -12,6 +12,7 @@ import pytest
 ROOT = Path(__file__).resolve().parents[1]
 DESKTOP = ROOT / "scripts/ubuntu/desktop.sh"
 INSTALL = ROOT / "scripts/ubuntu/install.sh"
+VERIFY = ROOT / "scripts/ubuntu/verify.sh"
 
 # Preconditions desktop.sh checks before it does anything. Each stub is the
 # smallest program that satisfies the check without touching the real system.
@@ -214,6 +215,45 @@ def test_chrome_and_rustdesk_are_required() -> None:
     assert "OPTIONAL_STEPS=(gnome_dock russian_layout)" in source
 
 
+def _generated_keyring(directory: Path, name: str = "Not Google") -> Path:
+    """Create a throwaway armoured keyring holding exactly one primary key."""
+    directory.mkdir(parents=True, exist_ok=True)
+    gnupg = directory / "gnupg"
+    gnupg.mkdir(mode=0o700, exist_ok=True)
+    batch = directory / "batch"
+    batch.write_text(
+        "%no-protection\nKey-Type: eddsa\nKey-Curve: ed25519\n"
+        f"Name-Real: {name}\nName-Email: nobody@example.invalid\n%commit\n",
+        encoding="utf-8",
+    )
+    generated = subprocess.run(
+        ["gpg", "--batch", "--homedir", str(gnupg), "--gen-key", str(batch)],
+        capture_output=True, text=True, check=False,
+    )
+    if generated.returncode != 0:
+        pytest.skip(f"gpg could not generate a test key: {generated.stderr[:200]}")
+    exported = subprocess.run(
+        ["gpg", "--batch", "--homedir", str(gnupg), "--armor", "--export"],
+        capture_output=True, check=False,
+    )
+    keyring = directory / "keyring.asc"
+    keyring.write_bytes(exported.stdout)
+    return keyring
+
+
+def _run_chrome_gate(keyring: Path) -> subprocess.CompletedProcess[str]:
+    """Run the installer's Chrome key gate exactly as desktop.sh composes it."""
+    gate = _extract("nddev::_chrome_keyring_verifies", DESKTOP)
+    return subprocess.run(
+        ["bash", "-c",
+         'set -euo pipefail\n'
+         f'source "{ROOT}/scripts/lib/common.sh"\n'
+         f'CHROME_KEY_FINGERPRINT="{CHROME_FINGERPRINT}"\n{gate}\n'
+         'nddev::_chrome_keyring_verifies "$1"', "_", str(keyring)],
+        capture_output=True, text=True, check=False,
+    )
+
+
 def _extract(function: str, path: Path) -> str:
     lines = path.read_text(encoding="utf-8").splitlines(keepends=True)
     out, inside = [], False
@@ -251,25 +291,92 @@ def test_chrome_key_gate_rejects_a_foreign_key(tmp_path: Path) -> None:
     )
     foreign.write_bytes(exported.stdout)
 
-    gate = _extract("nddev::_chrome_keyring_verifies", DESKTOP)
-    result = subprocess.run(
-        ["bash", "-c",
-         f'CHROME_KEY_FINGERPRINT="{CHROME_FINGERPRINT}"\n{gate}\n'
-         f'nddev::_chrome_keyring_verifies "$1"', "_", str(foreign)],
-        capture_output=True, text=True, check=False,
-    )
+    result = _run_chrome_gate(foreign)
     assert result.returncode != 0, "a foreign signing key was accepted"
 
 
 def test_chrome_key_gate_rejects_a_missing_keyring(tmp_path: Path) -> None:
-    gate = _extract("nddev::_chrome_keyring_verifies", DESKTOP)
-    result = subprocess.run(
+    assert _run_chrome_gate(tmp_path / "absent.asc").returncode != 0
+
+
+def test_chrome_installer_and_verifier_share_one_identity_primitive() -> None:
+    """Four call sites used to carry four copies of the same awk program.
+
+    One of those copies -- the Ubuntu verifier's -- was written inside a
+    double-quoted command substitution, so its escaped quotes reached awk
+    verbatim, awk exited 2, and under `set -o pipefail` strict Ubuntu GUI
+    verification aborted on every device in every state. The duplication is the
+    defect; a single primitive is the fix.
+    """
+    library = (ROOT / "scripts/lib/common.sh").read_text(encoding="utf-8")
+    assert "rldyour::gpg_primary_fingerprint()" in library
+    for relative in (
+        "scripts/ubuntu/desktop.sh",
+        "scripts/ubuntu/verify.sh",
+        "scripts/ubuntu/server.sh",
+        "scripts/ubuntu/verify-server.sh",
+    ):
+        source = (ROOT / relative).read_text(encoding="utf-8")
+        assert "rldyour::gpg_primary_fingerprint" in source, relative
+        assert "--show-keys --with-colons" not in source, (
+            f"{relative} still carries its own copy of the key-identity program"
+        )
+
+
+def test_verifier_chrome_gate_accepts_only_the_contract_fingerprint(tmp_path: Path) -> None:
+    """Execute the verifier's gate; do not assert on its source text.
+
+    The gate this replaces was unexecutable, and the only test that touched it
+    asserted on a neighbouring line, so nothing observed the failure.
+    """
+    keyring = _generated_keyring(tmp_path)
+    observed = subprocess.run(
         ["bash", "-c",
-         f'CHROME_KEY_FINGERPRINT="{CHROME_FINGERPRINT}"\n{gate}\n'
-         f'nddev::_chrome_keyring_verifies "$1"', "_", str(tmp_path / "absent.asc")],
+         'set -euo pipefail\n'
+         f'source "{ROOT}/scripts/lib/common.sh"\n'
+         'rldyour::gpg_primary_fingerprint "$1"', "_", str(keyring)],
         capture_output=True, text=True, check=False,
     )
-    assert result.returncode != 0
+    assert observed.returncode == 0, observed.stderr
+    fingerprint = observed.stdout.strip()
+    assert re.fullmatch(r"[0-9A-F]{40}", fingerprint), fingerprint
+
+    gate = _extract("rldyour::ubuntu_verify::chrome_key_trusted", VERIFY)
+    def run(expected: str) -> int:
+        return subprocess.run(
+            ["bash", "-c",
+             'set -euo pipefail\n'
+             f'source "{ROOT}/scripts/lib/common.sh"\n'
+             f'{gate}\n'
+             'rldyour::ubuntu_verify::chrome_key_trusted "$1" "$2"',
+             "_", str(keyring), expected],
+            capture_output=True, text=True, check=False,
+        ).returncode
+
+    assert run(fingerprint) == 0, "the verifier rejected its own keyring"
+    assert run(CHROME_FINGERPRINT) != 0, "the verifier accepted a foreign fingerprint"
+
+
+def test_verifier_chrome_gate_rejects_a_keyring_with_a_second_primary_key(
+    tmp_path: Path,
+) -> None:
+    """A keyring that also carries an unrelated primary key is not the vendor.
+
+    The previous check counted matching fingerprint lines, so a keyring holding
+    Google's key alongside an attacker's satisfied it.
+    """
+    first = _generated_keyring(tmp_path / "a", name="First Key")
+    second = _generated_keyring(tmp_path / "b", name="Second Key")
+    combined = tmp_path / "combined.asc"
+    combined.write_bytes(first.read_bytes() + second.read_bytes())
+    result = subprocess.run(
+        ["bash", "-c",
+         'set -euo pipefail\n'
+         f'source "{ROOT}/scripts/lib/common.sh"\n'
+         'rldyour::gpg_primary_fingerprint "$1"', "_", str(combined)],
+        capture_output=True, text=True, check=False,
+    )
+    assert result.returncode != 0, "a two-primary-key keyring was treated as one identity"
 
 
 def test_verifier_survives_a_device_without_any_chrome_source() -> None:

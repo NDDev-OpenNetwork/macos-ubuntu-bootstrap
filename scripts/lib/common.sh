@@ -34,6 +34,36 @@ rldyour::sha256_file() {
   fi
 }
 
+# Print the single primary-key fingerprint of a keyring, uppercased.
+#
+# This is the one implementation of vendor-key identity in the repository. The
+# same awk program used to be copied into the Chrome installer, the Chrome
+# verifier, the Docker installer, and the Docker verifier; the verifier copy was
+# written inside a double-quoted command substitution, so its escaped quotes
+# reached awk verbatim and the program never parsed. Under `set -o pipefail`
+# that aborted strict Ubuntu GUI verification on every device, in every state.
+#
+# Fails closed when the keyring is missing, is not a regular file, cannot be
+# parsed, or holds anything other than exactly one primary key. A keyring
+# carrying a second primary key is not the vendor identity the caller asked
+# about, even when one of its fingerprints happens to match.
+rldyour::gpg_primary_fingerprint() {
+  local keyring=${1:?keyring path is required}
+  [ -f "$keyring" ] && [ ! -L "$keyring" ] || return 1
+  gpg --batch --show-keys --with-colons "$keyring" 2>/dev/null |
+    awk -F: '
+      $1 == "pub" { primary_count++; awaiting_primary_fpr = 1; next }
+      $1 == "fpr" && awaiting_primary_fpr {
+        primary_fpr = toupper($10)
+        awaiting_primary_fpr = 0
+      }
+      END {
+        if (primary_count != 1 || primary_fpr == "") exit 1
+        print primary_fpr
+      }
+    '
+}
+
 # True when the current x86-64 CPU advertises AVX2. The standard Bun x64 build
 # requires AVX2; older CPUs must use the bun-linux-x64-baseline artifact or they
 # fail with SIGILL. Non-x86 architectures are not gated by this check.

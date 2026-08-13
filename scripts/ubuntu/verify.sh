@@ -79,6 +79,15 @@ rldyour::ubuntu_verify::runtime_receipt() {
   done
 }
 
+# The installed Chrome keyring must carry exactly one primary key, and it must
+# be the fingerprint the contract declares. Named rather than inlined so a test
+# can execute it against real keyrings instead of asserting on its source text.
+rldyour::ubuntu_verify::chrome_key_trusted() {
+  local keyring=$1 expected=$2 observed
+  observed="$(rldyour::gpg_primary_fingerprint "$keyring")" || return 1
+  [ "$observed" = "$expected" ]
+}
+
 rldyour::ubuntu_verify::managed_link() {
   local name=$1 expected=$2
   local path="$HOME/.local/bin/$name"
@@ -286,9 +295,11 @@ if [ "$PROFILE" != "server" ]; then
     command -v rustdesk >/dev/null 2>&1 || { rldyour::log "missing" "RustDesk"; exit 1; }
     chrome_source="$(grep -RslE 'dl.google.com/linux/chrome(/|-stable/)deb' /etc/apt/sources.list /etc/apt/sources.list.d 2>/dev/null || true)"
     [ -n "$chrome_source" ] || { rldyour::log "missing" "Google Chrome apt source"; exit 1; }
-    chrome_fingerprints="$(gpg --show-keys --with-colons /etc/apt/keyrings/rldyour-google-chrome.asc 2>/dev/null | awk -F: '$1 == \"fpr\" { print $10 }')"
-    [ "$(printf '%s\n' "$chrome_fingerprints" | grep -Fxc 'EB4C1BFD4F042F6DDDCCEC917721F63BD38B4796')" -eq 1 ] || {
-      rldyour::log "missing" "verified Google Chrome signing key"; exit 1;
+    rldyour::ubuntu_verify::chrome_key_trusted \
+      /etc/apt/keyrings/rldyour-google-chrome.asc \
+      EB4C1BFD4F042F6DDDCCEC917721F63BD38B4796 || {
+      rldyour::log "missing" "verified Google Chrome signing key"
+      exit 1
     }
     if command -v firefox >/dev/null 2>&1 || { command -v snap >/dev/null 2>&1 && snap list firefox >/dev/null 2>&1; }; then
       rldyour::log "missing" "Firefox must be absent from the Ubuntu GUI profile"

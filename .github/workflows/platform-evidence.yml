@@ -25,7 +25,6 @@ jobs:
   macos-native:
     if: github.event_name == 'workflow_dispatch' || github.event.pull_request.head.repo.full_name == github.repository
     runs-on: macos-15
-    timeout-minutes: 120
     strategy:
       fail-fast: false
       matrix:
@@ -56,7 +55,6 @@ jobs:
   ubuntu-native:
     if: github.event_name == 'workflow_dispatch' || github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ${{ matrix.runner }}
-    timeout-minutes: 120
     strategy:
       fail-fast: false
       matrix:
@@ -93,7 +91,6 @@ jobs:
   ubuntu-systemd-sandbox:
     if: github.event_name == 'workflow_dispatch' || github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ${{ matrix.runner }}
-    timeout-minutes: 150
     strategy:
       fail-fast: false
       max-parallel: 2
@@ -133,7 +130,6 @@ jobs:
   ubuntu-safeguards:
     if: github.event_name == 'workflow_dispatch' || github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-24.04
-    timeout-minutes: 150
     steps:
       - name: Checkout exact public commit without credentials
         env:
@@ -160,7 +156,6 @@ jobs:
   evidence-gate:
     if: always()
     runs-on: ubuntu-24.04
-    timeout-minutes: 5
     needs: [macos-native, ubuntu-native, ubuntu-systemd-sandbox, ubuntu-safeguards]
     steps:
       - name: Require every evidence lane

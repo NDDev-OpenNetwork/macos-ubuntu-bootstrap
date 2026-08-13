@@ -7,6 +7,8 @@ REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 LANE="${1:?usage: platform-evidence.sh LANE OUTPUT_DIR}"
 OUTPUT_DIR="${2:?usage: platform-evidence.sh LANE OUTPUT_DIR}"
 EVIDENCE_SHA="${EVIDENCE_SHA:?EVIDENCE_SHA is required}"
+EVIDENCE_STARTED_EPOCH="$(date +%s)"
+CONTAINER_NAME=""
 
 mkdir -p "$OUTPUT_DIR"
 LOG="$OUTPUT_DIR/run.log"
@@ -36,6 +38,34 @@ Path(os.environ["EVIDENCE_OUTPUT"]).write_text(
     json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8"
 )
 PY
+}
+
+finalize_evidence() {
+  local rc=$?
+  if [ -n "$CONTAINER_NAME" ]; then
+    docker rm --force "$CONTAINER_NAME" >/dev/null 2>&1 || true
+  fi
+  EVIDENCE_RC="$rc" EVIDENCE_FINISHED_EPOCH="$(date +%s)" \
+    EVIDENCE_STARTED_EPOCH="$EVIDENCE_STARTED_EPOCH" \
+    EVIDENCE_OUTPUT="$OUTPUT_DIR/evidence.json" python3 - <<'PY'
+import json
+import os
+from pathlib import Path
+
+path = Path(os.environ["EVIDENCE_OUTPUT"])
+payload = json.loads(path.read_text(encoding="utf-8")) if path.exists() else {}
+started = int(os.environ["EVIDENCE_STARTED_EPOCH"])
+finished = int(os.environ["EVIDENCE_FINISHED_EPOCH"])
+payload.update({
+    "duration_seconds": finished - started,
+    "finished_epoch": finished,
+    "result": "success" if int(os.environ["EVIDENCE_RC"]) == 0 else "failure",
+    "started_epoch": started,
+})
+path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+PY
+  echo "evidence lane=$LANE result=$([ "$rc" -eq 0 ] && echo success || echo failure) duration_seconds=$(($(date +%s) - EVIDENCE_STARTED_EPOCH))"
+  exit "$rc"
 }
 
 assert_exact_source() {
@@ -135,7 +165,6 @@ DOCKERFILE
     --volume /sys/fs/cgroup:/sys/fs/cgroup:rw \
     --volume "$REPO_ROOT:/repo:ro" \
     "$image"
-  trap 'docker rm --force "$CONTAINER_NAME" >/dev/null 2>&1 || true' EXIT
   local ready=0
   for _ in {1..30}; do
     if docker exec "$CONTAINER_NAME" systemctl is-system-running --quiet 2>/dev/null; then
@@ -174,6 +203,7 @@ run_sandbox_hardening() {
 
 assert_exact_source
 record_metadata
+trap finalize_evidence EXIT
 
 case "$LANE" in
   macos-gui) run_native_macos --gui ;;

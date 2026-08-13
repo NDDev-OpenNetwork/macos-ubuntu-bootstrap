@@ -21,18 +21,34 @@ import os
 import platform
 from pathlib import Path
 
+lane = os.environ["EVIDENCE_LANE"]
+evidence_type = "native_host"
+unproven = ["reboot_persistence"]
+if lane.startswith("sandbox-"):
+    evidence_type = "disposable_systemd_container"
+    unproven = ["reboot_persistence", "vm_or_bare_metal_boundary"]
+if lane == "sandbox-server-hardening":
+    unproven += ["second_session_ssh", "external_firewall_connectivity"]
+if lane == "ubuntu-arm-gui-refusal":
+    evidence_type = "native_host_expected_fail_closed"
+    unproven = []
+if lane == "macos-gui":
+    unproven += ["interactive_gui_launch", "authenticated_app_login"]
+
 payload = {
     "schema_version": 1,
     "repository": os.environ.get("GITHUB_REPOSITORY", "local"),
     "run_id": os.environ.get("GITHUB_RUN_ID", "local"),
     "run_attempt": os.environ.get("GITHUB_RUN_ATTEMPT", "local"),
     "job": os.environ.get("GITHUB_JOB", "local"),
-    "lane": os.environ["EVIDENCE_LANE"],
+    "evidence_type": evidence_type,
+    "lane": lane,
     "sha": os.environ["EVIDENCE_SHA"],
     "runner_name": os.environ.get("RUNNER_NAME", "local"),
     "runner_os": os.environ.get("RUNNER_OS", platform.system()),
     "runner_arch": os.environ.get("RUNNER_ARCH", platform.machine()),
     "uname": platform.uname()._asdict(),
+    "unproven": unproven,
 }
 Path(os.environ["EVIDENCE_OUTPUT"]).write_text(
     json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8"

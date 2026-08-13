@@ -7,6 +7,8 @@ remains available in immutable Git tags.
 
 ### Fixed
 
+- Published terminal plugins from verified pinned Git commit trees instead of
+  exposing mutable checkout metadata to the executable Antidote source layer.
 - Made Ubuntu server verification and device receipts prove the complete
   contract 3.0.1 source-tool set.
 - Restricted Ubuntu GUI apply to amd64 because required vendor applications do

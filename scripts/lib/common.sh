@@ -619,88 +619,334 @@ PY
   rldyour::log "ok" "fresh zsh login environment resolves all managed AI commands"
 }
 
-# Clone (or re-point) a git repository to an EXACT pinned commit at a managed
-# path. Idempotent: an already-pinned clean checkout is a no-op and never
-# re-clones; a non-git path at the destination is fail-closed and preserved.
-rldyour::_ensure_pinned_git_checkout() {
-  local url=$1 sha=$2 dir=$3 head origin
-  if [ -e "$dir" ] || [ -L "$dir" ]; then
-    if [ -L "$dir" ] || [ ! -d "$dir/.git" ]; then
-      rldyour::log "error" "unmanaged non-git path at pinned clone dir; preserved: ${dir}"
+# Keep Git's mutable service metadata out of executable terminal-plugin trees.
+# The object store is bare by construction (there is no worktree for fsmonitor to
+# watch), while `_publish_pinned_git_payload` below materializes only blob entries
+# from the reviewed commit tree.  Runtime consumers therefore never traverse a
+# `.git` directory, lock file, socket, hook, or other VCS implementation detail.
+rldyour::_ensure_pinned_git_object_store() {
+  local url=$1 sha=$2 store=$3 origin bare
+  if [ -e "$store" ] || [ -L "$store" ]; then
+    if [ -L "$store" ] || [ ! -d "$store" ]; then
+      rldyour::log "error" "unmanaged path at pinned Git object store; preserved: ${store}"
       return 1
     fi
-    # A managed checkout must point at the canonical remote: a repo sitting at
-    # the right commit but a different origin is not trusted.
-    origin="$(git -C "$dir" remote get-url origin 2>/dev/null || true)"
-    if [ "$origin" != "$url" ]; then
-      rldyour::log "error" "pinned clone dir has unexpected origin (${origin:-none} != ${url}); preserved: ${dir}"
+    bare="$(git --git-dir="$store" rev-parse --is-bare-repository 2>/dev/null || true)"
+    # Read the stored canonical value, not `remote get-url`: the latter applies
+    # the owner's url.*.insteadOf transport rewrite and can make an exact HTTPS
+    # origin look like SSH without changing repository identity.
+    origin="$(git --git-dir="$store" config --get remote.origin.url 2>/dev/null || true)"
+    if [ "$bare" != true ] || [ "$origin" != "$url" ]; then
+      rldyour::log "error" "pinned Git object store has unexpected identity; preserved: ${store}"
       return 1
     fi
-    head="$(git -C "$dir" rev-parse HEAD 2>/dev/null || true)"
-    # Fast path ONLY when the commit matches AND the working tree is pristine.
-    # These bytes are later compiled into the executable plugin bundle, so a
-    # modified tracked file or an untracked drop-in must not be trusted just
-    # because HEAD happens to match the pin.
-    if [ "$head" = "$sha" ] && [ -z "$(git -C "$dir" status --porcelain 2>/dev/null)" ]; then
-      # The content is provably the pinned commit, but its modes are not proven
-      # by that: an earlier clone may have landed group-writable. Normalize on the
-      # fast path too, or a device stays broken forever because the fast path is
-      # the only one it ever takes again.
-      rldyour::_harness_checkout_permissions "$dir" || return 1
-      return 0
-    fi
-    git -C "$dir" fetch --quiet --tags origin || {
-      rldyour::log "error" "failed to fetch pinned updates for ${dir}"
+    git --git-dir="$store" fetch --quiet --tags origin || {
+      rldyour::log "error" "failed to fetch pinned Git objects for ${store}"
       return 1
     }
   else
-    mkdir -p "${dir%/*}" || return 1
-    git clone --quiet "$url" "$dir" || {
-      rldyour::log "error" "failed to clone ${url}"
+    mkdir -p "${store%/*}" || return 1
+    git -c core.fsmonitor=false clone --quiet --bare "$url" "$store" || {
+      rldyour::log "error" "failed to clone pinned Git object store from ${url}"
       return 1
     }
   fi
-  # Restore EXACTLY the pinned commit and scrub any tracked or untracked drift so
-  # the materialized bytes are precisely the reviewed commit — never a dirty or
-  # locally substituted worktree.
-  git -C "$dir" checkout --quiet --detach "$sha" || {
-    rldyour::log "error" "pinned commit ${sha} not found in ${dir}"
+  git --git-dir="$store" cat-file -e "${sha}^{commit}" 2>/dev/null || {
+    rldyour::log "error" "pinned commit ${sha} is absent from ${store}"
     return 1
   }
-  git -C "$dir" reset --quiet --hard "$sha" || {
-    rldyour::log "error" "failed to reset ${dir} to ${sha}"
+  git --git-dir="$store" fsck --strict --no-dangling "$sha" >/dev/null 2>&1 || {
+    rldyour::log "error" "pinned Git object store failed integrity verification: ${store}"
     return 1
   }
-  git -C "$dir" clean -ffdx --quiet || {
-    rldyour::log "error" "failed to scrub untracked drift in ${dir}"
+  rldyour::_managed_tree_permissions normalize "$store" || {
+    rldyour::log "error" "could not normalize pinned Git object-store permissions: ${store}"
     return 1
   }
-  rldyour::_harness_checkout_permissions "$dir" || return 1
 }
 
-# `git clone` and `git checkout` create files under the caller's umask, and this
-# tree is later compiled into an executable plugin bundle whose consumer refuses a
-# group- or world-writable source. Under `umask 002` the clone lands with 252
-# group-writable paths and nddev-codex-app's `install-builder` fails closed with
-# "nddev-builder source plugin tree must not be writable by group or others" —
-# after this function had already reported success. Because the harness layer runs
-# ahead of every other layer under `set -euo pipefail`, that turned an
-# environment-dependent mode into a total device-apply abort, the same pathology
-#
-# Normalize rather than fail: the bytes are provably the pinned commit, so
-# tightening their modes cannot change what gets installed, and refusing would
-# leave every `umask 002` host permanently unable to bootstrap.
-rldyour::_harness_checkout_permissions() {
-  local dir=$1
-  rldyour::_managed_tree_permissions normalize "$dir" || {
-    rldyour::log "error" "could not normalize permissions on the pinned checkout: ${dir}"
-    return 1
-  }
+# Publish and verify the exact tracked payload of a pinned commit.  Git tree
+# entries are the allow-list: missing, additional, byte-divergent, mode-divergent,
+# or unsupported tracked entries fail closed.  The destination contains no Git
+# metadata and an already-published destination is verified rather than repaired.
+rldyour::_publish_pinned_git_payload() {
+  local store=$1 sha=$2 destination=$3 source_root
+  source_root=${4:-${store%/github.com/*}}
+  rldyour::_isolated_python python3 -I - "$store" "$sha" "$destination" "$source_root" <<'PY'
+import configparser
+import os
+import pathlib
+import re
+import shutil
+import stat
+import subprocess
+import sys
+import tempfile
+
+store, commit, raw_destination, raw_source_root = sys.argv[1:]
+destination = pathlib.Path(raw_destination)
+source_root = pathlib.Path(raw_source_root)
+uid = os.getuid()
+
+
+def git(git_store: str | pathlib.Path, *arguments: str) -> bytes:
+    completed = subprocess.run(
+        ["git", f"--git-dir={git_store}", *arguments],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        check=False,
+    )
+    if completed.returncode:
+        detail = completed.stderr.decode("utf-8", "replace").strip()
+        raise SystemExit(f"Git object read failed ({' '.join(arguments)}): {detail}")
+    return completed.stdout
+
+
+def normalize_object_store(git_store: pathlib.Path) -> None:
+    for directory, directories, files in os.walk(git_store, followlinks=False):
+        for raw_path in [pathlib.Path(directory), *(pathlib.Path(directory) / name for name in directories + files)]:
+            metadata = raw_path.lstat()
+            if metadata.st_uid != uid:
+                raise SystemExit(f"pinned Git object store has a foreign owner: {raw_path}")
+            if not (stat.S_ISREG(metadata.st_mode) or stat.S_ISDIR(metadata.st_mode)):
+                raise SystemExit(f"pinned Git object store contains an unsupported file type: {raw_path}")
+            permissions = stat.S_IMODE(metadata.st_mode)
+            if permissions & 0o022:
+                raw_path.chmod(permissions & ~0o022)
+
+
+def ensure_submodule_store(url: str, pinned_commit: str) -> pathlib.Path:
+    match = re.fullmatch(r"https://github\.com/([A-Za-z0-9_.-]+)/([A-Za-z0-9_.-]+?)(?:\.git)?", url)
+    if not match:
+        raise SystemExit(f"tracked submodule uses an unsupported origin: {url}")
+    owner, repository = match.groups()
+    canonical_url = f"https://github.com/{owner}/{repository}"
+    child_store = source_root / "github.com" / owner / f"{repository}.git"
+    if child_store.exists() or child_store.is_symlink():
+        if child_store.is_symlink() or not child_store.is_dir():
+            raise SystemExit(f"unmanaged path at pinned submodule object store: {child_store}")
+        bare = git(child_store, "rev-parse", "--is-bare-repository").decode().strip()
+        # Compare stored identity; `remote get-url` applies user-global
+        # url.*.insteadOf transport rewrites and is not an identity primitive.
+        origin = git(child_store, "config", "--get", "remote.origin.url").decode().strip()
+        if bare != "true" or origin.removesuffix(".git") != canonical_url:
+            raise SystemExit(f"pinned submodule object store has unexpected identity: {child_store}")
+        git(child_store, "fetch", "--quiet", "--tags", "origin")
+    else:
+        child_store.parent.mkdir(parents=True, exist_ok=True)
+        completed = subprocess.run(
+            ["git", "-c", "core.fsmonitor=false", "clone", "--quiet", "--bare", canonical_url, str(child_store)],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            check=False,
+        )
+        if completed.returncode:
+            detail = completed.stderr.decode("utf-8", "replace").strip()
+            raise SystemExit(f"failed to clone pinned submodule object store {canonical_url}: {detail}")
+    git(child_store, "cat-file", "-e", f"{pinned_commit}^{{commit}}")
+    git(child_store, "fsck", "--strict", "--no-dangling", pinned_commit)
+    normalize_object_store(child_store)
+    return child_store
+
+
+def submodule_origins(git_store: str | pathlib.Path, pinned_commit: str) -> dict[pathlib.PurePosixPath, str]:
+    try:
+        raw = git(git_store, "show", f"{pinned_commit}:.gitmodules")
+    except SystemExit:
+        return {}
+    parser = configparser.RawConfigParser(interpolation=None)
+    try:
+        parser.read_string(raw.decode("utf-8"))
+    except (UnicodeDecodeError, configparser.Error) as error:
+        raise SystemExit("tracked .gitmodules is malformed or not UTF-8") from error
+    origins: dict[pathlib.PurePosixPath, str] = {}
+    for section in parser.sections():
+        if not section.startswith('submodule "') or not section.endswith('"'):
+            raise SystemExit(f"tracked .gitmodules contains an unsupported section: {section}")
+        if not parser.has_option(section, "path") or not parser.has_option(section, "url"):
+            raise SystemExit(f"tracked .gitmodules entry is incomplete: {section}")
+        path = pathlib.PurePosixPath(parser.get(section, "path"))
+        if (
+            path.is_absolute()
+            or not path.parts
+            or any(part in {"", ".", ".."} or part.casefold() == ".git" for part in path.parts)
+        ):
+            raise SystemExit(f"tracked .gitmodules contains an unsafe path: {path}")
+        if path in origins:
+            raise SystemExit(f"tracked .gitmodules repeats a path: {path}")
+        origins[path] = parser.get(section, "url")
+    return origins
+
+
+def parse_tree(
+    git_store: str | pathlib.Path,
+    pinned_commit: str,
+    prefix: pathlib.PurePosixPath = pathlib.PurePosixPath(),
+    ancestry: tuple[tuple[str, str], ...] = (),
+) -> dict[pathlib.PurePosixPath, tuple[str, bytes]]:
+    entries: dict[pathlib.PurePosixPath, tuple[str, bytes]] = {}
+    identity = (str(pathlib.Path(git_store).resolve()), pinned_commit)
+    if identity in ancestry:
+        raise SystemExit("tracked submodule graph contains a cycle")
+    raw = git(git_store, "ls-tree", "-rz", "--full-tree", pinned_commit)
+    records: list[tuple[str, str, str, pathlib.PurePosixPath]] = []
+    for record in raw.split(b"\0"):
+        if not record:
+            continue
+        header, separator, raw_path = record.partition(b"\t")
+        if not separator:
+            raise SystemExit("pinned Git tree emitted a malformed entry")
+        try:
+            mode, kind, object_id = header.decode("ascii").split(" ")
+            path = pathlib.PurePosixPath(raw_path.decode("utf-8"))
+        except (UnicodeDecodeError, ValueError) as error:
+            raise SystemExit("pinned Git tree contains an unsupported path or header") from error
+        if (kind, mode) not in {
+            ("blob", "100644"),
+            ("blob", "100755"),
+            ("blob", "120000"),
+            ("commit", "160000"),
+        }:
+            raise SystemExit(
+                f"pinned Git tree contains unsupported tracked entry: {mode} {kind} {path}"
+            )
+        if (
+            path.is_absolute()
+            or not path.parts
+            or any(part in {"", ".", ".."} or part.casefold() == ".git" for part in path.parts)
+        ):
+            raise SystemExit(f"pinned Git tree contains an unsafe tracked path: {path}")
+        records.append((mode, kind, object_id, path))
+    origins = submodule_origins(git_store, pinned_commit) if any(mode == "160000" for mode, _, _, _ in records) else {}
+    gitlinks = {path for mode, _, _, path in records if mode == "160000"}
+    if set(origins) != gitlinks:
+        raise SystemExit("tracked gitlinks and .gitmodules paths do not match exactly")
+    for mode, _kind, object_id, path in records:
+        published_path = prefix / path
+        if mode == "160000":
+            child_store = ensure_submodule_store(origins[path], object_id)
+            child_entries = parse_tree(child_store, object_id, published_path, ancestry + (identity,))
+            overlap = set(entries) & set(child_entries)
+            if overlap:
+                raise SystemExit(f"tracked submodule payload overlaps its parent: {min(overlap)}")
+            entries.update(child_entries)
+        else:
+            if published_path in entries:
+                raise SystemExit(f"pinned Git tree contains a duplicate tracked path: {published_path}")
+            entries[published_path] = (mode, git(git_store, "cat-file", "blob", object_id))
+    if not entries:
+        raise SystemExit("pinned Git tree has no tracked payload")
+    return entries
+
+
+entries = parse_tree(store, commit)
+expected_directories = {
+    pathlib.PurePosixPath(*path.parts[:index])
+    for path in entries
+    for index in range(1, len(path.parts))
+}
+
+
+def safe_symlink_target(path: pathlib.PurePosixPath, payload: bytes) -> str:
+    try:
+        target = payload.decode("utf-8")
+    except UnicodeDecodeError as error:
+        raise SystemExit(f"tracked symlink target is not UTF-8: {path}") from error
+    if not target or "\0" in target or pathlib.PurePosixPath(target).is_absolute():
+        raise SystemExit(f"tracked symlink has an unsafe target: {path}")
+    resolved = pathlib.PurePosixPath(path.parent, target)
+    normalized: list[str] = []
+    for part in resolved.parts:
+        if part in {"", "."}:
+            continue
+        if part == "..":
+            if not normalized:
+                raise SystemExit(f"tracked symlink escapes its payload root: {path}")
+            normalized.pop()
+        else:
+            normalized.append(part)
+    normalized_target = pathlib.PurePosixPath(*normalized)
+    if normalized_target not in entries and normalized_target not in expected_directories:
+        raise SystemExit(f"tracked symlink does not resolve to tracked payload: {path}")
+    return target
+
+
+def verify(root: pathlib.Path) -> None:
+    if root.is_symlink() or not root.is_dir():
+        raise SystemExit(f"tracked payload root is not a real directory: {root}")
+    root_metadata = root.lstat()
+    if root_metadata.st_uid != uid or stat.S_IMODE(root_metadata.st_mode) != 0o755:
+        raise SystemExit(f"tracked payload root ownership or mode diverged: {root}")
+    actual_files: set[pathlib.PurePosixPath] = set()
+    actual_directories: set[pathlib.PurePosixPath] = set()
+    for directory, directories, files in os.walk(root, followlinks=False):
+        base = pathlib.Path(directory)
+        relative_base = base.relative_to(root)
+        for name in directories + files:
+            item = base / name
+            relative = pathlib.PurePosixPath(*(relative_base / name).parts)
+            metadata = item.lstat()
+            if metadata.st_uid != uid:
+                raise SystemExit(f"tracked payload has a foreign owner: {item}")
+            if stat.S_ISDIR(metadata.st_mode):
+                actual_directories.add(relative)
+                if stat.S_IMODE(metadata.st_mode) != 0o755:
+                    raise SystemExit(f"tracked payload directory mode diverged: {item}")
+            elif stat.S_ISREG(metadata.st_mode) or stat.S_ISLNK(metadata.st_mode):
+                actual_files.add(relative)
+            else:
+                raise SystemExit(f"tracked payload contains an unsupported file type: {item}")
+    if actual_directories != expected_directories:
+        raise SystemExit("tracked payload directory set is missing or contains additional paths")
+    if actual_files != set(entries):
+        raise SystemExit("tracked payload file set is missing or contains additional paths")
+    for path, (mode, payload) in entries.items():
+        item = root.joinpath(*path.parts)
+        metadata = item.lstat()
+        if mode == "120000":
+            if not stat.S_ISLNK(metadata.st_mode):
+                raise SystemExit(f"tracked symlink semantics diverged: {item}")
+            if os.readlink(item) != safe_symlink_target(path, payload):
+                raise SystemExit(f"tracked symlink target diverged: {item}")
+        else:
+            expected_mode = 0o755 if mode == "100755" else 0o644
+            if not stat.S_ISREG(metadata.st_mode) or stat.S_IMODE(metadata.st_mode) != expected_mode:
+                raise SystemExit(f"tracked file mode diverged: {item}")
+            if item.read_bytes() != payload:
+                raise SystemExit(f"tracked file bytes diverged: {item}")
+
+
+if destination.exists() or destination.is_symlink():
+    verify(destination)
+    raise SystemExit(0)
+
+destination.parent.mkdir(parents=True, exist_ok=True)
+stage = pathlib.Path(tempfile.mkdtemp(prefix=f".{destination.name}.stage.", dir=destination.parent))
+try:
+    os.chmod(stage, 0o755)
+    for directory in sorted(expected_directories, key=lambda item: (len(item.parts), item.parts)):
+        target = stage.joinpath(*directory.parts)
+        target.mkdir()
+        target.chmod(0o755)
+    for path, (mode, payload) in sorted(entries.items(), key=lambda item: item[0].parts):
+        target = stage.joinpath(*path.parts)
+        if mode == "120000":
+            target.symlink_to(safe_symlink_target(path, payload))
+        else:
+            target.write_bytes(payload)
+            target.chmod(0o755 if mode == "100755" else 0o644)
+    verify(stage)
+    os.replace(stage, destination)
+finally:
+    if stage.exists():
+        shutil.rmtree(stage)
+verify(destination)
+PY
 }
 
 # Materialize an OFFLINE antidote plugin bundle shared by macOS and Ubuntu:
-# ensure antidote is present, pre-clone every plugin at its pinned SHA into
-# antidote's clone home, then compile the static ~/.zsh_plugins.zsh that shell
+# ensure antidote is present, publish every plugin's tracked pinned payload into
+# antidote's source home, then compile the static ~/.zsh_plugins.zsh that shell
 # startup sources with zero network. Idempotent: a second run re-verifies pinned
 # SHAs and never re-clones a clean, already-pinned repo.
 rldyour::materialize_zsh_plugins() {
@@ -708,7 +954,8 @@ rldyour::materialize_zsh_plugins() {
   # getantidote/antidote pinned commit for the plain-Ubuntu clone path.
   local antidote_pin="4913257e0ae3fee2a77e7189e526fe55b6ff9536"
   local antidote_home="${XDG_CACHE_HOME:-$HOME/.cache}/antidote"
-  local antidote_zsh="" candidate line repo sha dir bundle tmp
+  local source_root="${XDG_CACHE_HOME:-$HOME/.cache}/rldyour/git-objects"
+  local antidote_zsh="" candidate line repo sha dir store bundle tmp
   local -a antidote_candidates=(
     /opt/homebrew/opt/antidote/share/antidote/antidote.zsh
     /usr/local/opt/antidote/share/antidote/antidote.zsh
@@ -719,7 +966,7 @@ rldyour::materialize_zsh_plugins() {
   rldyour::section "Materialize offline antidote plugin bundle"
 
   if [ "${RLDYOUR_DRY_RUN:-1}" -eq 1 ]; then
-    rldyour::log "info" "[DRY-RUN] ensure antidote (brew, else git clone getantidote/antidote@${antidote_pin} to \$HOME/.antidote), pre-clone every pinned plugin from ${manifest} into ${antidote_home}, then compile \$HOME/.zsh_plugins.zsh"
+    rldyour::log "info" "[DRY-RUN] ensure antidote (brew, else publish getantidote/antidote@${antidote_pin} tracked payload to \$HOME/.antidote), publish every pinned tracked plugin payload from ${manifest} into ${antidote_home}, then compile \$HOME/.zsh_plugins.zsh"
     return 0
   fi
 
@@ -737,7 +984,7 @@ rldyour::materialize_zsh_plugins() {
   }
 
   # 1. Ensure antidote.zsh is available: brew provides it on macOS/linuxbrew;
-  #    otherwise clone getantidote/antidote at the pinned SHA to $HOME/.antidote,
+  #    otherwise publish getantidote/antidote's pinned tracked payload to $HOME/.antidote,
   #    matching the path templates/terminal/zshrc already probes.
   for candidate in "${antidote_candidates[@]}"; do
     if [ -r "$candidate" ]; then
@@ -746,17 +993,19 @@ rldyour::materialize_zsh_plugins() {
     fi
   done
   if [ -z "$antidote_zsh" ]; then
-    rldyour::_ensure_pinned_git_checkout \
-      "https://github.com/getantidote/antidote" "$antidote_pin" "$HOME/.antidote" || return 1
+    store="$source_root/github.com/getantidote/antidote.git"
+    rldyour::_ensure_pinned_git_object_store \
+      "https://github.com/getantidote/antidote" "$antidote_pin" "$store" || return 1
+    rldyour::_publish_pinned_git_payload "$store" "$antidote_pin" "$HOME/.antidote" "$source_root" || return 1
     antidote_zsh="$HOME/.antidote/antidote.zsh"
     [ -r "$antidote_zsh" ] || {
-      rldyour::log "error" "antidote clone did not provide antidote.zsh: ${antidote_zsh}"
+      rldyour::log "error" "antidote tracked payload did not provide antidote.zsh: ${antidote_zsh}"
       return 1
     }
   fi
 
-  # 2. Pre-clone every plugin at its pinned SHA into antidote's full-style clone
-  #    home ($ANTIDOTE_HOME/github.com/<owner>/<repo>) so neither bundling nor
+  # 2. Publish every plugin's tracked commit-tree payload into Antidote's
+  #    full-style source home ($ANTIDOTE_HOME/github.com/<owner>/<repo>) so neither bundling nor
   #    shell startup ever reaches the network.
   while IFS= read -r line || [ -n "$line" ]; do
     case "$line" in ''|\#*) continue ;; esac
@@ -771,10 +1020,15 @@ rldyour::materialize_zsh_plugins() {
       return 1
     }
     dir="$antidote_home/github.com/$repo"
-    rldyour::_ensure_pinned_git_checkout "https://github.com/$repo" "$sha" "$dir" || return 1
+    store="$source_root/github.com/${repo}.git"
+    rldyour::_ensure_pinned_git_object_store "https://github.com/$repo" "$sha" "$store" || return 1
+    rldyour::_publish_pinned_git_payload "$store" "$sha" "$dir" "$source_root" || {
+      rldyour::log "error" "pinned terminal-plugin payload failed verification: ${dir}"
+      return 1
+    }
   done < "$manifest"
 
-  # 3. Compile the static bundle. Every clone is present at its pinned SHA, so
+  # 3. Compile the static bundle. Every tracked payload is present at its pinned SHA, so
   #    antidote sources them by path and never clones — the output is pure
   #    `source`/`fpath` lines that shell startup runs offline.
   bundle="$HOME/.zsh_plugins.zsh"

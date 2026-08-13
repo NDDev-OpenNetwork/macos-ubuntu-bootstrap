@@ -207,7 +207,7 @@ run_sandbox_hardening() {
   container_exec_dev "cd /repo && SSH_CONNECTION='192.0.2.10 50000 192.0.2.20 22' RLDYOUR_SERVER_SSH_USER=dev bash scripts/bootstrap.sh --platform ubuntu --profile server --no-gui --docker-mode none --harden-ssh --enable-ufw --with-fail2ban --plan --strict"
   container_exec_dev "cd /repo && SSH_CONNECTION='192.0.2.10 50000 192.0.2.20 22' RLDYOUR_SERVER_SSH_USER=dev bash scripts/bootstrap.sh --platform ubuntu --profile server --no-gui --docker-mode none --harden-ssh --enable-ufw --with-fail2ban --apply --strict"
   container_exec_dev "cd /repo && RLDYOUR_PROFILE=server RLDYOUR_GUI_ENABLED=0 RLDYOUR_DOCKER_MODE=none bash scripts/ubuntu/verify.sh --strict"
-  container_exec_dev "cd /repo && bash scripts/ubuntu/verify-server.sh --docker-mode none --expect-ufw --expect-ssh-hardening --expect-fail2ban --ssh-port 22 --ssh-user dev"
+  container_exec_dev "cd /repo && RLDYOUR_SERVER_SSH_MATCH_ADDRESS=192.0.2.10 RLDYOUR_SERVER_SSH_LOCAL_ADDRESS=192.0.2.20 bash scripts/ubuntu/verify-server.sh --docker-mode none --expect-ufw --expect-ssh-hardening --expect-fail2ban --ssh-port 22 --ssh-user dev"
 }
 
 assert_exact_source

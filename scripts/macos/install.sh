@@ -126,7 +126,9 @@ install_source_packages() {
   if [ "$RLDYOUR_DRY_RUN" -eq 1 ]; then
     rldyour::log "info" "[DRY-RUN] disable Dart telemetry reporting through 'dart --disable-analytics'"
   else
-    rldyour::ensure_dart_telemetry_disabled "$(command -v dart)" || return 1
+    local managed_dart
+    managed_dart="$(brew --prefix dart-sdk)/bin/dart"
+    rldyour::ensure_dart_telemetry_disabled "$managed_dart" || return 1
   fi
 }
 

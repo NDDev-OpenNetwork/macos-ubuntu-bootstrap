@@ -116,6 +116,8 @@ def test_dart_telemetry_is_disabled_through_one_shared_fail_closed_helper() -> N
     for installer in ("scripts/ubuntu/install.sh", "scripts/macos/install.sh"):
         body = (ROOT / installer).read_text(encoding="utf-8")
         assert "rldyour::ensure_dart_telemetry_disabled" in body, installer
+    macos_install = (ROOT / "scripts/macos/install.sh").read_text(encoding="utf-8")
+    assert 'managed_dart="$(brew --prefix dart-sdk)/bin/dart"' in macos_install
     # The config is never written by this repository, only read back.
     assert "dart-flutter-telemetry.config" in common
     assert "reporting=0\\n" not in common

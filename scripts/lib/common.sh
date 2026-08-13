@@ -377,7 +377,9 @@ rldyour::install_vendor_ai_clis() {
 
 rldyour::install_ai_launchers() {
   local bin="$HOME/.local/bin"
-  mkdir -p "$bin"
+  # install_managed_file is plan-aware, but this mkdir was not, so a plan
+  # created ~/.local/bin on a machine it was only supposed to describe.
+  [ "${RLDYOUR_DRY_RUN:-1}" -eq 1 ] || mkdir -p "$bin"
   rldyour::install_managed_file "$bin/cx" "# Managed by macos-ubuntu-bootstrap: ai-launcher-cx-v1" 0755 <<'EOF'
 #!/bin/sh
 # Managed by macos-ubuntu-bootstrap: ai-launcher-cx-v1

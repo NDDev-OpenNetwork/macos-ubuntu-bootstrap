@@ -1,8 +1,11 @@
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 from pathlib import Path
+
+import pytest
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -59,3 +62,36 @@ def test_ubuntu_profile_is_explicit() -> None:
     result = run("--platform", "ubuntu")
     assert result.returncode == 2
     assert "requires --profile" in result.stderr
+
+
+# ----------------------------- plan is read-only -----------------------------
+
+
+@pytest.mark.parametrize(
+    "profile,gui",
+    [("server", []), ("desktop", ["--no-gui"]), ("desktop-builds", ["--no-gui"])],
+)
+def test_plan_creates_nothing_in_the_home_it_describes(
+    tmp_path: Path, profile: str, gui: list[str]
+) -> None:
+    """`--plan` is documented as read-only; prove it against a throwaway HOME.
+
+    A plan used to create ~/.local/bin from an unconditional mkdir, and both
+    ~/.bun/install/global and ~/.cache/uv because the "is this pin already
+    installed?" probes are package-manager commands that initialize their own
+    store before they can answer.
+    """
+    home = tmp_path / "home"
+    home.mkdir()
+    result = subprocess.run(
+        ["bash", "scripts/bootstrap.sh", "--platform", "ubuntu",
+         "--profile", profile, *gui, "--plan"],
+        cwd=ROOT,
+        capture_output=True,
+        text=True,
+        check=False,
+        env={**os.environ, "HOME": str(home)},
+    )
+    assert result.returncode == 0, result.stderr[-2000:]
+    created = sorted(str(path.relative_to(home)) for path in home.rglob("*"))
+    assert created == [], f"plan mutated the home directory: {created}"

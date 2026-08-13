@@ -1530,6 +1530,11 @@ install_python_source_tools() {
     version="${entry#*==}"
     # Reproducible: skip only when the EXACT pinned version is already installed;
     # otherwise force-install the pin so a stale/divergent version is corrected.
+    if [ "${RLDYOUR_DRY_RUN:-1}" -eq 1 ]; then
+      # `uv tool list` materializes ~/.cache/uv before it can answer.
+      rldyour::log "info" "[DRY-RUN] ensure pinned uv tool: ${entry}"
+      continue
+    fi
     if uv tool list 2>/dev/null | grep -Eq "^${name}[[:space:]]+v?${version//./\\.}([[:space:]]|$)"; then
       rldyour::log "ok" "pinned uv tool present: ${entry}"
     else
@@ -1546,6 +1551,12 @@ install_bun_lsps() {
     version="${entry##*@}"
     # Reproducible: skip only when the EXACT pinned version is already installed;
     # otherwise install the pin so a stale/divergent version is corrected.
+    if [ "${RLDYOUR_DRY_RUN:-1}" -eq 1 ]; then
+      # `bun pm ls -g` creates ~/.bun/install/global before it can answer, so a
+      # plan may not ask. State the pin the apply will converge on.
+      rldyour::log "info" "[DRY-RUN] ensure pinned Bun source tool: ${entry}"
+      continue
+    fi
     if bun pm ls -g 2>/dev/null | grep -Fq "${name}@${version}"; then
       rldyour::log "ok" "pinned Bun source tool present: ${entry}"
     else

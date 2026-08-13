@@ -202,11 +202,19 @@ rldyour::section "Verify Ubuntu $PROFILE profile"
 rldyour::ubuntu_verify::tool_host_provenance
 rldyour::ubuntu_verify::herdr_provenance
 
+# Every command this bootstrap publishes on every Ubuntu profile. A tool that is
+# installed but never verified is a tool whose failed install is invisible --
+# the defect this repository already closed once for cmake-language-server and
+# which had quietly reopened for eleven more.
 required_cmds=(
   git curl node bun uv python3 shellcheck shfmt clangd
-  pyright pyright-langserver basedpyright ruff
+  pyright pyright-langserver basedpyright ruff ty semgrep
   tsc vtsls yaml-language-server bash-language-server docker-langserver
   vscode-html-language-server vscode-css-language-server vscode-json-language-server taplo
+  gh-actions-language-server ansible-language-server
+  biome oxlint markdownlint-cli2 prettier
+  starship atuin carapace
+  cmake-language-server
   codex claude grok cx cl gk
 )
 for cmd in "${required_cmds[@]}"; do
@@ -254,9 +262,6 @@ if [ "$PROFILE" != "server" ]; then
       *) rldyour::log "info" "Telegram skipped: upstream publishes no $(uname -m) build" ;;
     esac
   fi
-  # cmake-language-server ships in PYTHON_SOURCE_TOOLS but was never verified,
-  # so a failed install stayed invisible on Ubuntu while macOS gated on it.
-  rldyour::require_cmd cmake-language-server required
   [ "$(go version 2>/dev/null | awk '{ print $3 }')" = "go1.26.5" ] || {
     rldyour::log "missing" "Go exact managed Ubuntu version 1.26.5"
     exit 1
@@ -311,7 +316,7 @@ else
   for cmd in go gopls rustc cargo rust-analyzer dart; do
     rldyour::require_cmd "$cmd" required
   done
-  for cmd in gitleaks osv-scanner actionlint hadolint markdown-oxide delta yq ast-grep just age age-keygen cmake-language-server; do
+  for cmd in gitleaks osv-scanner actionlint hadolint markdown-oxide delta yq ast-grep just age age-keygen; do
     rldyour::require_cmd "$cmd" required
   done
   [ "$(go version 2>/dev/null | awk '{ print $3 }')" = "go1.26.5" ] || {

@@ -168,7 +168,11 @@ def _resolve_build_profile(explicit: str | None) -> str:
 
 
 def regular_owned(
-    path: Path, *, executable: bool = False, enforce_private_mode: bool = True
+    path: Path,
+    *,
+    executable: bool = False,
+    enforce_private_mode: bool = True,
+    enforce_owner: bool = True,
 ) -> os.stat_result:
     """Assert a path is a regular, non-symlink, owner-held file.
 
@@ -176,6 +180,18 @@ def regular_owned(
     file. That is genuine tamper resistance for a file the installer created
     and owns. It is meaningless for a Git-tracked repository source (Git records
     only the executable bit), so callers reading repository sources pass False.
+
+    ``enforce_owner`` is likewise about device files rather than repository
+    sources. For a file the installer wrote under ``$HOME``, current-UID
+    ownership is a real property: anyone else owning it means something outside
+    this repository wrote it. For a repository *source* it is neither necessary
+    nor sufficient. Not necessary, because staging the repository read-only as
+    root and applying it as an unprivileged user is a legitimate shape -- it is
+    what the hosted native evidence lanes do, and it is safer than the
+    alternative. Not sufficient, because the first path checked is
+    ``device_integrity.py`` itself: anyone who owns that file controls the check,
+    so the check cannot defend against them. What actually pins a repository
+    source into the receipt is its content hash, which is recorded either way.
     """
     try:
         metadata = path.lstat()
@@ -183,7 +199,7 @@ def regular_owned(
         fail(f"required path is missing: {path}")
     if not stat.S_ISREG(metadata.st_mode) or path.is_symlink():
         fail(f"path must be a regular non-symlink file: {path}")
-    if metadata.st_uid != os.getuid():
+    if enforce_owner and metadata.st_uid != os.getuid():
         fail(f"path is not owned by the current UID: {path}")
     if enforce_private_mode and metadata.st_mode & 0o022:
         fail(f"path is group/world-writable: {path}")
@@ -251,7 +267,10 @@ def policy_hashes() -> dict[str, str]:
             if entry.is_file() and entry.suffix == ".desktop":
                 paths[f"desktop_{entry.stem}"] = entry
     for path in paths.values():
-        regular_owned(path, enforce_private_mode=False)
+        # Repository sources, not device files: see regular_owned's docstring for
+        # why neither the private-mode nor the owner check applies here. The
+        # content hash below is what pins them into the receipt.
+        regular_owned(path, enforce_private_mode=False, enforce_owner=False)
     return {name: sha256_file(path) for name, path in paths.items()}
 
 

@@ -832,3 +832,42 @@ def test_no_document_claims_the_harness_collector_observes_nothing() -> None:
     source = MODULE_PATH.read_text(encoding="utf-8")
     assert "currently observe nothing" not in source
     assert "carries no ``harnesses.detection``" not in source
+
+
+def test_policy_hashes_accept_a_repository_the_applying_user_does_not_own() -> None:
+    """The hosted native evidence lanes stage the repository as root.
+
+    `platform-evidence.sh` does `sudo cp -a` the checkout to
+    /opt/rldyour-evidence-source and then applies it as an unprivileged
+    `rldyourevidence`. That is a legitimate shape -- a read-only repository
+    staged by an administrator and applied by a user who cannot modify it -- and
+    it is safer than the alternative, yet it made `policy_hashes` fail with
+    `path is not owned by the current UID`. The device receipt could not be
+    built in the very lanes that are supposed to gate it.
+
+    A repository source is pinned into the receipt by its content hash, not by
+    who owns it: the first path checked is `device_integrity.py` itself, so
+    anyone who owns it already controls the check.
+    """
+    import inspect
+
+    source = inspect.getsource(di.policy_hashes)
+    assert "enforce_owner=False" in source
+
+    # And the primitive still enforces ownership by default, for device files.
+    signature = inspect.signature(di.regular_owned)
+    assert signature.parameters["enforce_owner"].default is True
+
+
+def test_regular_owned_still_rejects_a_foreign_owner_for_device_files(tmp_path) -> None:
+    """Ownership remains enforced where it means something."""
+    import inspect
+
+    target = tmp_path / "receipt.json"
+    target.write_text("{}", encoding="utf-8")
+    # Owned by us, so it passes with the check on.
+    di.regular_owned(target, enforce_private_mode=False)
+    # The device-state collectors must not have opted out of it.
+    for name in ("_user_tool_state", "_desktop_entry_state"):
+        source = inspect.getsource(getattr(di, name))
+        assert "enforce_owner=False" not in source, f"{name} opted out of ownership"

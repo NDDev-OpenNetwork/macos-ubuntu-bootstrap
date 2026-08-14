@@ -225,15 +225,19 @@ def test_evidence_gate_opens_the_artifacts_it_gates_on() -> None:
     assert "scripts/ci/verify_evidence_artifacts.py" in gate_job
 
 
-def test_evidence_runs_on_main_so_a_release_candidate_carries_it() -> None:
-    """A `pull_request` run reports against the PR head, not the merge commit.
+def test_evidence_has_no_default_branch_trigger() -> None:
+    """The lanes check out a contributor's head SHA and run it.
 
-    Release candidates are merge commits on main. Without a push trigger a
-    candidate carries `bootstrap-gate` and no `evidence-gate` at all, and the
-    release gate below would be asking for something that never existed.
+    A default-branch trigger would give that write access to the default-branch
+    Actions cache scope -- the cache-poisoning shape CodeQL reports for this file.
+    The release gate locates evidence by tree identity instead, so the trigger
+    set stays low-trust.
     """
     triggers = EVIDENCE_WORKFLOW.split("\npermissions:", 1)[0]
-    assert re.search(r"^  push:\n    branches: \[main\]$", triggers, re.M)
+    assert not re.search(r"^  push:", triggers, re.M), (
+        "platform-evidence gained a default-branch trigger; see verify-candidate"
+    )
+    assert "inputs:" not in triggers, "workflow_dispatch regained an attacker-choosable ref"
 
 
 def test_evidence_gate_is_in_the_required_check_projection() -> None:
@@ -247,15 +251,40 @@ def test_evidence_gate_is_in_the_required_check_projection() -> None:
     assert "bootstrap-gate" in contexts
 
 
-def test_release_requires_both_gates_on_the_exact_candidate() -> None:
+def test_release_requires_both_gates_before_publication() -> None:
     job = RELEASE_WORKFLOW.split("\n  verify-candidate:\n", 1)[1].split("\n  verify-tag:", 1)[0]
-    assert "for gate in bootstrap-gate evidence-gate" in job
+
+    # bootstrap-gate is asked about the candidate itself.
+    assert "check_name=bootstrap-gate" in job
     assert "commits/${GITHUB_SHA}/check-runs" in job
+
+    # evidence-gate is asked about the head the candidate's tree came from, and
+    # the tree identity is proven rather than assumed.
+    assert "check_name=evidence-gate" in job
+    assert 'candidate_tree="$(git rev-parse "${GITHUB_SHA}^{tree}")"' in job
+    assert '[ "$candidate_tree" = "$head_tree" ]' in job
+
     # Publication must depend on it, on every trigger.
     supply = RELEASE_WORKFLOW.split("\n  supply-chain:\n", 1)[1]
     assert "needs.verify-candidate.result == 'success'" in supply
     # verify-candidate carries no `if:`, so it runs for tag pushes too.
     assert not re.search(r"^    if:", job, re.M)
+
+
+def test_the_tree_identity_property_is_backed_by_the_ruleset() -> None:
+    """The proof relies on strict required-status-checks, so assert it is set.
+
+    A merge commit has the same tree as its head only when the branch was up to
+    date. `strict_required_status_checks_policy` is what forces that; without it
+    the tree check would simply start failing, which is the safe direction, but
+    the projection should still say so.
+    """
+    strict = [
+        rule["parameters"]["strict_required_status_checks_policy"]
+        for rule in RULESET["rules"]
+        if rule["type"] == "required_status_checks"
+    ]
+    assert strict == [True], "verify-candidate's tree-identity proof assumes a strict policy"
 
 
 def test_required_capabilities_declare_the_steps_a_lane_must_observe() -> None:

@@ -8,20 +8,17 @@ on:
       - "config/**"
       - "templates/**"
       - "VERSION"
-  # A `pull_request` run reports its checks against the PR head, not against the
-  # merge commit that lands. Release candidates are merge commits on main, so
-  # without this trigger a candidate carries `bootstrap-gate` and no
-  # `evidence-gate` at all -- and a release gate asking for evidence on the exact
-  # candidate SHA would be asking for something that never existed.
-  push:
-    branches: [main]
-  # No `sha` input. It used to accept any commit reachable from this repository,
-  # which includes a fork's PR head under refs/pull/*, and a dispatch always runs
-  # in the default-branch context where the Actions cache is writable. That is a
-  # privileged checkout of code nobody reviewed. With the push trigger above, a
-  # release candidate carries its own evidence and the input has no remaining
-  # use: a dispatch now verifies the ref it was dispatched against, which the
-  # dispatcher could already push to.
+  # Deliberately NOT `push: [main]`. A release candidate does need evidence, but
+  # adding a default-branch trigger here would give this workflow -- which checks
+  # out a contributor's exact head SHA and runs it -- write access to the
+  # default-branch Actions cache scope. `release.yml` instead proves that the
+  # candidate's tree is identical to a head whose `evidence-gate` is green, which
+  # is a property `main`'s ruleset already guarantees. See verify-candidate.
+  #
+  # No `sha` input either. It accepted any commit reachable from this repository,
+  # which includes a fork's PR head under refs/pull/*, and a dispatch runs in the
+  # default-branch context. A dispatch now verifies the ref it was dispatched
+  # against, which the dispatcher could already push to.
   workflow_dispatch:
 
 permissions: {}

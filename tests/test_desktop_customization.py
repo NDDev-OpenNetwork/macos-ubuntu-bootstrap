@@ -559,10 +559,10 @@ def test_min_version_rejects_an_old_version(tmp_path: Path) -> None:
 
 def test_min_version_reads_a_version_reported_on_stderr(tmp_path: Path) -> None:
     """The exact shape of `dart --version` on older SDKs."""
-    tool = _tool(tmp_path, "stderrtool", 'echo "Dart SDK version: 3.12.2" >&2\n')
+    tool = _tool(tmp_path, "stderrtool", 'echo "Dart SDK version: 3.13.0" >&2\n')
     result = _min_version(tool)
     assert result.returncode == 0, result.stdout + result.stderr
-    assert "3.12.2" in result.stdout
+    assert "3.13.0" in result.stdout
 
 
 def test_min_version_fails_closed_when_no_version_can_be_read(tmp_path: Path) -> None:

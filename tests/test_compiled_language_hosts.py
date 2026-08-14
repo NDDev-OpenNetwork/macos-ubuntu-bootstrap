@@ -162,7 +162,7 @@ def test_dart_opt_out_fails_when_documented_command_fails(tmp_path: Path) -> Non
 def test_dart_verifiers_reject_wrong_versions() -> None:
     ubuntu = (ROOT / "scripts/ubuntu/verify.sh").read_text(encoding="utf-8")
     macos = (ROOT / "scripts/macos/verify.sh").read_text(encoding="utf-8")
-    assert '"$(dart --version 2>&1 | awk \'NR == 1 { print $4 }\')" = "3.12.2"' in ubuntu
+    assert '"$(dart --version 2>&1 | awk \'NR == 1 { print $4 }\')" = "3.13.0"' in ubuntu
     assert "rldyour::require_cmd_min_version dart 3.12 --version" in macos
 
 

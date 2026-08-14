@@ -257,3 +257,76 @@ def test_every_desktop_entry_declares_a_runnable_precondition() -> None:
         assert first and Path(first[0]).name == Path(program).name, (
             f"{name}: TryExec {program} does not guard Exec {exec_lines[0]}"
         )
+
+
+UBUNTU_VERIFY = (ROOT / "scripts/ubuntu/verify.sh").read_text(encoding="utf-8")
+
+
+def test_ubuntu_verifier_asserts_the_contract_versions() -> None:
+    """Every version the Ubuntu verifier asserts must come from the contract.
+
+    The parity tests above bind the *installer* constants. Nothing bound the
+    *verifier*, and the two drifted apart in exactly the way that is hardest to
+    see: `uv`'s check is a regex with escaped dots, so a refresh that rewrites
+    every literal `0.11.30` in the tree leaves `'^uv 0\\.11\\.30…'` untouched.
+    The installer would then publish one version and the verifier demand
+    another, and a strict verify would fail on a correctly installed host.
+
+    Each assertion below is written the way that verifier writes it, so a pin
+    refresh that misses one fails here rather than on a device.
+    """
+    runtime = CONTRACT["runtime_support"]
+    node = runtime["ubuntu_node_lts"]
+    uv = runtime["ubuntu_uv"]
+    bun = runtime["ubuntu_bun"]
+    go = runtime["ubuntu_go"]
+    rust = runtime["ubuntu_rust"]
+    dart = runtime["ubuntu_dart"]
+
+    # Exact-match command probes.
+    assert f'"$(node --version 2>/dev/null | head -n 1)" = "v{node}"' in UBUNTU_VERIFY
+    assert f'"$(bun --version 2>/dev/null | head -n 1)" = "{bun}"' in UBUNTU_VERIFY
+    assert f"= \"go{go}\"" in UBUNTU_VERIFY
+    assert f"= \"{rust}\"" in UBUNTU_VERIFY
+    assert f"= \"{dart}\"" in UBUNTU_VERIFY
+
+    # uv reports `uv X.Y.Z (<commit> <date>)`, so its check is a regex and its
+    # dots are escaped. Rebuild that exact pattern from the contract.
+    uv_pattern = "grep -Eq '^uv {}([[:space:]]|$)'".format(uv.replace(".", r"\."))
+    assert uv_pattern in UBUNTU_VERIFY, f"verifier does not assert uv {uv}"
+
+    # Managed runtime receipts carry the version as a bare argument.
+    assert f"runtime_receipt node {node} " in UBUNTU_VERIFY
+    assert f"runtime_receipt uv {uv} " in UBUNTU_VERIFY
+    assert f"runtime_receipt bun {bun} " in UBUNTU_VERIFY
+
+    # Managed install roots are versioned paths; a stale root would verify a
+    # directory the installer never creates.
+    assert f'node_root="$HOME/.local/share/rldyour/node/v{node}"' in UBUNTU_VERIFY
+    assert f'uv_root="$HOME/.local/share/rldyour/uv/{uv}"' in UBUNTU_VERIFY
+    assert f'bun_root="$HOME/.local/share/rldyour/bun/{bun}"' in UBUNTU_VERIFY
+
+
+def test_no_stale_runtime_version_survives_anywhere_in_the_verifier() -> None:
+    """No version-shaped literal in the verifier is outside the contract.
+
+    The test above proves the current pins are asserted. This one proves no
+    *previous* pin is still asserted somewhere else in the same file — the
+    failure mode where a refresh updates one of two call sites.
+    """
+    runtime = CONTRACT["runtime_support"]
+    known = {
+        runtime["ubuntu_node_lts"],
+        runtime["ubuntu_uv"],
+        runtime["ubuntu_bun"],
+        runtime["ubuntu_go"],
+        runtime["ubuntu_rust"],
+        runtime["ubuntu_dart"],
+        CONTRACT["user_tools"]["herdr"]["version"],
+    }
+    # Escaped-regex spellings of the same versions are equally valid.
+    known |= {v.replace(".", r"\.") for v in known}
+
+    found = set(re.findall(r"\b\d+\\?\.\d+\\?\.\d+\b", UBUNTU_VERIFY))
+    stale = found - known
+    assert not stale, f"verifier asserts versions absent from the contract: {sorted(stale)}"

@@ -67,10 +67,17 @@ bash scripts/auth-handoff.sh check
 ## Validation
 
 ```bash
+bash scripts/ci/setup-test-env.sh
 bash scripts/ci/lint.sh
 bash scripts/ci/validate.sh
-python3 -m pytest
+.venv/bin/python -m pytest
 ```
+
+`setup-test-env.sh` establishes what the suite needs — a real zsh, and the
+hash-locked Python 3.14 environment — and is idempotent. `python3 -m pytest`
+passes only where pytest already happened to be installed, and the
+terminal-portability suite asserts against a real zsh rather than skipping
+without one.
 
 Real platform behavior must also be verified on the corresponding macOS or
 Ubuntu host; container checks are not evidence for launchd, systemd, GNOME,

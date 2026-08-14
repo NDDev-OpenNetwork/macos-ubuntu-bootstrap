@@ -5,6 +5,45 @@ remains available in immutable Git tags.
 
 ## [Unreleased]
 
+### Fixed
+
+- The module's own declared verification lane could not run on a clean host.
+  `.gds/repository.yaml` began `verification.commands.test` with
+  `uv venv --python 3.14`, and declared no prerequisite that provides uv — or
+  zsh, which `tests/test_terminal_portability.py` needs because it runs the
+  managed rc files through the shell that actually reads them. A host without uv
+  failed before a virtualenv existed; a host with uv but without zsh installed
+  cleanly and then failed inside pytest at a fixture. Both were reported to the
+  control plane as the module failing its tests, and neither was. GitHub CI
+  passed either way, because the reusable Python lane installed exactly what the
+  anchor omitted — so the declaration written to reproduce CI was the one place
+  that did not.
+
+  `scripts/ci/setup-test-env.sh` now owns the environment, and both
+  `.github/workflows/pytest.yml` and the anchor call it. It is declared as
+  `verification.commands.bootstrap`, a GDS prerequisite lane that runs first and
+  is deliberately not in `required`: a module is not verified by having been
+  prepared, and its failure states that the check could not be attempted rather
+  than that the module failed it.
+
+  Running the declared lane on a bare `ubuntu:24.04` container found four
+  prerequisites no amount of reading would have: the suite drives `git`,
+  `ssh-keygen`, `gpg` and `python3` through `subprocess`, and a GitHub runner
+  ships all of them — which is precisely why their absence from the anchor could
+  not fail anywhere. It also found that `curl` installed with
+  `--no-install-recommends` cannot complete a TLS handshake without
+  `ca-certificates`, surfacing as a certificate error on a pinned download.
+
+  uv itself is acquired the way this repository acquires every pinned artifact:
+  the exact version and SHA-256 the contract already states for a device, from a
+  fixed versioned URL, verified before execution.
+
+- The documented way to validate a change was the one the anchor exists to rule
+  out. `README.md`, `AGENTS.md` and `docs/install.md` all instructed
+  `python3 -m pytest`, which passes only where pytest already happened to be
+  installed, long after CI had stopped using it. A reader following the guide ran
+  something the repository had already established proves nothing.
+
 ### Added
 
 - One statement of what protects `main`. The contexts the branch enforces were

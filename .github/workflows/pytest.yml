@@ -28,25 +28,14 @@ jobs:
       # a job asking for a label no runner advertises queues indefinitely.
       runner: ubuntu-latest
       python_version: "3.14"
-      # zsh is a genuine test fixture: the terminal-portability suite asserts the
-      # shell rc files this installer writes are parseable by the shell that
-      # actually reads them. Dependencies come from the hash-locked lock through
-      # uv — pip is forbidden estate-wide, and an unpinned, unhashed install in
-      # the lane that proves the installer is the wrong place to make an
-      # exception.
+      # One script owns the test environment, and `.gds/repository.yaml`
+      # declares the same one as its `bootstrap` lane. These steps used to live
+      # here as a shell one-liner and nowhere else, so the module's own declared
+      # verification lane began with `uv venv` on a host that might have neither
+      # uv nor zsh — and this workflow's success said nothing about that,
+      # because it was the thing supplying what the anchor omitted.
       #
-      # The interpreter has to be pinned explicitly. The reusable runs
-      # `uv python install 3.14`, which makes 3.14 *available* but does not make
-      # it `python` — so `python -m pip install` previously landed in the user
-      # site-packages of the runner's ambient interpreter ("Defaulting to user
-      # installation because normal site-packages is not writeable") and the
-      # tests ran there. The lane was named `python (3.14)` and did not run on
-      # 3.14. A venv built from the requested version, used explicitly by the
-      # test command, makes the declared version the one that actually runs.
-      install_command: >-
-        sudo apt-get update &&
-        sudo apt-get install -y --no-install-recommends zsh &&
-        uv venv --python 3.14 &&
-        uv pip install --require-hashes -r requirements-test.txt
+      # What the script establishes and why is documented in the script.
+      install_command: bash scripts/ci/setup-test-env.sh
       test_command: .venv/bin/python -m pytest -q
       timeout_minutes: 15

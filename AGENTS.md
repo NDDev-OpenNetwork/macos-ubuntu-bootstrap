@@ -80,10 +80,17 @@ existing packages or healthy Docker implicitly.
 ## Verification
 
 ```bash
+bash scripts/ci/setup-test-env.sh
 bash scripts/ci/lint.sh
 bash scripts/ci/validate.sh
-python3 -m pytest
+.venv/bin/python -m pytest
 ```
+
+`setup-test-env.sh` establishes what the suite needs — a real zsh, and the
+hash-locked Python 3.14 environment — and is idempotent. `python3 -m pytest`
+passes only where pytest already happened to be installed, and the
+terminal-portability suite asserts against a real zsh rather than skipping
+without one.
 
 Use the strict platform verifiers on real target machines when platform behavior
 changes. Do not claim runtime evidence that was not produced.

@@ -49,5 +49,8 @@ bash scripts/bootstrap.sh --platform ubuntu --profile server --apply \
 Keep the current SSH session open until a second key-authenticated connection
 succeeds. UFW alone does not contain Docker-published ports.
 
-Validate changes with `bash scripts/ci/lint.sh`, `bash scripts/ci/validate.sh`,
-and `python3 -m pytest`. Platform verification requires real target machines.
+Validate changes with `bash scripts/ci/setup-test-env.sh` once, then
+`bash scripts/ci/lint.sh`, `bash scripts/ci/validate.sh` and
+`.venv/bin/python -m pytest`. The setup script is idempotent and establishes
+the real zsh and hash-locked Python 3.14 environment the suite asserts
+against. Platform verification requires real target machines.

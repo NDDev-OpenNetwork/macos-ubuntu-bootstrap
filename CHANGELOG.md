@@ -28,6 +28,22 @@ remains available in immutable Git tags.
 
 ### Fixed
 
+- Made `evidence-gate` prove something. It read four `needs.*.result` values and
+  never opened an artifact, and the runtime check inside `finalize_evidence`
+  re-tested an invariant the matrix validator already refused statically, so it
+  could never fire. REQUIRED capabilities now declare the steps a lane must
+  record; the lane script appends a step name only after the command that proves
+  it returns, so a successful lane that skipped a step fails. The gate downloads
+  all thirteen artifacts and requires the payload count, the (lane, architecture)
+  set, each result, each capability list, each observation ledger, each
+  `not_proven` list and each SHA to hold. `evidence-gate` is now in the
+  checked-in required-check projection, and `platform-evidence` also runs on
+  `main` — a `pull_request` run reports against the PR head, so a release
+  candidate merge commit previously carried no `evidence-gate` at all. Release
+  preparation verifies both mandatory gates on the exact candidate commit on
+  every trigger, including a tag push, which previously published without asking
+  about hosted evidence.
+
 - Connected the device integrity receipt to the lifecycle it documents.
   `scripts/device_integrity.py` had no runtime caller, and its
   one-owner-per-harness check read a contract key that did not exist, so it

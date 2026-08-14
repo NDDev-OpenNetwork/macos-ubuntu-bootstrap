@@ -127,6 +127,44 @@ jobs:
       - name: Validate workflow syntax
         uses: raven-actions/actionlint@3d39aea434753780c3b3d4a1a31c854b4dbf49d7
 
+  # Both mandatory gates must be green on the exact commit being released, on
+  # every trigger. This used to live inside verify-tag, which runs only on
+  # workflow_dispatch and asked for bootstrap-gate alone -- so a tag push
+  # published without anyone asking whether the hosted evidence passed.
+  #
+  # A tag push still validates after the tag exists, and this repository cannot
+  # change that: root automation is the sole tag creator. What it can do is
+  # refuse to publish a release for a candidate whose gates are not green, which
+  # turns "immutable tag burned and release published" into "tag burned, release
+  # refused" -- recoverable by bumping VERSION.
+  verify-candidate:
+    name: Verify release candidate gates
+    needs: resolve
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      checks: read
+      contents: read
+    steps:
+      - name: Require both mandatory gates on the exact candidate commit
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          for gate in bootstrap-gate evidence-gate; do
+            conclusion="$(
+              gh api \
+                -H "Accept: application/vnd.github+json" \
+                "/repos/${GITHUB_REPOSITORY}/commits/${GITHUB_SHA}/check-runs?check_name=${gate}&status=completed&filter=latest&per_page=1" \
+                --jq '.check_runs[0].conclusion // ""'
+            )"
+            [ "$conclusion" = success ] || {
+              echo "release candidate ${GITHUB_SHA} has ${gate}=${conclusion:-absent}; both gates must be green" >&2
+              exit 1
+            }
+            echo "${gate}: success on ${GITHUB_SHA}"
+          done
+
   verify-tag:
     name: Verify exact manual release tag
     if: github.event_name == 'workflow_dispatch'
@@ -156,16 +194,8 @@ jobs:
             echo "manual release commit is no longer the exact origin/main commit" >&2
             exit 1
           }
-          gate_conclusion="$(
-            gh api \
-              -H "Accept: application/vnd.github+json" \
-              "/repos/${GITHUB_REPOSITORY}/commits/${GITHUB_SHA}/check-runs?check_name=bootstrap-gate&status=completed&filter=latest&per_page=1" \
-              --jq '.check_runs[0].conclusion // ""'
-          )"
-          [ "$gate_conclusion" = "success" ] || {
-            echo "manual release requires a successful bootstrap-gate on the exact commit" >&2
-            exit 1
-          }
+          # Gate conclusions are verified once, for every trigger, by
+          # verify-candidate. This job owns tag and branch identity only.
           if gh release view "$RELEASE_VERSION" >/dev/null 2>&1; then
             echo "release '$RELEASE_VERSION' already exists and is immutable; bump VERSION" >&2
             exit 1
@@ -188,8 +218,8 @@ jobs:
   # The pinned reusable workflow owns immutable `gh release create`
   # publication with `--verify-tag`; manual dispatch only verifies an existing tag.
   supply-chain:
-    needs: [resolve, verify-tag]
-    if: ${{ always() && needs.resolve.result == 'success' && (needs.verify-tag.result == 'success' || needs.verify-tag.result == 'skipped') }}
+    needs: [resolve, verify-candidate, verify-tag]
+    if: ${{ always() && needs.resolve.result == 'success' && needs.verify-candidate.result == 'success' && (needs.verify-tag.result == 'success' || needs.verify-tag.result == 'skipped') }}
     permissions:
       contents: write
       id-token: write

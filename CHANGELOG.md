@@ -7,6 +7,76 @@ remains available in immutable Git tags.
 
 ### Added
 
+- One statement of what protects `main`. The contexts the branch enforces were
+  written down three times — the live ruleset, `.github/rulesets/branch-main.json`
+  and `.gds/repository.yaml` — and nothing compared them.
+  `scripts/ci/check_required_contexts.py` does, on every pull request, against
+  the live rules API. The `.gds` list in particular was bound by nothing at all:
+  it was accurate, and nothing would have reported it if it stopped being, which
+  is how `#79` found it unset by reading it rather than by a check failing.
+
+- A dependency gate that checks dependencies.
+  `scripts/ci/check_ci_tool_parity.py` compares the tool versions and digests CI
+  runs against the ones the contract pins for a device, proves every workflow
+  download names a fixed version and verifies a digest, and proves nothing
+  reaches a shell straight from the network. `validate.sh` and the required
+  `Dependency pin checks` both run it, so one implementation answers for both.
+
+### Fixed
+
+- The ruleset mirror declared a check that could not report, and shipped a
+  command to apply it. `branch-main.json` listed `evidence-gate` as a pending
+  proposal, `.github/rulesets/README.md` explained the delta with *"`evidence-gate`
+  runs on `pull_request` and on pushes to `main` … so making it required does not
+  introduce a check that cannot report"*, and gave an administrator a
+  ready-to-paste `gh api --method PUT` to do it. That justification stopped being
+  true when `#77` closed `#75` by making `pull_request` the only trigger. A pull
+  request touching none of the workflow's `paths:` never receives the context,
+  and a fork's pull request skips every producer job, which `evidence-gate` turns
+  into a hard failure rather than an absence — so running the documented command
+  would have made both classes permanently unmergeable. The mirror is now a
+  mirror: it may not declare a check the live ruleset does not enforce, and the
+  test that used to pin `evidence-gate` into it now keeps it out until it can
+  report for every pull request that can reach `main`.
+
+- The required merge gate linted with whatever was newest.
+  `raven-actions/actionlint` was pinned to a commit, but that action defaults its
+  tool version to `latest` and verifies no checksum, so the action SHA bound the
+  wrapper and nothing bound the bytes — in the one check that must be green to
+  merge, and again in the release lane. The checksum-bound implementation already
+  existed and was already what `actionlint.yml` called, but that workflow was not
+  a required context: the repository ran the strong lane advisorily and the weak
+  lane as its gate. `ci.yml` now calls the checksum-bound reusable with the
+  contract's version and digest, `release.yml` reads both out of the contract at
+  run time the way it already did for uv, and the duplicate workflow is deleted.
+
+- CI and a developer's machine scanned with different programs. The contract
+  pinned OSV-Scanner `2.5.0` while the caller passed no version and inherited the
+  pinned provider's `2.4.0` default, whose scanning pipeline is not the same one.
+  The caller now passes the contract's version and digest — the provider
+  downloads `osv-scanner_linux_amd64`, which is the asset that digest covers.
+
+- `Dependency pin checks` could not fail for anything it existed to catch. It
+  searched the installers for variable and function *names*; every one of them
+  survives replacing the version, the digest and the URL it holds. Its
+  network-pipe guard was `"curl -fsSL https://" in data and "| sh" in data`, a
+  test on the whole file, so two unrelated lines satisfied it while
+  `wget … | sh` did not. The same weakness lived in `validate.sh` as an `rg`
+  sweep that failed the build on a comment *describing* the construct. Both are
+  replaced by one parser-based check that knows code from documentation, names
+  every shell, and for Python looks for the actual handover — `os.system`, or
+  `subprocess` with `shell=True` — rather than for the words.
+
+- The runner-routing test skipped the callers most likely to be wrong. It only
+  required an explicit hosted runner from a caller that already passed some
+  input, so deleting a caller's entire `with:` block — the single edit that most
+  obviously hands runner selection back to the pinned provider's default —
+  removed it from the test's attention instead of failing it. This repository is
+  public, so `pull_request` runs untrusted fork code, and several of those
+  reusables default `runner` to the estate's self-hosted label.
+
+### Added
+
 - Weekly discovery of pin drift against official sources. `#66` found seven pins
   behind their upstreams, one a whole minor version, and nothing in the
   repository would have said so — Dependabot covers the GitHub Actions

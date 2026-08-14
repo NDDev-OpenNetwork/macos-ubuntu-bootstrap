@@ -142,9 +142,14 @@ if bash "$REPO_ROOT/scripts/bootstrap.sh" --platform ubuntu --plan >/dev/null 2>
   exit 1
 fi
 
-if rg -n 'curl[^|]*\|[[:space:]]*(ba)?sh' "$REPO_ROOT/scripts"; then
-  echo "remote curl-to-shell pipeline is forbidden" >&2
-  exit 1
-fi
+# Pins, downloads and the no-network-into-a-shell rule, in one place.
+#
+# The rule used to live here as `rg 'curl[^|]*\|[[:space:]]*(ba)?sh'`, which
+# enforced a spelling instead of the property: a comment describing the
+# construct failed the build, while `wget ... | sh` and `curl ... | zsh` passed
+# it. The parser-based check knows the difference between code and a comment,
+# names every shell, and additionally proves CI runs the tool versions the
+# contract pins -- which is what `Dependency pin checks` now asserts too.
+python3 "$REPO_ROOT/scripts/ci/check_ci_tool_parity.py"
 
 echo "ci-validate-ok"

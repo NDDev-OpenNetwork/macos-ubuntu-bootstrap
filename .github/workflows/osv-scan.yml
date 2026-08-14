@@ -29,4 +29,16 @@ jobs:
       # pinned commit, not here. A wrong value does not fail loudly either:
       # a job asking for a label no runner advertises queues indefinitely.
       runner: ubuntu-latest
+      # The version and digest the contract pins for a device, passed explicitly
+      # so CI analyses this repository with the scanner its own users get.
+      # Without them the caller inherits the provider's default, which was
+      # 2.4.0 at this pin -- a different scanning pipeline, so CI and a
+      # developer's machine could disagree about the same repository.
+      #
+      # `scripts/ci/check_ci_tool_parity.py` fails if these drift from
+      # `config/rldyour-contract.json`. The provider downloads
+      # `osv-scanner_linux_amd64`, which is the asset the contract's x64 digest
+      # covers, so the value transfers exactly rather than by resemblance.
+      osv_scanner_version: '2.5.0'
+      osv_scanner_sha256: 'edcfc41d257db36148f065055655fe3fcfc434b0b423ea67468a84c207524e0c'
       scan_args: '--recursive .'

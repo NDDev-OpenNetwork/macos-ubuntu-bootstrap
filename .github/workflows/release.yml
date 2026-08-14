@@ -124,8 +124,31 @@ jobs:
           bash scripts/ci/validate.sh
           .venv/bin/python -m pytest -q
 
+      # Acquired the same way as uv above, and for the same reason: the commit
+      # being released must lint with the program the contract names, not with
+      # whatever `latest` resolves to on the day the release runs.
+      # `raven-actions/actionlint` was pinned to a commit but defaults its tool
+      # version to `latest` and verifies no checksum, so the action SHA bound
+      # the wrapper and nothing bound the bytes. Reading version and digest from
+      # the contract keeps this in step with the device by construction --
+      # there is no second copy of the value here to drift.
       - name: Validate workflow syntax
-        uses: raven-actions/actionlint@3d39aea434753780c3b3d4a1a31c854b4dbf49d7
+        run: |
+          set -euo pipefail
+          version="$(jq -er '.runtime_support.ubuntu_pinned_source_tools.actionlint.version' \
+            config/rldyour-contract.json)"
+          sha256="$(jq -er '.runtime_support.ubuntu_pinned_source_tools.actionlint.sha256.x64' \
+            config/rldyour-contract.json)"
+          archive="$(mktemp)"
+          curl --proto '=https' --tlsv1.2 --fail --silent --show-error --location \
+            "https://github.com/rhysd/actionlint/releases/download/v${version}/actionlint_${version}_linux_amd64.tar.gz" \
+            --output "$archive"
+          echo "${sha256}  ${archive}" | sha256sum --check --status
+          mkdir -p "$RUNNER_TEMP/actionlint"
+          tar -xzf "$archive" -C "$RUNNER_TEMP/actionlint" actionlint
+          rm -f "$archive"
+          "$RUNNER_TEMP/actionlint/actionlint" --version | grep -Fq "$version"
+          "$RUNNER_TEMP/actionlint/actionlint" -color
 
   # Both mandatory gates must be green on the exact commit being released, on
   # every trigger. This used to live inside verify-tag, which runs only on

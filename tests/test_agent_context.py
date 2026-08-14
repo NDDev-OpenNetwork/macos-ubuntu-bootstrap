@@ -109,7 +109,7 @@ def _reusable_callers() -> list[tuple[Path, bool, bool, bool, str]]:
     reader, and pulling one in for a lint would be a supply-chain change for a
     convenience. These files have one `uses:` per job at a fixed indent.
     """
-    callers: list[tuple[Path, bool, bool]] = []
+    callers: list[tuple[Path, bool, bool, bool, str]] = []
     for path in sorted(WORKFLOWS.glob("*.yml")):
         lines = path.read_text(encoding="utf-8").splitlines()
         for index, line in enumerate(lines):
@@ -144,14 +144,21 @@ def test_every_reusable_caller_that_can_name_a_runner_does() -> None:
     """
     callers = _reusable_callers()
     assert callers, "no ci-workflows callers found"
+    # `has_with` is deliberately not part of this condition. It used to be:
+    # the rule only applied to a caller that already passed some input, so
+    # deleting the entire `with:` block -- the single edit that most obviously
+    # hands runner selection back to the provider's default -- removed the
+    # caller from the test's attention instead of failing it. The property is
+    # about every caller, not about callers that happen to configure something.
     missing = [
         path.name
-        for path, has_with, names_runner, exempt, _value in callers
-        if has_with and not names_runner and not exempt
+        for path, _has_with, names_runner, exempt, _value in callers
+        if not names_runner and not exempt
     ]
     assert missing == [], (
-        f"these callers pass inputs but never name a runner: {missing}. "
-        "If a reusable exposes no `runner` input, say so in a comment."
+        f"these callers never name a runner: {missing}. Pass "
+        "`runner: ubuntu-latest`; if the reusable exposes no `runner` input at "
+        "the pinned commit, say so in a comment next to the call."
     )
     # An exemption is a claim about the pinned commit and must be re-checked
     # when the pin moves, so it is recorded next to the call rather than

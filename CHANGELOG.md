@@ -28,6 +28,29 @@ remains available in immutable Git tags.
 
 ### Fixed
 
+- Made `evidence-gate` prove something. It read four `needs.*.result` values and
+  never opened an artifact, and the runtime check inside `finalize_evidence`
+  re-tested an invariant the matrix validator already refused statically, so it
+  could never fire. REQUIRED capabilities now declare the steps a lane must
+  record; the lane script appends a step name only after the command that proves
+  it returns, so a successful lane that skipped a step fails. The gate downloads
+  all thirteen artifacts and requires the payload count, the (lane, architecture)
+  set, each result, each capability list, each observation ledger, each
+  `not_proven` list and each SHA to hold. `evidence-gate` is now in the
+  checked-in required-check projection.
+- Made release preparation verify both mandatory gates before publication, on
+  every trigger including a tag push, which previously published without asking
+  about hosted evidence at all. `evidence-gate` reports against a PR head rather
+  than the merge commit that lands, so rather than give `platform-evidence` a
+  default-branch trigger — it checks out a contributor's head SHA and runs it,
+  and a default-branch trigger would hand that write access to the default-branch
+  Actions cache scope — the release gate proves the candidate's tree is identical
+  to the head whose `evidence-gate` is green. `main` already guarantees that
+  through `strict_required_status_checks_policy`, and the gate verifies it rather
+  than assuming it. `platform-evidence`'s `sha` dispatch input was removed for the
+  same reason: it accepted any commit reachable from the repository, including a
+  fork's PR head under `refs/pull/*`.
+
 - Connected the device integrity receipt to the lifecycle it documents.
   `scripts/device_integrity.py` had no runtime caller, and its
   one-owner-per-harness check read a contract key that did not exist, so it

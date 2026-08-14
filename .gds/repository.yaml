@@ -37,13 +37,26 @@ git:
 
 verification:
   commands:
-    # Reproduces what CI runs, prerequisite included. `python3 -m pytest` alone
-    # only passed where pytest happened to be installed, which is the condition
-    # this anchor exists to rule out. `.github/workflows/pytest.yml` and
-    # `release.yml` both build the hash-locked virtualenv first.
+    # What the tests need, established before they run.
+    #
+    # This lane used to be absent and its work inlined at the top of `test`,
+    # which made two different failures look the same. `uv venv` on a host
+    # without uv failed before a virtualenv existed; a host with uv but without
+    # zsh installed cleanly and then failed inside pytest, at the
+    # terminal-portability fixture. Both were reported as "the module failed its
+    # tests", and neither was. GitHub CI passed either way, because the reusable
+    # Python lane installed what this anchor omitted -- so the declaration that
+    # exists to reproduce CI was the one place that did not.
+    #
+    # `bootstrap` is a prerequisite lane: it runs first, and its failure states
+    # that the check could not be attempted. It is deliberately not in
+    # `required` -- a module is not verified by having been prepared.
+    #
+    # One script, called from here and from `.github/workflows/pytest.yml`, so
+    # the two cannot describe different environments.
+    bootstrap:
+      - "bash scripts/ci/setup-test-env.sh"
     test:
-      - "uv venv --python 3.14"
-      - "uv pip install --require-hashes -r requirements-test.txt"
       - "bash scripts/ci/validate.sh"
       - ".venv/bin/python -m pytest -q"
   required:

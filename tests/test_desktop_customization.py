@@ -596,6 +596,7 @@ BASH4_ONLY = (
 MACOS_PATH_SCRIPTS = [
     "scripts/ci/lint.sh",
     "scripts/ci/platform-evidence.sh",
+    "scripts/ci/setup-test-env.sh",
     "scripts/ci/validate.sh",
     "scripts/bootstrap.sh",
     "scripts/lib/common.sh",

@@ -24,6 +24,20 @@ CLAUDE = ROOT / ".claude/CLAUDE.md"
 MEMORIES = ROOT / ".serena/memories"
 CONTRACT = json.loads((ROOT / "config/rldyour-contract.json").read_text(encoding="utf-8"))
 WORKFLOWS = ROOT / ".github/workflows"
+ANCHOR = ROOT / ".gds/repository.yaml"
+SETUP_SCRIPT = "scripts/ci/setup-test-env.sh"
+
+
+def _behaviour(text: str) -> str:
+    """The lines that do something, without the lines that explain them.
+
+    Every scanner in this repository has had to learn this distinction the
+    hard way: a check that reads a comment as code punishes writing down why a
+    rule exists, which is the documentation most worth keeping.
+    """
+    return "\n".join(
+        line for line in text.splitlines() if not line.lstrip().startswith("#")
+    )
 
 
 # ----------------------------- context topology -----------------------------
@@ -270,4 +284,81 @@ def test_no_tracked_document_points_at_a_deleted_memory() -> None:
         for match in re.finditer(r"\.serena/memories/([A-Za-z0-9_-]+\.md)", doc.read_text(encoding="utf-8")):
             assert match.group(1) in present, (
                 f"{doc.relative_to(ROOT)} names {match.group(1)}, which does not exist"
+            )
+
+
+# --------------------- the declared verification lane ----------------------
+
+
+def test_the_anchor_declares_a_prerequisite_lane_rather_than_inlining_it() -> None:
+    """The control plane must be able to tell "not attempted" from "failed".
+
+    `verification.commands.test` used to start with `uv venv --python 3.14`, so
+    a host without uv failed before a virtualenv existed and a host with uv but
+    without zsh failed inside pytest at a fixture. Both were reported as the
+    module failing its tests. GDS has a `bootstrap` lane for exactly this: it
+    runs first, and its failure states that the check could not be attempted.
+    """
+    commands = _behaviour(ANCHOR.read_text(encoding="utf-8")).split("verification:", 1)[1]
+
+    assert re.search(rf"^\s*bootstrap:\n\s*- \"bash {re.escape(SETUP_SCRIPT)}\"", commands, re.M), (
+        f"the anchor must declare `bootstrap: [bash {SETUP_SCRIPT}]`"
+    )
+
+    test_lane = commands.split("\n    test:\n", 1)[1].split("\n  required:", 1)[0]
+    for setup in ("uv venv", "uv pip install", "apt-get"):
+        assert setup not in test_lane, (
+            f"the test lane restates {setup!r}; environment setup belongs to the "
+            "bootstrap lane, so its failure is not reported as a test failure"
+        )
+
+    # `bootstrap` is a prerequisite, not proof. The GDS schema forbids it in
+    # `required`, and asserting it here keeps the two readings of the anchor --
+    # this repository's and the control plane's -- from diverging.
+    required = commands.split("\n  required:", 1)[1]
+    assert "bootstrap" not in required.split("\n  ", 1)[0], (
+        "a module is not verified by having been prepared"
+    )
+
+
+def test_ci_and_the_anchor_use_one_test_environment() -> None:
+    """Two descriptions of one environment is how they came to differ.
+
+    `pytest.yml` installed zsh and built the locked virtualenv; the anchor did
+    something similar but not the same, and only the workflow's version ever
+    ran. Both now name the same script, so there is no second description to
+    drift.
+    """
+    pytest_workflow = _behaviour(
+        (WORKFLOWS / "pytest.yml").read_text(encoding="utf-8")
+    )
+    assert f"install_command: bash {SETUP_SCRIPT}" in pytest_workflow, (
+        f"pytest.yml must delegate environment setup to {SETUP_SCRIPT}"
+    )
+    for setup in ("apt-get install", "uv venv", "uv pip install"):
+        assert setup not in pytest_workflow, (
+            f"pytest.yml restates {setup!r} instead of calling {SETUP_SCRIPT}"
+        )
+    assert (ROOT / SETUP_SCRIPT).is_file()
+
+
+def test_the_documented_validation_sequence_is_the_one_that_works() -> None:
+    """`python3 -m pytest` is what the anchor exists to rule out.
+
+    It passes only where pytest already happened to be installed. Three
+    documents instructed it as *the* validation step long after CI stopped
+    using it, so a reader following the guide ran something the repository had
+    already established does not prove anything.
+    """
+    for name in ("README.md", "AGENTS.md", "docs/install.md"):
+        text = (ROOT / name).read_text(encoding="utf-8")
+        assert SETUP_SCRIPT in text, f"{name} does not mention {SETUP_SCRIPT}"
+        assert ".venv/bin/python -m pytest" in text, (
+            f"{name} must name the interpreter the locked environment provides"
+        )
+        # A fenced block is an instruction; prose explaining why the bare
+        # command is insufficient is not.
+        for block in re.findall(r"```bash\n(.*?)```", text, re.S):
+            assert "python3 -m pytest" not in block, (
+                f"{name} still instructs `python3 -m pytest` in a command block"
             )

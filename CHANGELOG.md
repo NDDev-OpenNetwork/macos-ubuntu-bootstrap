@@ -32,6 +32,17 @@ remains available in immutable Git tags.
 
 ### Fixed
 
+- Key-only SSH hardening no longer refuses a valid `authorized_keys` on Ubuntu
+  26.04. The preflight asked `test -r` through `sudo`, and coreutils 9.5
+  answers `-r` via `access(2)` without granting root its usual override, so a
+  correct mode-0600 key file owned by the target user read as unreadable. On
+  24.04 the same probe returned true. Measured as root with full capabilities
+  on one file: external `test -r` gave 0 on 24.04 and 1 on 26.04, while the
+  shell builtin and `test -e` agreed on both. Readability is now answered by
+  opening the file, which depends on no coreutils policy about what root may
+  read and reads no key material. This was a refusal on a real server, not a
+  test artifact, and only the release matrix surfaced it.
+
 - Made the sandbox readiness check release-portable. It waited for systemd to
   report `running`, but on 26.04 `systemd-modules-load.service` fails inside a
   container — it cannot load kernel modules — so systemd settles `degraded` and

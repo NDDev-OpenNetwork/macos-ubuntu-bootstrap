@@ -37,18 +37,19 @@ remains available in immutable Git tags.
   all thirteen artifacts and requires the payload count, the (lane, architecture)
   set, each result, each capability list, each observation ledger, each
   `not_proven` list and each SHA to hold. `evidence-gate` is now in the
-  checked-in required-check projection, and `platform-evidence` also runs on
-  `main` — a `pull_request` run reports against the PR head, so a release
-  candidate merge commit previously carried no `evidence-gate` at all. Adding
-  that trigger put the workflow in the default-branch context, where the
-  Actions cache is writable, so `platform-evidence`'s `sha` dispatch input was
-  removed with it: it accepted any commit reachable from the repository,
-  including a fork's PR head under `refs/pull/*`, and running that as a
-  privileged checkout is a cache-poisoning path CodeQL correctly flagged. A
-  dispatch now verifies the ref it was dispatched against. Release
-  preparation verifies both mandatory gates on the exact candidate commit on
-  every trigger, including a tag push, which previously published without asking
-  about hosted evidence.
+  checked-in required-check projection.
+- Made release preparation verify both mandatory gates before publication, on
+  every trigger including a tag push, which previously published without asking
+  about hosted evidence at all. `evidence-gate` reports against a PR head rather
+  than the merge commit that lands, so rather than give `platform-evidence` a
+  default-branch trigger — it checks out a contributor's head SHA and runs it,
+  and a default-branch trigger would hand that write access to the default-branch
+  Actions cache scope — the release gate proves the candidate's tree is identical
+  to the head whose `evidence-gate` is green. `main` already guarantees that
+  through `strict_required_status_checks_policy`, and the gate verifies it rather
+  than assuming it. `platform-evidence`'s `sha` dispatch input was removed for the
+  same reason: it accepted any commit reachable from the repository, including a
+  fork's PR head under `refs/pull/*`.
 
 - Connected the device integrity receipt to the lifecycle it documents.
   `scripts/device_integrity.py` had no runtime caller, and its

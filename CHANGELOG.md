@@ -32,6 +32,13 @@ remains available in immutable Git tags.
 
 ### Fixed
 
+- Stopped superseded evidence runs holding the queue. `evidence-gate` proves
+  the artifacts belong to one exact SHA and the release gate resolves a
+  candidate through the head whose gate is green, so a run for an older head
+  answers a question nobody is asking. With the lane count doubled by 26.04
+  coverage and `max-parallel: 2` serialising the sandbox matrix, letting each
+  push queue a full run behind the one it invalidated turned two quick
+  corrections into two hours of runner time.
 - Key-only SSH hardening no longer refuses a valid `authorized_keys` on Ubuntu
   26.04. The preflight asked `test -r` through `sudo`, and coreutils 9.5
   answers `-r` via `access(2)` without granting root its usual override, so a

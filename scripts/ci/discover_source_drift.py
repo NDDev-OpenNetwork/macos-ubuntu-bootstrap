@@ -38,6 +38,7 @@ import os
 import re
 import sys
 import urllib.error
+import urllib.parse
 import urllib.request
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -80,11 +81,22 @@ class Finding:
         }
 
 
+# The only host this script may send a credential to.
+GITHUB_API_HOST = "api.github.com"
+
+
 def _get(url: str) -> Any:
-    """Fetch first-party JSON. Network and rate-limit failures raise OSError."""
+    """Fetch first-party JSON. Network and rate-limit failures raise OSError.
+
+    The token is attached by exact hostname, never by substring. `"api.github.com"
+    in url` would also match `https://evil.example.invalid/api.github.com/x`,
+    handing the credential to whoever chose that URL. Every URL here is a
+    hardcoded constant so it was not reachable, but a token-scoping test that is
+    right by accident is one refactor from being wrong.
+    """
     request = urllib.request.Request(url, headers={"User-Agent": USER_AGENT})
     token = os.environ.get("GITHUB_TOKEN", "")
-    if token and "api.github.com" in url:
+    if token and urllib.parse.urlsplit(url).hostname == GITHUB_API_HOST:
         request.add_header("Authorization", f"Bearer {token}")
     with urllib.request.urlopen(request, timeout=TIMEOUT_SECONDS) as response:  # noqa: S310
         return json.loads(response.read().decode("utf-8"))

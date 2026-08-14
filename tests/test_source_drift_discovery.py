@@ -174,3 +174,41 @@ def test_discovery_cannot_write_the_contract() -> None:
     assert not _re.search(r"\bopen\([^)]*['\"][wax]", source), (
         "discovery opened a file for writing; it must only read metadata"
     )
+
+
+@pytest.mark.parametrize("url,expected", [
+    ("https://api.github.com/repos/x/y/releases/latest", True),
+    # A lookalike host that merely contains the API host as a substring.
+    ("https://evil.example.invalid/api.github.com/repos/x/y", False),
+    ("https://api.github.com.evil.example.invalid/repos/x/y", False),
+    ("https://nodejs.org/dist/index.json", False),
+    ("https://registry.npmjs.org/@openai/codex/latest", False),
+])
+def test_the_token_goes_only_to_the_github_api_host(monkeypatch, url, expected) -> None:
+    """`"api.github.com" in url` would hand the credential to a lookalike host.
+
+    Every URL in this script is a hardcoded constant, so it was not reachable --
+    but a credential boundary that is right by accident is one refactor away
+    from being wrong, and CodeQL was correct to say so.
+    """
+    seen: dict[str, str] = {}
+
+    class _Response:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *exc):
+            return False
+
+        def read(self):
+            return b"{}"
+
+    def capture(request, timeout=None):
+        seen.update(request.headers)
+        return _Response()
+
+    monkeypatch.setenv("GITHUB_TOKEN", "secret-value")
+    monkeypatch.setattr(drift.urllib.request, "urlopen", capture)
+    drift._get(url)
+    carried = any("secret-value" in value for value in seen.values())
+    assert carried is expected, f"{url}: token carried={carried}, expected {expected}"

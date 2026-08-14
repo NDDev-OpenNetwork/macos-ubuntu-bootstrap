@@ -330,3 +330,100 @@ def test_no_stale_runtime_version_survives_anywhere_in_the_verifier() -> None:
     found = set(re.findall(r"\b\d+\\?\.\d+\\?\.\d+\b", UBUNTU_VERIFY))
     stale = found - known
     assert not stale, f"verifier asserts versions absent from the contract: {sorted(stale)}"
+
+
+# --------------------------------------------------------------------------
+# macOS package determinism (#63, ADR 0010)
+#
+# The Homebrew set resolves by bare name, so one release yields different tool
+# versions depending on host history. That was never a taken decision, and the
+# provenance schema documented the opposite of it. ADR 0010 takes the decision;
+# these tests bind it to the installer so a package cannot be added without one.
+# --------------------------------------------------------------------------
+
+
+def _macos_array(name: str) -> list[str]:
+    match = re.search(rf"^{name}=\(\n(.*?)^\)", MACOS_INSTALL, re.S | re.M)
+    if match:
+        return re.sub(r"#.*$", "", match.group(1), flags=re.M).split()
+    match = re.search(rf"^{name}=\((.*?)\)$", MACOS_INSTALL, re.M)
+    assert match, f"{name} not found in scripts/macos/install.sh"
+    return match.group(1).split()
+
+
+def test_every_macos_formula_and_cask_has_a_determinism_class() -> None:
+    block = CONTRACT["macos_package_determinism"]
+    assert set(_macos_array("BREW_SOURCE_PACKAGES")) == set(block["rolling-homebrew-formula"])
+    assert set(_macos_array("GUI_CASKS")) == set(block["rolling-homebrew-cask"])
+
+
+def test_every_declared_class_is_defined_and_non_empty() -> None:
+    block = CONTRACT["macos_package_determinism"]
+    defined = set(block["classes"])
+    populated = {
+        key for key in block
+        if not key.startswith("_") and key not in {"classes", "provenance_may_declare",
+                                                   "provenance_must_not_declare"}
+    }
+    assert populated == defined, f"class keys and definitions disagree: {populated ^ defined}"
+    for name in defined:
+        assert block[name], f"{name} is declared but empty"
+        assert len(block["classes"][name]) > 40, f"{name} has no usable definition"
+
+
+def test_no_package_is_classified_twice() -> None:
+    block = CONTRACT["macos_package_determinism"]
+    seen: set[str] = set()
+    for name in block["classes"]:
+        members = set(block[name])
+        assert not (members & seen), f"{name} re-classifies {sorted(members & seen)}"
+        seen |= members
+
+
+def test_the_registry_pinned_class_holds_exact_versions() -> None:
+    """A registry-pinned entry without a version is a rolling entry in disguise."""
+    block = CONTRACT["macos_package_determinism"]
+    lsp = set(_macos_array("BUN_LSP_PACKAGES")) if "BUN_LSP_PACKAGES=(" in MACOS_INSTALL else set()
+    lsp = {item.strip('"') for item in lsp}
+    for entry in block["registry-pinned"]:
+        if entry == "@openai/codex":
+            continue  # pinned by version + sha512 in harnesses, not by an npm spec
+        assert "@" in entry.lstrip("@"), f"{entry} names no version"
+        assert entry in lsp, f"{entry} is classified but not in BUN_LSP_PACKAGES"
+
+
+def test_the_exact_class_covers_what_must_not_come_from_homebrew() -> None:
+    """Herdr and Homebrew itself are exact, and deliberately not formulae."""
+    block = CONTRACT["macos_package_determinism"]
+    exact = set(block["immutable-upstream-artifact"])
+    assert {"herdr", "homebrew-pkg"} <= exact
+    # Herdr must not also be a formula: AGENTS.md forbids substituting the
+    # Homebrew formula for the receipt-pinned release asset.
+    assert "herdr" not in set(_macos_array("BREW_SOURCE_PACKAGES"))
+    assert CONTRACT["user_tools"]["herdr"]["install_method"]["macos"] == (
+        "verified-github-release-binary"
+    )
+
+
+def test_provenance_may_not_declare_what_no_resolver_can_check() -> None:
+    """The five-tuple that read as a guarantee and was never read.
+
+    Each forbidden field carries the reason it is forbidden, so a future change
+    has to argue with the reason rather than just re-add the field.
+    """
+    block = CONTRACT["macos_package_determinism"]
+    forbidden = block["provenance_must_not_declare"]
+    for field in ("formula_revision", "bottle_tag", "bottle_rebuild",
+                  "bottle_sha256", "executable_sha256"):
+        assert field in forbidden, f"{field} is not recorded as forbidden"
+        assert len(forbidden[field]) > 30, f"{field} is forbidden without a reason"
+    assert not set(forbidden) & set(block["provenance_may_declare"])
+
+
+def test_the_adr_exists_and_is_cited_by_the_contract() -> None:
+    """A citation that resolves to nothing is a defect, per docs/adr/README.md."""
+    referenced = CONTRACT["macos_package_determinism"]["_adr"]
+    assert (ROOT / referenced).is_file(), f"contract cites a missing ADR: {referenced}"
+    adr = (ROOT / referenced).read_text(encoding="utf-8")
+    assert adr.startswith("# ADR 0010:")
+    assert "Status: accepted" in adr

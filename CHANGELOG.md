@@ -26,6 +26,19 @@ remains available in immutable Git tags.
   before that decision would fail verification on a host whose already
   installed formula the installer deliberately preserves.
 
+### Added
+
+- ADR 0010 takes the macOS package determinism decision the repository had
+  drifted into without recording: the Homebrew formula and cask sets are
+  intentionally rolling, and anything whose exact bytes matter is installed from
+  an immutable upstream artifact instead, as Herdr already was. Every macOS
+  package now carries a determinism class in `macos_package_determinism`, bound
+  to the installer's arrays by tests, so a package cannot be added without one.
+  The record also fixes what provenance metadata may claim -- only facts a
+  resolver can establish on the machine it runs on -- and names each field it may
+  not claim together with the reason, so `executable_sha256` cannot be re-added
+  for a rolling formula whose digest moves on every homebrew-core rebuild.
+
 ### Fixed
 
 - Made `evidence-gate` prove something. It read four `needs.*.result` values and

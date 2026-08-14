@@ -59,6 +59,14 @@ enforcement this repository cannot observe.
   server runtime and hardening in `scripts/ubuntu/server.sh`.
 - Preserve exact runtime receipts and architecture hashes for fixed artifacts.
 - Do not add mutable dependency resolution where a frozen/pinned path exists.
+- macOS Homebrew formulae and casks are **intentionally rolling** (ADR 0010).
+  Ubuntu pins exact artifacts; the platforms differ and
+  `macos_package_determinism` in the contract records the class of every macOS
+  package. Anything whose exact bytes matter is not a Homebrew package -- that is
+  why Herdr comes from a checksum-pinned release asset. Provenance metadata may
+  claim only what a resolver can establish locally; never re-add a frozen
+  `executable_sha256` for a rolling formula, because homebrew-core rebuilds move
+  it and freezing it turns an ordinary upstream event into a red required check.
 
 ## Ubuntu server safeguards
 

@@ -55,7 +55,7 @@ RUST_VERSION="1.97.1"
 RUST_CHANNEL_DATE="2026-07-16"
 RUST_SHA256_X86_64="88f28fa9af20594179f85d6df67078dfd6fa93e2f6da5e1e9b0ac4997988ca4f"
 RUST_SHA256_AARCH64="9a7a2c336b4787f1b72f6bab7c35d5b7af2fd03cbd39b4fc721466a70d402a7d"
-# Dart is the third desktop language-server host (ADR 0006), on the same footing
+# Dart is the third desktop language-server host (ADR 0005), on the same footing
 # as Go and Rust. One self-contained SDK archive carries `dart language-server`
 # (the analysis server) and `dart mcp-server` (the Dart/Flutter MCP transport the
 # rldyour-mcps marketplace declares), so a single tracked hash covers both. The
@@ -87,6 +87,11 @@ APT_SOURCE_PACKAGES=(
 )
 
 APT_DESKTOP_BUILD_PACKAGES=(build-essential)
+
+# Declared by the contract as ubuntu_apt_packages.desktop_gui_fonts. It used
+# to be installed as a bare literal inside install_gui_apps, so the package
+# parity test could not see it and the contract did not know it existed.
+APT_DESKTOP_GUI_FONTS=(fonts-jetbrains-mono)
 
 
 # Registry-backed language servers + source checks, pinned to exact versions
@@ -1239,7 +1244,7 @@ ensure_rust() {
   }
 }
 
-# Dart SDK host (ADR 0006). The stable channel publishes one self-contained zip
+# Dart SDK host (ADR 0005). The stable channel publishes one self-contained zip
 # per architecture whose only top-level entry is `dart-sdk/`, so the wrapper is
 # stripped exactly the way ensure_rust strips its own. `dart` is the single
 # published link: `dart language-server` backs Dart/Flutter source analysis and
@@ -1530,6 +1535,11 @@ install_python_source_tools() {
     version="${entry#*==}"
     # Reproducible: skip only when the EXACT pinned version is already installed;
     # otherwise force-install the pin so a stale/divergent version is corrected.
+    if [ "${RLDYOUR_DRY_RUN:-1}" -eq 1 ]; then
+      # `uv tool list` materializes ~/.cache/uv before it can answer.
+      rldyour::log "info" "[DRY-RUN] ensure pinned uv tool: ${entry}"
+      continue
+    fi
     if uv tool list 2>/dev/null | grep -Eq "^${name}[[:space:]]+v?${version//./\\.}([[:space:]]|$)"; then
       rldyour::log "ok" "pinned uv tool present: ${entry}"
     else
@@ -1546,6 +1556,12 @@ install_bun_lsps() {
     version="${entry##*@}"
     # Reproducible: skip only when the EXACT pinned version is already installed;
     # otherwise install the pin so a stale/divergent version is corrected.
+    if [ "${RLDYOUR_DRY_RUN:-1}" -eq 1 ]; then
+      # `bun pm ls -g` creates ~/.bun/install/global before it can answer, so a
+      # plan may not ask. State the pin the apply will converge on.
+      rldyour::log "info" "[DRY-RUN] ensure pinned Bun source tool: ${entry}"
+      continue
+    fi
     if bun pm ls -g 2>/dev/null | grep -Fq "${name}@${version}"; then
       rldyour::log "ok" "pinned Bun source tool present: ${entry}"
     else
@@ -1567,7 +1583,7 @@ install_gui_apps() {
     return 0
   fi
   rldyour::section "Install verified Ubuntu GUI applications"
-  apt_install fonts-jetbrains-mono || rldyour::log "warn" "fonts-jetbrains-mono unavailable"
+  apt_install "${APT_DESKTOP_GUI_FONTS[@]}" || rldyour::log "warn" "desktop GUI fonts unavailable"
   # Desktop customization: GNOME dock, Russian layout, Chrome, Firefox removal.
   rldyour::section "Configure Ubuntu desktop (dock, keyboard, browser)"
   local desktop_script
@@ -1690,11 +1706,6 @@ main() {
   else
     rldyour::log "info" "desktop entries skipped: gui disabled"
   fi
-  if [ "$user_tools_failed" -ne 0 ]; then
-    rldyour::log "error" "one or more user tools remain unmanaged or divergent; all repairs were attempted"
-    return 1
-  fi
-
   install_gui_apps
   run_server_layer
 
@@ -1707,8 +1718,22 @@ main() {
   # verify.sh requires. Ordering it last keeps the failure fatal, which it must be,
   # while making it fatal to itself instead of to the whole device.
   [ "$SKIP_AI" -eq 1 ] || install_ai_runtimes
+
+  # Every optional-layer failure is reported here, once, after every layer has
+  # been attempted. The user-tool result used to be reported earlier, before
+  # install_gui_apps, run_server_layer and install_ai_runtimes -- so a single
+  # divergent Herdr, which is a user tool on every profile including server,
+  # left a server without Docker, without the vendor AI CLIs and without
+  # verification, while the message claimed every repair had been attempted.
+  # A failure here must stay fatal to the run; it must not be fatal to the
+  # layers behind it.
+  if [ "$user_tools_failed" -ne 0 ]; then
+    rldyour::log "error" "one or more user tools remain unmanaged or divergent; every other layer was still attempted"
+  fi
   if [ "$GUI_LAYER_FAILED" -ne 0 ]; then
     rldyour::log "error" "desktop customization failed a required step; every other layer was still attempted"
+  fi
+  if [ "$user_tools_failed" -ne 0 ] || [ "$GUI_LAYER_FAILED" -ne 0 ]; then
     return 1
   fi
   verify_apply

@@ -184,3 +184,76 @@ def test_macos_herdr_asset_matches_contract_and_bypasses_homebrew() -> None:
     assert herdr["source"]["verified_at"] == "2026-08-13"
     assert "never invoke mutable herdr update" in herdr["update_policy"]
     assert "herdr update" not in MACOS_INSTALL
+
+
+# ---------- desktop entries, GUI fonts, and launcher preconditions ----------
+
+
+def _gui_capable_profiles() -> list[str]:
+    """Profiles whose contract allows gui_modes to be enabled."""
+    profiles = CONTRACT["targets"]["ubuntu"]["profiles"]
+    return sorted(
+        name for name, spec in profiles.items() if "enabled" in spec["gui_modes"]
+    )
+
+
+def test_desktop_entries_cover_every_gui_capable_profile() -> None:
+    """install_desktop_entries is gated on GUI, not on profile.
+
+    The contract listed only `desktop`, so a desktop-builds workstation with a
+    GUI installed both launchers while the contract said it should not -- and
+    no test could see the disagreement. desktop-builds is everything desktop
+    has plus Docker (ADR 0008), and user_tools.telegram already declared both.
+    """
+    expected = _gui_capable_profiles()
+    for name, entry in CONTRACT["desktop_entries"].items():
+        assert sorted(entry["profiles"]) == expected, (
+            f"desktop entry {name} does not match the GUI-capable profile set"
+        )
+
+
+def test_desktop_entries_are_installed_for_any_gui_profile() -> None:
+    """The installer's gate must be the one the contract describes."""
+    body = UBUNTU_INSTALL.split("install_desktop_entries() {", 1)[1].split("\n}", 1)[0]
+    assert '[ "$GUI_ENABLED" -eq 1 ]' in body
+    # $PROFILE appears only in the skip message, never as a condition.
+    assert '[ "$PROFILE"' not in body, (
+        "the installer gates desktop entries on GUI alone; the contract must say so"
+    )
+
+
+def test_gui_fonts_are_declared_rather_than_inlined() -> None:
+    declared = CONTRACT["ubuntu_apt_packages"]["desktop_gui_fonts"]
+    block = re.search(r"^APT_DESKTOP_GUI_FONTS=\((.*?)\)", UBUNTU_INSTALL, re.M | re.S)
+    assert block, "APT_DESKTOP_GUI_FONTS is missing"
+    assert block.group(1).split() == declared, "GUI font set drifts from the contract"
+    assert 'apt_install fonts-jetbrains-mono' not in UBUNTU_INSTALL, (
+        "a bare literal install is invisible to package parity"
+    )
+
+
+def test_every_desktop_entry_declares_a_runnable_precondition() -> None:
+    """A launcher whose program is absent must hide, not fail silently.
+
+    herdr.desktop runs Ptyxis, which nothing here installs and which Ubuntu
+    24.04 does not package; without TryExec the entry appears in the menu and
+    starts nothing.
+    """
+    for name, entry in CONTRACT["desktop_entries"].items():
+        template = ROOT / entry["source"]
+        text = template.read_text(encoding="utf-8")
+        exec_lines = [
+            line for line in text.splitlines() if line.startswith("Exec=")
+        ]
+        assert exec_lines, f"{name}: no Exec line"
+        try_exec = [line for line in text.splitlines() if line.startswith("TryExec=")]
+        assert len(try_exec) == 1, f"{name}: exactly one TryExec is required"
+        program = try_exec[0].removeprefix("TryExec=").strip()
+        assert program, f"{name}: empty TryExec"
+        first = exec_lines[0].removeprefix("Exec=").split()
+        # `Exec=env VAR=value program ...` is the managed Telegram shape.
+        while first and ("=" in first[0] or first[0] == "env"):
+            first = first[1:]
+        assert first and Path(first[0]).name == Path(program).name, (
+            f"{name}: TryExec {program} does not guard Exec {exec_lines[0]}"
+        )

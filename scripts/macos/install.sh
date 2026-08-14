@@ -105,8 +105,14 @@ ensure_homebrew() {
 
 ensure_formula() {
   local formula="$1"
-  if [ "$RLDYOUR_DRY_RUN" -eq 1 ] && ! command -v brew >/dev/null 2>&1; then
-    rldyour::log "info" "[DRY-RUN] brew install ${formula}"
+  # A plan states the formula it will converge on; it does not ask Homebrew.
+  # The guard used to fire only when brew was ABSENT, so on the machine this
+  # installer actually targets -- where brew is always present -- a plan ran
+  # `brew list` once per formula. That is an execution during a dry run, and
+  # Homebrew materializes ~/Library/Caches/Homebrew/bootsnap on the first call,
+  # so the plan wrote to the home directory it was only describing.
+  if [ "$RLDYOUR_DRY_RUN" -eq 1 ]; then
+    rldyour::log "info" "[DRY-RUN] ensure Homebrew formula: ${formula}"
     return 0
   fi
   if brew list --formula "$formula" >/dev/null 2>&1; then
@@ -123,7 +129,7 @@ install_source_packages() {
     ensure_formula "$formula"
   done
   # `dart-sdk` backs the Dart analysis server and the `dart mcp-server` transport
-  # (ADR 0006). Homebrew cannot pin an exact patch, so unlike Ubuntu there is no
+  # (ADR 0005). Homebrew cannot pin an exact patch, so unlike Ubuntu there is no
   # receipt here — but the telemetry opt-out is identical on both platforms and
   # shares one helper.
   if [ "$RLDYOUR_DRY_RUN" -eq 1 ]; then
@@ -295,8 +301,9 @@ verify_existing_cask_app() {
 ensure_cask() {
   local cask="$1"
   local app_path=""
-  if [ "$RLDYOUR_DRY_RUN" -eq 1 ] && ! command -v brew >/dev/null 2>&1; then
-    rldyour::log "info" "[DRY-RUN] brew install --cask ${cask}"
+  # Same contract as ensure_formula: no Homebrew invocation during a plan.
+  if [ "$RLDYOUR_DRY_RUN" -eq 1 ]; then
+    rldyour::log "info" "[DRY-RUN] ensure Homebrew cask: ${cask}"
     return 0
   fi
   if brew list --cask "$cask" >/dev/null 2>&1; then
@@ -350,6 +357,12 @@ install_bun_lsps() {
     version="${entry##*@}"
     # Reproducible: skip only when the EXACT pinned version is already installed;
     # otherwise install the pin so a stale/divergent version is corrected.
+    if [ "${RLDYOUR_DRY_RUN:-1}" -eq 1 ]; then
+      # `bun pm ls -g` creates ~/.bun/install/global before it can answer, so a
+      # plan may not ask. State the pin the apply will converge on.
+      rldyour::log "info" "[DRY-RUN] ensure pinned Bun source tool: ${entry}"
+      continue
+    fi
     if bun pm ls -g 2>/dev/null | grep -Fq "${name}@${version}"; then
       rldyour::log "ok" "pinned Bun source tool present: ${entry}"
     else

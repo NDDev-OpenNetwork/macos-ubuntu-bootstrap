@@ -1,8 +1,7 @@
 #!/usr/bin/env python3
 """Build and verify the installed device runtime receipt against the contract.
 
-This script mirrors the architecture of ``browser_runtime_integrity.py``: a
-canonical-JSON receipt is built from a proven installed state, persisted
+A canonical-JSON receipt is built from a proven installed state, persisted
 atomically, and verified by re-collecting the state and comparing exactly. It
 extends the pattern to the *whole device* — not just the browser stack — by
 also comparing every declared runtime version and pinned source tool against
@@ -132,8 +131,8 @@ def _resolve_build_profile(explicit: str | None) -> str:
     When none is set we fall back to ``desktop`` — the strict superset that
     verifies every runtime host and tool. That default is fail-closed: a server
     receipt built without a profile is over-verified into a loud NOT_PROVEN, not
-    silently under-verified into a false PROVEN. The one automated caller
-    (scripts/bootstrap-device.sh run_doctor) always passes ``--profile``.
+    silently under-verified into a false PROVEN. There is currently no automated
+    caller; every invocation should pass ``--profile`` explicitly.
     """
     if explicit:
         if explicit not in VALID_PROFILES:
@@ -248,8 +247,8 @@ def policy_hashes() -> dict[str, str]:
 def _run_version(binary: Path, flag: str) -> str:
     """Run ``<binary> <flag>`` in a scrubbed environment and return stdout.
 
-    Mirrors the subprocess idiom of browser_runtime_integrity.py: strip
-    PYTHONPATH/PYTHONHOME, capture output, timeout, and chain-raise on failure.
+    Strips PYTHONPATH/PYTHONHOME, captures output, applies a timeout, and
+    chain-raises on failure.
     """
     if not binary.exists():
         return "absent"
@@ -409,10 +408,13 @@ def _harness_state(home: Path) -> dict[str, dict[str, Any]]:
     """Record where each catalogued harness resolves on this device.
 
     ``one-owner-per-harness`` was prose only. Nothing on a device could say
-    whether ``codex`` resolved to the target ``nddev-codex-app`` publishes or to
-    a second copy from a package-manager global, and nothing recorded that a
-    delegated on-pause harness was installed anyway. This records the observed
-    facts; the contract, not the receipt, decides what they mean.
+    whether ``codex`` resolved to the target its own installer publishes or to a
+    second copy from a package-manager global. This records the observed facts;
+    the contract, not the receipt, decides what they mean.
+
+    The contract carries no ``harnesses.detection`` block, so this collector and
+    the ownership check below currently observe nothing. That gap is tracked
+    separately; do not read a passing receipt as proof of harness ownership.
     """
     contract = load_contract()
     detection = contract.get("harnesses", {}).get("detection", {})

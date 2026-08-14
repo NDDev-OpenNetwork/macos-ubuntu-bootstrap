@@ -7,6 +7,37 @@ remains available in immutable Git tags.
 
 ### Fixed
 
+- Source drift was rendered and never acted on. `discover_source_drift.py`
+  exited non-zero only for a `violation`; an ordinary `behind` result printed a
+  row, uploaded a report and exited zero, so the scheduled run went green and the
+  finding existed only inside a job summary nobody opens. `#66` — the issue this
+  script exists to keep from recurring — was seven pins behind their upstreams,
+  and this mechanism would have reported them exactly that quietly. A non-held
+  `behind` now fails, and the message names the pin, both versions, and the two
+  ways to resolve it.
+
+  Unreachability keeps its exemption, because "GitHub rate-limited us" is not
+  evidence that a pin drifted — but only up to a tolerance. Past it the run has
+  not read enough to be evidence of anything and says so instead of reporting
+  health. The residual limit is stated in the script rather than hidden: a single
+  source unreachable every week stays inside the tolerance, and catching that
+  needs state across runs the script deliberately does not keep.
+
+  The workflow also ran discovery **twice**, once for `--markdown` and once for
+  `--json` — two network snapshots taken minutes apart, free to disagree, each
+  spending the rate limit the other needed. It now probes once and renders that
+  snapshot with `--from-json`, so the summary, the artifact and the exit status
+  all describe the same moment. The report is published before the job fails: a
+  failure whose evidence was never uploaded is one people re-run rather than read.
+
+### Changed
+
+- Refreshed uv `0.12.4` → `0.12.5`, with both architecture digests computed from
+  the downloaded artifacts. Found by the drift check above on its first real run,
+  against sources the previous version would have reported as green.
+
+### Fixed
+
 - The module's own declared verification lane could not run on a clean host.
   `.gds/repository.yaml` began `verification.commands.test` with
   `uv venv --python 3.14`, and declared no prerequisite that provides uv — or

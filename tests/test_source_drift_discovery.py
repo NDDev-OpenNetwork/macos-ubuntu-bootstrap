@@ -109,8 +109,8 @@ def test_violations_fail_the_run(monkeypatch, capsys) -> None:
     OSError("connection reset"),
     TimeoutError("timed out"),
 ])
-def test_an_unreachable_source_is_reported_but_does_not_fail(monkeypatch, failure) -> None:
-    """A report that fails on GitHub's rate limit is a report people mute."""
+def test_an_unreachable_source_is_reported_as_unknown(monkeypatch, failure) -> None:
+    """Reachability is not evidence about a pin, whatever the transport said."""
     def explode(url):
         raise failure
     monkeypatch.setattr(drift, "_get", explode)
@@ -121,7 +121,35 @@ def test_an_unreachable_source_is_reported_but_does_not_fail(monkeypatch, failur
     assert all(item.status == "unknown" for item in findings), (
         [f"{i.name}={i.status}" for i in findings if i.status != "unknown"]
     )
-    assert drift.main([]) == 0
+
+
+def _finding(name: str, status: str, **kw) -> object:
+    return drift.Finding(
+        name=name, pinned=kw.get("pinned", "1.0.0"), latest=kw.get("latest"),
+        status=status, source=kw.get("source", "example"), detail=kw.get("detail", ""),
+    )
+
+
+def test_a_few_unreachable_sources_are_tolerated(capsys) -> None:
+    """A rate limit on two of twenty-five must not read as drift."""
+    findings = [_finding(f"tool{i}", "current") for i in range(20)]
+    findings += [_finding("a", "unknown"), _finding("b", "unknown")]
+    assert drift.report(findings) == 0
+    assert "source-drift-unknown: a" in capsys.readouterr().err
+
+
+def test_mostly_unknown_is_not_a_clean_report(capsys) -> None:
+    """The silent-green case: nothing was read, and it looked like health."""
+    findings = [_finding(f"tool{i}", "unknown") for i in range(10)]
+    assert drift.report(findings) == 1
+    assert "not evidence that the pins are current" in capsys.readouterr().err
+
+
+def test_the_unknown_tolerance_is_the_boundary() -> None:
+    ok = [_finding("x", "current")] + [_finding(f"u{i}", "unknown") for i in range(2)]
+    over = [_finding("x", "current")] + [_finding(f"u{i}", "unknown") for i in range(3)]
+    assert drift.report(ok, unknown_tolerance=2) == 0
+    assert drift.report(over, unknown_tolerance=2) == 1
 
 
 # ----------------------------- drift itself -----------------------------
@@ -132,6 +160,47 @@ def test_a_newer_upstream_is_reported_as_behind(monkeypatch) -> None:
     findings = {item.name: item for item in drift.discover(CONTRACT)}
     assert findings["codex"].status == "behind"
     assert findings["codex"].latest == "999.0.0"
+
+
+def test_a_behind_pin_fails_the_run(capsys) -> None:
+    """Rendering a finding and exiting zero is how #66 could have recurred."""
+    findings = [_finding("x", "current"), _finding("codex", "behind", latest="999.0.0")]
+    assert drift.report(findings) == 1
+    err = capsys.readouterr().err
+    assert "source-drift-behind: codex" in err
+    assert "INTENTIONAL_HOLDS" in err, "the message must say what to do about it"
+
+
+def test_a_held_pin_does_not_fail_the_run(capsys) -> None:
+    """A hold is a decision that was made, not a finding waiting to be made."""
+    findings = [_finding("x", "current"),
+                _finding("codex", "held", latest="999.0.0", detail="pending advisory")]
+    assert drift.report(findings) == 0
+    assert capsys.readouterr().err == ""
+
+
+def test_rendering_reads_a_snapshot_instead_of_probing_again(tmp_path, monkeypatch) -> None:
+    """One run, one moment.
+
+    The workflow used to invoke this script twice -- once for Markdown, once for
+    JSON -- so the summary and the artifact were two network snapshots taken
+    minutes apart, free to disagree, each spending the rate limit the other
+    needed.
+    """
+    calls = []
+    monkeypatch.setattr(drift, "_get", lambda url: calls.append(url) or {"tag_name": "v1"})
+
+    snapshot = tmp_path / "report.json"
+    snapshot.write_text(json.dumps([
+        _finding("codex", "behind", latest="999.0.0").as_dict(),
+        _finding("x", "current").as_dict(),
+    ]), encoding="utf-8")
+
+    assert drift.main(["--markdown", "--from-json", str(snapshot)]) == 1
+    assert calls == [], "rendering a snapshot must not touch the network"
+
+    restored = drift.load_snapshot(snapshot)
+    assert [item.status for item in restored] == ["behind", "current"]
 
 
 def test_an_intentional_hold_reads_as_a_decision(monkeypatch) -> None:

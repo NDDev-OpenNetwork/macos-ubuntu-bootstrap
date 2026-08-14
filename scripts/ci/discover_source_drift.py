@@ -18,16 +18,36 @@ Fail-closed conditions, each of which exits non-zero:
 - an architecture the contract requires is no longer published;
 - a probe returns a URL that is not a fixed, versioned location.
 
-A network or rate-limit failure is NOT one of those: it is reported as
-``unknown`` and leaves the exit status alone, because "GitHub was rate-limiting
-us" is not evidence that a pin drifted, and turning it into a failure would
-train people to ignore this report.
+A pin that is simply behind its upstream also exits non-zero, unless it carries
+an entry in ``INTENTIONAL_HOLDS``. That is the difference between a report and a
+check: this used to render `behind` and exit 0, so the scheduled run went green
+and the finding existed only inside a job summary nobody opens. #66 found seven
+pins behind their upstreams; a mechanism that would have reported them exactly
+as quietly is not a fix for that.
+
+A network or rate-limit failure is treated differently, because "GitHub was
+rate-limiting us" is not evidence that a pin drifted. One or two `unknown`
+results are reported and tolerated. Above ``UNKNOWN_TOLERANCE`` the run has not
+learned enough to be evidence of anything and fails as such -- a report that is
+mostly "could not tell" should not be indistinguishable from a clean one.
+
+The residual limit, stated rather than hidden: a *single* source that is
+unreachable every week stays inside the tolerance and stays green. Catching that
+needs state across runs, which this script deliberately does not have. The
+JSON snapshot is uploaded on every run so the history is inspectable.
+
+One network snapshot per run. Rendering reads a snapshot rather than probing
+again -- the workflow used to call this script twice, once for Markdown and once
+for JSON, so the two outputs described two different moments and consumed the
+rate limit twice to disagree.
 
 Usage:
 
-    python3 scripts/ci/discover_source_drift.py            # human-readable
-    python3 scripts/ci/discover_source_drift.py --json     # machine-readable
-    python3 scripts/ci/discover_source_drift.py --markdown # job summary
+    python3 scripts/ci/discover_source_drift.py                    # human-readable
+    python3 scripts/ci/discover_source_drift.py --json             # machine-readable
+    python3 scripts/ci/discover_source_drift.py --markdown         # job summary
+    python3 scripts/ci/discover_source_drift.py --markdown \
+        --from-json report.json                                    # render, no network
 """
 
 from __future__ import annotations
@@ -53,6 +73,12 @@ TIMEOUT_SECONDS = 30
 # A pin whose current value is intentionally held rather than stale. Each entry
 # states why, so a held pin reads as a decision instead of an oversight.
 INTENTIONAL_HOLDS: dict[str, str] = {}
+
+# How many sources may be unreachable before the run stops being evidence.
+# Two tolerates the transient rate limit this script was already careful about;
+# a report where a third of the sources could not be read says nothing about
+# whether the pins drifted, and should not be able to say it in green.
+UNKNOWN_TOLERANCE = 2
 
 
 class DiscoveryError(RuntimeError):
@@ -338,15 +364,73 @@ def render_text(findings: list[Finding]) -> str:
     return "\n".join(lines) + "\n"
 
 
+def load_snapshot(path: Path) -> list[Finding]:
+    """Rebuild findings from a snapshot this script wrote earlier."""
+    raw = json.loads(path.read_text(encoding="utf-8"))
+    return [
+        Finding(
+            name=item["name"], pinned=item["pinned"], latest=item["latest"],
+            status=item["status"], source=item["source"],
+            detail=item.get("detail", ""), assets=item.get("assets", []),
+        )
+        for item in raw
+    ]
+
+
+def report(findings: list[Finding], *, unknown_tolerance: int = UNKNOWN_TOLERANCE) -> int:
+    """The exit status the findings justify, and why, on stderr."""
+    failed = False
+
+    violations = [item for item in findings if item.status == "violation"]
+    for item in violations:
+        print(f"source-drift-violation: {item.name}: {item.detail}", file=sys.stderr)
+        failed = True
+
+    behind = [item for item in findings if item.status == "behind"]
+    for item in behind:
+        print(
+            f"source-drift-behind: {item.name}: contract pins {item.pinned}, "
+            f"{item.source} publishes {item.latest}. Refresh it, or record why "
+            "not in INTENTIONAL_HOLDS.",
+            file=sys.stderr,
+        )
+        failed = True
+
+    unknown = [item for item in findings if item.status == "unknown"]
+    for item in unknown:
+        print(f"source-drift-unknown: {item.name}: {item.detail}", file=sys.stderr)
+    if len(unknown) > unknown_tolerance:
+        print(
+            f"source-drift-unknown: {len(unknown)} of {len(findings)} sources could "
+            f"not be read, above the tolerance of {unknown_tolerance}. This run is "
+            "not evidence that the pins are current.",
+            file=sys.stderr,
+        )
+        failed = True
+
+    return 1 if failed else 0
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--json", action="store_true", help="machine-readable output")
     parser.add_argument("--markdown", action="store_true", help="job-summary output")
     parser.add_argument("--contract", type=Path, default=CONTRACT_PATH)
+    parser.add_argument(
+        "--from-json", type=Path, default=None,
+        help="render a snapshot this script wrote earlier instead of probing again",
+    )
+    parser.add_argument(
+        "--unknown-tolerance", type=int, default=UNKNOWN_TOLERANCE,
+        help="how many unreachable sources a run may report and still be evidence",
+    )
     args = parser.parse_args(argv)
 
-    contract = json.loads(args.contract.read_text(encoding="utf-8"))
-    findings = discover(contract)
+    if args.from_json is not None:
+        findings = load_snapshot(args.from_json)
+    else:
+        contract = json.loads(args.contract.read_text(encoding="utf-8"))
+        findings = discover(contract)
 
     if args.json:
         print(json.dumps([item.as_dict() for item in findings], indent=2, sort_keys=True))
@@ -355,12 +439,7 @@ def main(argv: list[str] | None = None) -> int:
     else:
         print(render_text(findings), end="")
 
-    violations = [item for item in findings if item.status == "violation"]
-    if violations:
-        for item in violations:
-            print(f"source-drift-violation: {item.name}: {item.detail}", file=sys.stderr)
-        return 1
-    return 0
+    return report(findings, unknown_tolerance=args.unknown_tolerance)
 
 
 if __name__ == "__main__":

@@ -52,7 +52,13 @@ remains available in immutable Git tags.
   `not_proven` list and each SHA to hold. `evidence-gate` is now in the
   checked-in required-check projection, and `platform-evidence` also runs on
   `main` — a `pull_request` run reports against the PR head, so a release
-  candidate merge commit previously carried no `evidence-gate` at all. Release
+  candidate merge commit previously carried no `evidence-gate` at all. Adding
+  that trigger put the workflow in the default-branch context, where the
+  Actions cache is writable, so `platform-evidence`'s `sha` dispatch input was
+  removed with it: it accepted any commit reachable from the repository,
+  including a fork's PR head under `refs/pull/*`, and running that as a
+  privileged checkout is a cache-poisoning path CodeQL correctly flagged. A
+  dispatch now verifies the ref it was dispatched against. Release
   preparation verifies both mandatory gates on the exact candidate commit on
   every trigger, including a tag push, which previously published without asking
   about hosted evidence.

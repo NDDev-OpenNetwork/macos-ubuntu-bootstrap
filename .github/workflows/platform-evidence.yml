@@ -15,17 +15,19 @@ on:
   # candidate SHA would be asking for something that never existed.
   push:
     branches: [main]
+  # No `sha` input. It used to accept any commit reachable from this repository,
+  # which includes a fork's PR head under refs/pull/*, and a dispatch always runs
+  # in the default-branch context where the Actions cache is writable. That is a
+  # privileged checkout of code nobody reviewed. With the push trigger above, a
+  # release candidate carries its own evidence and the input has no remaining
+  # use: a dispatch now verifies the ref it was dispatched against, which the
+  # dispatcher could already push to.
   workflow_dispatch:
-    inputs:
-      sha:
-        description: "Exact commit SHA to verify; must be reachable from this repository."
-        required: true
-        type: string
 
 permissions: {}
 
 concurrency:
-  group: platform-evidence-${{ github.event.pull_request.number || inputs.sha || github.sha }}
+  group: platform-evidence-${{ github.event.pull_request.number || github.sha }}
   cancel-in-progress: false
 
 jobs:
@@ -39,7 +41,7 @@ jobs:
     steps:
       - name: Checkout exact public commit without credentials
         env:
-          EVIDENCE_SHA: ${{ github.event.pull_request.head.sha || inputs.sha || github.sha }}
+          EVIDENCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
         run: |
           set -euo pipefail
           git init .
@@ -48,7 +50,7 @@ jobs:
           git checkout --detach "$EVIDENCE_SHA"
       - name: Native Apple Silicon apply and strict verification
         env:
-          EVIDENCE_SHA: ${{ github.event.pull_request.head.sha || inputs.sha || github.sha }}
+          EVIDENCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
         run: bash scripts/ci/platform-evidence.sh "${{ matrix.lane }}" "$RUNNER_TEMP/evidence"
       - name: Upload sanitized evidence
         if: always()
@@ -75,7 +77,7 @@ jobs:
     steps:
       - name: Checkout exact public commit without credentials
         env:
-          EVIDENCE_SHA: ${{ github.event.pull_request.head.sha || inputs.sha || github.sha }}
+          EVIDENCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
         run: |
           set -euo pipefail
           git init .
@@ -84,7 +86,7 @@ jobs:
           git checkout --detach "$EVIDENCE_SHA"
       - name: Native Ubuntu evidence
         env:
-          EVIDENCE_SHA: ${{ github.event.pull_request.head.sha || inputs.sha || github.sha }}
+          EVIDENCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
         run: bash scripts/ci/platform-evidence.sh "${{ matrix.lane }}" "$RUNNER_TEMP/evidence"
       - name: Upload sanitized evidence
         if: always()
@@ -114,7 +116,7 @@ jobs:
     steps:
       - name: Checkout exact public commit without credentials
         env:
-          EVIDENCE_SHA: ${{ github.event.pull_request.head.sha || inputs.sha || github.sha }}
+          EVIDENCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
         run: |
           set -euo pipefail
           git init .
@@ -123,7 +125,7 @@ jobs:
           git checkout --detach "$EVIDENCE_SHA"
       - name: Disposable systemd apply and strict verification
         env:
-          EVIDENCE_SHA: ${{ github.event.pull_request.head.sha || inputs.sha || github.sha }}
+          EVIDENCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
         run: bash scripts/ci/platform-evidence.sh "${{ matrix.lane }}" "$RUNNER_TEMP/evidence"
       - name: Upload sanitized evidence
         if: always()
@@ -140,7 +142,7 @@ jobs:
     steps:
       - name: Checkout exact public commit without credentials
         env:
-          EVIDENCE_SHA: ${{ github.event.pull_request.head.sha || inputs.sha || github.sha }}
+          EVIDENCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
         run: |
           set -euo pipefail
           git init .
@@ -149,7 +151,7 @@ jobs:
           git checkout --detach "$EVIDENCE_SHA"
       - name: Disposable SSH, UFW, and Fail2ban apply evidence
         env:
-          EVIDENCE_SHA: ${{ github.event.pull_request.head.sha || inputs.sha || github.sha }}
+          EVIDENCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
         run: bash scripts/ci/platform-evidence.sh sandbox-server-hardening "$RUNNER_TEMP/evidence"
       - name: Upload sanitized evidence
         if: always()
@@ -185,7 +187,7 @@ jobs:
       # a matrix. The steps below open every artifact.
       - name: Checkout exact public commit without credentials
         env:
-          EVIDENCE_SHA: ${{ github.event.pull_request.head.sha || inputs.sha || github.sha }}
+          EVIDENCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
         run: |
           set -euo pipefail
           git init .
@@ -201,7 +203,7 @@ jobs:
 
       - name: Verify the evidence supports what the matrix declares
         env:
-          EVIDENCE_SHA: ${{ github.event.pull_request.head.sha || inputs.sha || github.sha }}
+          EVIDENCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
         run: |
           set -euo pipefail
           python3 scripts/ci/verify_evidence_artifacts.py downloaded-evidence --sha "$EVIDENCE_SHA"

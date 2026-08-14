@@ -281,8 +281,8 @@ def _run_version(binary: Path, flag: str) -> str:
 def _normalize_version(raw: str, name: str) -> str:
     """Reduce a version string to the comparable token.
 
-    Each runtime emits its version differently (``v24.18.0``, ``uv 0.11.30``,
-    ``go version go1.26.5 linux/amd64``, ``rustc 1.97.1 (...)``). Pull the first
+    Each runtime emits its version differently (``v24.19.0``, ``uv 0.12.4``,
+    ``go version go1.26.6 linux/amd64``, ``rustc 1.97.1 (...)``). Pull the first
     ``X.Y.Z`` token so the comparison is against the contract's bare semver.
     """
     match = re.search(r"\d+\.\d+\.\d+", raw)

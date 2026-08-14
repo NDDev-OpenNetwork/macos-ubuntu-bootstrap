@@ -355,8 +355,8 @@ rldyour::install_vendor_ai_clis() {
     grok_script="$stage/grok-install.sh"
     rldyour::download_verified_sha512_file "$RLDYOUR_CODEX_TARBALL" "$RLDYOUR_CODEX_SHA512" "$codex_tgz" || return 1
     npm_bin="$(command -v npm 2>/dev/null || true)"
-    if [ -z "$npm_bin" ] && [ -x "$HOME/.local/share/rldyour/node/v24.18.0/bin/npm" ]; then
-      npm_bin="$HOME/.local/share/rldyour/node/v24.18.0/bin/npm"
+    if [ -z "$npm_bin" ] && [ -x "$HOME/.local/share/rldyour/node/v24.19.0/bin/npm" ]; then
+      npm_bin="$HOME/.local/share/rldyour/node/v24.19.0/bin/npm"
     fi
     [ -n "$npm_bin" ] || {
       rldyour::log "error" "npm is unavailable for the verified Codex package installation"

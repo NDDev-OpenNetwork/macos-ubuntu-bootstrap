@@ -11,8 +11,29 @@ remains available in immutable Git tags.
   made hosted evidence fail closed when a required capability is unproven or a
   runner/lane architecture is outside the declared proof boundary.
 
+### Changed
+
+- Refreshed every pinned upstream source against first-party release metadata
+  and recomputed each digest from the downloaded artifact: Node.js
+  24.18.0 -> 24.19.0, uv 0.11.30 -> 0.12.4, Homebrew.pkg 6.0.9 -> 6.0.17,
+  Go 1.26.5 -> 1.26.6, Dart SDK 3.12.2 -> 3.13.0, osv-scanner 2.4.0 -> 2.5.0,
+  and ast-grep 0.45.0 -> 0.45.1. Bun 1.3.14, gopls v0.23.0, Rust 1.97.1,
+  Herdr 0.8.0, Telegram 7.0.9, RustDesk 1.4.9, Codex 0.147.0, the Chrome
+  signing key, both vendor AI installer scripts, and the remaining eight
+  pinned source tools were re-downloaded and confirmed unchanged. The macOS
+  Dart floor stays at 3.12 on purpose: `dart-sdk` is a rolling Homebrew
+  formula whose determinism class is decided in #63, and raising the floor
+  before that decision would fail verification on a host whose already
+  installed formula the installer deliberately preserves.
+
 ### Fixed
 
+- Bound every version the Ubuntu verifier asserts to the contract. The
+  verifier checks uv with an escaped-dot regex, so it was the one pin a
+  literal refresh could not reach: the installer and the verifier could
+  publish and demand different versions, and a strict verify would then fail
+  on a correctly installed host. Two parity tests now prove the verifier
+  asserts the contract's versions and asserts no others.
 - Repaired Ubuntu GUI strict verification, which could not pass in any state:
   the Chrome signing-key check was written inside a double-quoted command
   substitution, so its escaped quotes reached `awk` verbatim and the verifier

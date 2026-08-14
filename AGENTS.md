@@ -12,6 +12,11 @@ platform installers/verifiers, `config/rldyour-contract.json`, `README.md`, and
 typed evidence tiers, and required-versus-optional proof. Device-integrity
 receipts report the state of one installed device; they do not redefine platform
 support or promote container/structural observations to native-host evidence.
+`scripts/device_integrity.py` is written by apply after strict verification
+passes and read back by `verify.sh --strict`; ADR 0007 records both call sites
+and what the receipt does and does not assert. `harnesses.detection` in the
+contract is what makes one-owner-per-harness checkable — do not describe an
+enforcement this repository cannot observe.
 
 ## Contract 3.0.1
 

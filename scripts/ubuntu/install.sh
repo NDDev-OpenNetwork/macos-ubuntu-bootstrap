@@ -1650,6 +1650,19 @@ run_server_layer() {
   rldyour::ubuntu_server::main "${args[@]}"
 }
 
+# Record the proven device state as a canonical receipt. This runs only after
+# strict verification has passed, so the receipt describes a state something
+# else already proved -- it is a record, never the proof itself. ADR 0007
+# describes this mechanism; until this call existed, nothing invoked it and the
+# document described something that did not run.
+build_device_receipt() {
+  rldyour::section "Record the device integrity receipt"
+  python3 "$REPO_ROOT/scripts/device_integrity.py" build --profile "$PROFILE" --replace-invalid || {
+    rldyour::log "error" "device receipt could not be built from the applied state"
+    return 1
+  }
+}
+
 verify_apply() {
   if [ "$RLDYOUR_DRY_RUN" -eq 1 ]; then
     rldyour::log "info" "plan complete; verification runs only after apply"
@@ -1660,6 +1673,7 @@ verify_apply() {
       RLDYOUR_SERVER_HARDEN_SSH="$HARDEN_SSH" \
       RLDYOUR_SERVER_ENABLE_FAIL2BAN="$WITH_FAIL2BAN" \
       bash "$SCRIPT_DIR/verify.sh" --strict
+    build_device_receipt
   fi
 }
 

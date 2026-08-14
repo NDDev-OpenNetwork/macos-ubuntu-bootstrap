@@ -871,3 +871,53 @@ def test_regular_owned_still_rejects_a_foreign_owner_for_device_files(tmp_path) 
     for name in ("_user_tool_state", "_desktop_entry_state"):
         source = inspect.getsource(getattr(di, name))
         assert "enforce_owner=False" not in source, f"{name} opted out of ownership"
+
+
+# Functions whose `regular_owned` targets are repository sources rather than
+# files this installer wrote on the device.
+_REPOSITORY_SOURCE_READERS = {"load_contract", "policy_hashes"}
+
+
+def test_every_repository_source_check_opts_out_of_ownership() -> None:
+    """Catch the class, not the instance.
+
+    Fixing `policy_hashes` alone moved the hosted lane's failure from
+    `scripts/device_integrity.py` to `config/rldyour-contract.json`, because
+    `load_contract` performed the same check independently. This walks the AST
+    and requires every `regular_owned` call inside a repository-source reader to
+    pass `enforce_owner=False` -- and, symmetrically, every call outside one NOT
+    to, since a file this installer wrote is where ownership means something.
+
+    Classification is by enclosing function rather than by argument name: the
+    receipt path in `load_receipt` and the loop variable in `policy_hashes` are
+    both called `path`, so the name says nothing.
+    """
+    import ast
+
+    tree = ast.parse(MODULE_PATH.read_text(encoding="utf-8"))
+    checked = 0
+    for function in ast.walk(tree):
+        if not isinstance(function, ast.FunctionDef):
+            continue
+        reads_repository = function.name in _REPOSITORY_SOURCE_READERS
+        for node in ast.walk(function):
+            if not (isinstance(node, ast.Call)
+                    and getattr(node.func, "id", None) == "regular_owned"):
+                continue
+            checked += 1
+            keywords = {kw.arg: kw.value for kw in node.keywords}
+            value = keywords.get("enforce_owner")
+            opted_out = isinstance(value, ast.Constant) and value.value is False
+            if reads_repository:
+                assert opted_out, (
+                    f"{function.name} (line {node.lineno}) reads a repository source but "
+                    "still enforces current-UID ownership; the hosted lanes stage the "
+                    "repository as root and apply it as an unprivileged user"
+                )
+            else:
+                assert not opted_out, (
+                    f"{function.name} (line {node.lineno}) opted out of ownership for a "
+                    "device file; ownership is a real property there"
+                )
+
+    assert checked >= 3, f"expected at least three call sites, found {checked}"

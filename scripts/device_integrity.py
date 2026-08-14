@@ -241,7 +241,10 @@ def ensure_under(path: Path, root: Path, label: str) -> None:
 
 
 def load_contract() -> dict[str, Any]:
-    regular_owned(CONTRACT_PATH, enforce_private_mode=False)
+    # The contract is a repository source, so neither the private-mode nor the
+    # owner check applies: see regular_owned's docstring. Its content is pinned
+    # into the receipt by policy_hashes.
+    regular_owned(CONTRACT_PATH, enforce_private_mode=False, enforce_owner=False)
     try:
         return json.loads(CONTRACT_PATH.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError) as exc:

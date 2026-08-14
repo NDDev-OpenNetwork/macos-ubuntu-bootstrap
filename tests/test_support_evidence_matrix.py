@@ -146,6 +146,12 @@ assert GATE_SPEC and GATE_SPEC.loader
 gate = importlib.util.module_from_spec(GATE_SPEC)
 GATE_SPEC.loader.exec_module(gate)
 
+CONTEXTS_SCRIPT = ROOT / "scripts/ci/check_required_contexts.py"
+CONTEXTS_SPEC = importlib.util.spec_from_file_location("check_required_contexts", CONTEXTS_SCRIPT)
+assert CONTEXTS_SPEC and CONTEXTS_SPEC.loader
+required_contexts = importlib.util.module_from_spec(CONTEXTS_SPEC)
+CONTEXTS_SPEC.loader.exec_module(required_contexts)
+
 
 def _matrix_instances(name: str, text: str) -> int:
     """Instances one `strategy.matrix` block expands to.
@@ -263,15 +269,53 @@ def test_evidence_runs_only_from_pull_request() -> None:
         )
 
 
-def test_evidence_gate_is_in_the_required_check_projection() -> None:
-    contexts = {
+def _mirror_contexts() -> set[str]:
+    return {
         check["context"]
         for rule in RULESET["rules"]
         if rule["type"] == "required_status_checks"
         for check in rule["parameters"]["required_status_checks"]
     }
-    assert "evidence-gate" in contexts
+
+
+def test_the_ruleset_mirror_does_not_require_a_check_that_cannot_report() -> None:
+    """This assertion used to be its own opposite, and that was the defect.
+
+    The mirror declared `evidence-gate`, the README explained the delta as a
+    pending proposal, and this test pinned it there -- so the one mechanism that
+    could have caught the mistake was instead holding it in place.
+
+    `platform-evidence.yml` has had `pull_request` as its only trigger since #77
+    closed #75. A pull request touching none of its `paths:` never receives the
+    context, and a fork's pull request skips every producer job, which
+    `evidence-gate` turns into a hard failure rather than an absence. Requiring
+    it would have made both classes unmergeable.
+
+    A check earns a place here by being able to report a definite result for
+    every pull request that can reach `main` -- not by being desirable.
+    """
+    contexts = _mirror_contexts()
     assert "bootstrap-gate" in contexts
+    assert "evidence-gate" not in contexts, (
+        "evidence-gate is back in the ruleset mirror. It may only be required "
+        "once fork pull requests and out-of-path pull requests each receive a "
+        "documented, definite result -- see .github/rulesets/README.md."
+    )
+
+
+def test_the_three_required_context_lists_are_one_list() -> None:
+    """The live ruleset, the mirror and the `.gds` anchor must agree.
+
+    Before this, `.gds/repository.yaml`'s `required_contexts` was bound by
+    nothing: it was accurate, and nothing would have reported it if it stopped
+    being. Issue #79 found it unset by reading it; the next drift would have
+    needed someone to read it again.
+
+    The live comparison needs the API and belongs to CI, which passes `--live`.
+    Here the two checked-in lists are compared, which is what a local run and a
+    fork's pull request can both do.
+    """
+    assert required_contexts.mirror_contexts() == required_contexts.anchor_contexts()
 
 
 def test_release_requires_both_gates_before_publication() -> None:

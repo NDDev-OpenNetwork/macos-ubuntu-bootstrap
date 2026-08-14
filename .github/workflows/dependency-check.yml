@@ -1,5 +1,25 @@
 name: dependency-check
 
+# `Dependency pin checks` is a required status check on `main`, and for most of
+# its life it did not check a pin. It searched the installers for variable and
+# function *names* -- `RLDYOUR_CODEX_SHA512`, `rldyour::download_verified_file`
+# -- and reported success when it found them. Every one of those names survives
+# changing the version it holds, the digest it holds and the URL it fetches
+# from, which is the whole content of a pin. The gate could not fail for any
+# mutation it was there to catch. Its network-pipe guard had the matching
+# weakness: `"curl -fsSL https://" in data and "| sh" in data` is a test on the
+# whole file, so two unrelated lines satisfied it while `wget ... | sh` did not.
+#
+# It now compares values: the tools CI runs against the versions and digests the
+# contract pins for a device, the shape of every vendor pin, and -- parsed
+# rather than grepped -- the property that nothing reaches a shell straight from
+# the network.
+#
+# The job name is deliberately unchanged. It is a required context, and renaming
+# a required context does not rename the requirement -- it detaches the branch
+# rule from the job, leaving a check that can never report and a gate that never
+# blocks.
+
 on:
   schedule:
     - cron: "40 6 * * 1"
@@ -29,56 +49,5 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: Validate verified vendor CLI installation
-        shell: bash
-        run: |
-          set -euo pipefail
-
-          python3 - <<'PY'
-          from pathlib import Path
-
-          installers = [
-              Path("scripts/macos/install.sh"),
-              Path("scripts/ubuntu/install.sh"),
-          ]
-          common = Path("scripts/lib/common.sh")
-
-          for path in installers:
-              data = path.read_text(encoding="utf-8")
-              if "install_ai_runtimes" not in data:
-                  raise SystemExit(f"vendor CLI entrypoint missing in {path}")
-          common_data = common.read_text(encoding="utf-8")
-          for marker in (
-              "rldyour::install_vendor_ai_clis",
-              "RLDYOUR_CODEX_VERSION",
-              "RLDYOUR_CODEX_SHA512",
-              "RLDYOUR_CLAUDE_INSTALLER_SHA256",
-              "RLDYOUR_GROK_INSTALLER_SHA256",
-              "rldyour::download_verified_file",
-          ):
-              if marker not in common_data:
-                  raise SystemExit(f"verified vendor CLI marker missing in {common}: {marker}")
-          if "curl -fsSL https://" in common_data and "| sh" in common_data:
-              raise SystemExit("vendor installers must be downloaded and verified before execution")
-
-          print("Codex, Claude Code, and Grok vendor CLI pins are verified")
-          PY
-
-      - name: Validate dependency-check intent
-        shell: bash
-        run: |
-          set -euo pipefail
-          required=(
-            "scripts/bootstrap.sh"
-            "scripts/ci/validate.sh"
-            "scripts/macos/install.sh"
-            "scripts/ubuntu/install.sh"
-          )
-
-          for script in "${required[@]}"; do
-            if [ ! -r "$script" ]; then
-              echo "Missing required script: $script" >&2
-              exit 1
-            fi
-          done
-          echo "dependency intent verified"
+      - name: CI runs the tools the contract pins
+        run: python3 scripts/ci/check_ci_tool_parity.py

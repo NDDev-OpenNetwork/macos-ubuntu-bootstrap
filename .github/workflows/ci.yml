@@ -136,9 +136,48 @@ jobs:
           args=(--profile desktop --no-gui)
           bash scripts/bootstrap.sh --platform "${{ matrix.cross_platform }}" "${args[@]}" --plan --skip-system --skip-checks
 
+  # This lane feeds the required `bootstrap-gate`, and it used to acquire its
+  # linter mutably: `raven-actions/actionlint` was pinned to a commit, but that
+  # action's `version` input defaults to `latest` and it verifies no checksum.
+  # Pinning the wrapper and letting it resolve whatever bytes are newest is not
+  # a content-addressed supply chain -- the same repository commit could lint
+  # with a different program tomorrow, in the one check that must be green to
+  # merge.
+  #
+  # The checksum-bound implementation already existed in `ci-workflows` and was
+  # already what `actionlint.yml` called -- but that workflow was not a required
+  # context, so the repository ran the strong lane advisorily and the weak lane
+  # as its gate. `actionlint.yml` is deleted with this change; keeping two
+  # implementations of one check is how they drift.
+  #
+  # Version and digest come from `config/rldyour-contract.json`, the same values
+  # a device installs, and `scripts/ci/check_ci_tool_parity.py` fails if they
+  # drift apart.
   workflow-lint:
+    permissions:
+      contents: read
+    uses: NDDev-it-com/ci-workflows/.github/workflows/actionlint.yml@7f69c724923d06b2c2057c5a6ad341c37f1a8995 # 0.13.3
+    with:
+      # Public repo: pull_request runs untrusted fork code. Pin the hosted runner
+      # explicitly. The estate runner platform forbids public/fork code on a
+      # trusted runner group (modules/github-actions, docs/threat-model.md),
+      # and this repository is public. The reusable's default belongs to the
+      # pinned commit, not here. A wrong value does not fail loudly either:
+      # a job asking for a label no runner advertises queues indefinitely.
+      runner: ubuntu-latest
+      actionlint_version: '1.7.12'
+      actionlint_sha256: '8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8'
+
+  # Proves the three statements of what protects `main` are one list: the live
+  # ruleset, the checked-in mirror, and `.gds/repository.yaml`. It reaches the
+  # API, so it is its own job rather than a step inside a matrix that would run
+  # it twice, and it joins `bootstrap-gate` rather than becoming an eighth
+  # required context -- the gate is the aggregation point that already exists.
+  required-contexts:
     runs-on: ubuntu-latest
-    name: workflow-lint
+    name: required-contexts
+    permissions:
+      contents: read
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
@@ -146,11 +185,13 @@ jobs:
           fetch-depth: 1
           persist-credentials: false
 
-      - name: Lint GitHub workflow YAML files
-        uses: raven-actions/actionlint@3d39aea434753780c3b3d4a1a31c854b4dbf49d7
+      - name: Live ruleset, mirror and anchor must agree
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 scripts/ci/check_required_contexts.py --live
 
   bootstrap-gate:
-    needs: [bootstrap-script-lint, bootstrap-validate, bootstrap-dryrun-crosscheck, workflow-lint]
+    needs: [bootstrap-script-lint, bootstrap-validate, bootstrap-dryrun-crosscheck, workflow-lint, required-contexts]
     runs-on: ubuntu-latest
     if: always()
     steps:
@@ -171,6 +212,11 @@ jobs:
 
           if [[ "${{ needs.workflow-lint.result }}" != "success" ]]; then
             echo "workflow-lint: ${{ needs.workflow-lint.result }}" >&2
+            exit 1
+          fi
+
+          if [[ "${{ needs.required-contexts.result }}" != "success" ]]; then
+            echo "required-contexts: ${{ needs.required-contexts.result }}" >&2
             exit 1
           fi
 

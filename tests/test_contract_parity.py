@@ -5,10 +5,17 @@ Extends the pattern established by test_compiled_language_hosts.py
 previously unchecked: apt baseline, GUI applications, macOS GUI casks, and
 Node/uv/Bun version+hash constants. A drift between the contract and the
 installer is caught here at CI time, before it can ship to a device.
+
+The contract also has a second consumer that went unchecked for longer: this
+repository's own workflows. CI ran OSV-Scanner 2.4.0 -- the pinned provider's
+default -- while the contract pinned 2.5.0 for a device, so the merge gate and
+the developer it protects were analysing the same repository with different
+programs. Those assertions live at the end of this module.
 """
 
 from __future__ import annotations
 
+import importlib.util
 import json
 import re
 from pathlib import Path
@@ -18,6 +25,13 @@ CONTRACT = json.loads((ROOT / "config/rldyour-contract.json").read_text(encoding
 UBUNTU_INSTALL = (ROOT / "scripts/ubuntu/install.sh").read_text(encoding="utf-8")
 MACOS_INSTALL = (ROOT / "scripts/macos/install.sh").read_text(encoding="utf-8")
 MACOS_VERIFY = (ROOT / "scripts/macos/verify.sh").read_text(encoding="utf-8")
+
+PARITY_SPEC = importlib.util.spec_from_file_location(
+    "check_ci_tool_parity", ROOT / "scripts/ci/check_ci_tool_parity.py"
+)
+assert PARITY_SPEC and PARITY_SPEC.loader
+ci_parity = importlib.util.module_from_spec(PARITY_SPEC)
+PARITY_SPEC.loader.exec_module(ci_parity)
 
 
 def test_release_metadata_matches_contract_version() -> None:
@@ -427,3 +441,63 @@ def test_the_adr_exists_and_is_cited_by_the_contract() -> None:
     adr = (ROOT / referenced).read_text(encoding="utf-8")
     assert adr.startswith("# ADR 0010:")
     assert "Status: accepted" in adr
+
+
+def test_ci_runs_the_tools_the_contract_pins() -> None:
+    """The gate that must be green to merge analyses what a device installs.
+
+    `Dependency pin checks` runs this same module in CI. Binding it here too
+    means a local run catches the drift before a push does, and means the check
+    is not the property of one workflow file that could be edited away.
+    """
+    assert ci_parity.check(CONTRACT) == 0
+
+
+def test_ci_tool_parity_fails_when_a_pin_moves_on_one_side_only() -> None:
+    """A validator nobody has seen fail is a validator nobody has tested.
+
+    Both directions matter. Bumping the contract without the caller ships a
+    device a scanner CI never ran; bumping the caller without the contract does
+    the reverse. Neither is visible in a diff that touches one file.
+    """
+    import copy
+
+    for path in (
+        ("runtime_support", "ubuntu_pinned_source_tools", "osv-scanner", "version"),
+        ("runtime_support", "ubuntu_pinned_source_tools", "actionlint", "version"),
+    ):
+        mutated = copy.deepcopy(CONTRACT)
+        node = mutated
+        for key in path[:-1]:
+            node = node[key]
+        node[path[-1]] = "0.0.0-not-the-pinned-version"
+        try:
+            ci_parity.check(mutated)
+        except ci_parity.ParityError:
+            continue
+        raise AssertionError(f"moving {'.'.join(path)} alone did not fail the parity check")
+
+
+def test_ci_tool_parity_covers_every_workflow_that_names_a_pinned_tool() -> None:
+    """A tool that gains a CI caller must gain a row, not slip through.
+
+    `CI_TOOL_INPUTS` is declared rather than discovered, which is right -- a
+    reusable's input names are its interface. The cost is that a new caller is
+    invisible to it. This closes that: any workflow passing a `*_version` input
+    for a tool the contract pins must be listed.
+    """
+    workflows = ROOT / ".github/workflows"
+    declared = {(tool, name) for tool, name, *_ in ci_parity.CI_TOOL_INPUTS}
+    pinned = set(CONTRACT["runtime_support"]["ubuntu_pinned_source_tools"])
+
+    for path in sorted(workflows.glob("*.yml")):
+        text = path.read_text(encoding="utf-8")
+        for match in re.finditer(r"^\s*([a-z0-9_]+)_version:", text, re.M):
+            stem = match.group(1).replace("_", "-")
+            tool = next((name for name in pinned if name.replace("-", "") == stem.replace("-", "")), None)
+            if tool is None:
+                continue
+            assert (tool, path.name) in declared, (
+                f"{path.name} passes a version for the contract-pinned tool {tool!r} "
+                "but is not in CI_TOOL_INPUTS, so nothing compares the two"
+            )

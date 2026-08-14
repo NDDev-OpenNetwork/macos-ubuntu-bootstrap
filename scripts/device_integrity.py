@@ -47,6 +47,15 @@ DEFAULT_RECEIPT = Path.home() / ".local/share/rldyour/device-receipt.json"
 # Runtime hosts declared in the contract under runtime_support, mapped to the
 # command that reports their version and the contract field that pins it. Each
 # entry drives one version comparison during verify.
+#
+# The contract fields are named `ubuntu_*` because only Ubuntu installs these
+# from an exact tracked artifact. macOS installs them through Homebrew, which
+# resolves current metadata and preserves an already installed formula, so a
+# macOS host legitimately carries a different patch version. Comparing a macOS
+# device against `ubuntu_uv` reports drift that is not drift, so the version
+# comparison is Linux-only and macOS records the observation without asserting
+# it. Whether macOS should pin exactly is a contract decision, tracked in #63;
+# until it is made, this tool must not invent an answer.
 RUNTIME_HOSTS: dict[str, tuple[str, str]] = {
     # name: (version_flag, contract_field under runtime_support)
     "node": ("--version", "ubuntu_node_lts"),
@@ -57,6 +66,11 @@ RUNTIME_HOSTS: dict[str, tuple[str, str]] = {
     "rustc": ("--version", "ubuntu_rust"),
     "dart": ("--version", "ubuntu_dart"),
 }
+
+# The contract pins exact artifacts for these platforms only. On any other
+# platform the runtime versions and pinned source tools are observed and
+# recorded, never asserted.
+EXACT_VERSION_PLATFORMS = ("linux",)
 
 # Pinned source tools (contract: runtime_support.ubuntu_pinned_source_tools).
 # Each is installed as a managed binary under ~/.local/bin/<name>.
@@ -412,9 +426,11 @@ def _harness_state(home: Path) -> dict[str, dict[str, Any]]:
     second copy from a package-manager global. This records the observed facts;
     the contract, not the receipt, decides what they mean.
 
-    The contract carries no ``harnesses.detection`` block, so this collector and
-    the ownership check below currently observe nothing. That gap is tracked
-    separately; do not read a passing receipt as proof of harness ownership.
+    ``harnesses.detection`` in the contract drives this. Each entry names the
+    command, the prefix its owner publishes into, and whether that prefix is
+    enforced. Only harnesses this repository installs itself carry
+    ``enforcement: owned-prefix``; the two whose vendor installer picks its own
+    target are observed and recorded, never failed on.
     """
     contract = load_contract()
     detection = contract.get("harnesses", {}).get("detection", {})
@@ -649,16 +665,24 @@ def _verify_contract_versions(state: dict[str, Any], *, profile: str = "desktop"
 
     ``profile`` scopes profile-specific user tools. Runtime hosts and pinned
     source tools are required on every Ubuntu profile by contract 3.0.1.
+
+    The ``ubuntu_*`` contract fields pin exact artifacts, which only Ubuntu
+    installs. macOS resolves the same tools through Homebrew, which preserves
+    an already installed formula, so asserting those fields on a macOS device
+    reports drift that is not drift. Version equality is therefore checked only
+    on the platforms the contract pins exactly; elsewhere the versions are
+    still collected into the receipt, they are simply not asserted.
     """
     contract = load_contract()
     runtime_support = contract.get("runtime_support", {})
     drifts: list[str] = []
+    exact = _current_os() in EXACT_VERSION_PLATFORMS
 
     for name, _flag, field in [
         (n, RUNTIME_HOSTS[n][0], RUNTIME_HOSTS[n][1]) for n in RUNTIME_HOSTS
     ]:
         declared = runtime_support.get(field)
-        if declared is None:
+        if declared is None or not exact:
             continue
         installed = state.get("runtime_hosts", {}).get(name, {}).get("normalized")
         # Strip a leading 'v' from the declared value: the contract stores
@@ -670,7 +694,7 @@ def _verify_contract_versions(state: dict[str, Any], *, profile: str = "desktop"
         elif installed != declared_norm:
             drifts.append(f"{name}: installed {installed} != contract {declared}")
 
-    declared_tools = runtime_support.get(PINNED_SOURCE_TOOLS_CONTRACT, {})
+    declared_tools = runtime_support.get(PINNED_SOURCE_TOOLS_CONTRACT, {}) if exact else {}
     installed_tools = state.get("pinned_source_tools", {})
     for name, spec in declared_tools.items():
         declared = spec.get("version")

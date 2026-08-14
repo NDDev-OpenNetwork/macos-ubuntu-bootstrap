@@ -345,4 +345,24 @@ else
   bash "$SCRIPT_DIR/verify-server.sh" "${args[@]}"
 fi
 
+# A device receipt written by a previous apply must still describe this device.
+# device_integrity.py re-collects the state and compares it exactly, which is a
+# different question from the one the checks above answer: they ask whether each
+# declared thing is present and correct now, it asks whether anything changed
+# since the state was recorded. A device that has never been applied by this
+# repository has no receipt, and that is not a verification failure -- only a
+# receipt that no longer matches is.
+if [ "$STRICT" -eq 1 ]; then
+  receipt="$HOME/.local/share/rldyour/device-receipt.json"
+  if [ -f "$receipt" ]; then
+    python3 "$REPO_ROOT/scripts/device_integrity.py" verify --receipt "$receipt" || {
+      rldyour::log "missing" "device receipt no longer describes this device"
+      exit 1
+    }
+    rldyour::log "ok" "device receipt verified"
+  else
+    rldyour::log "info" "no device receipt yet; apply writes one after strict verification"
+  fi
+fi
+
 [ "$STRICT" -eq 0 ] || rldyour::log "ok" "strict Ubuntu verification passed"

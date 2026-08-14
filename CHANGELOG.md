@@ -28,6 +28,20 @@ remains available in immutable Git tags.
 
 ### Fixed
 
+- Connected the device integrity receipt to the lifecycle it documents.
+  `scripts/device_integrity.py` had no runtime caller, and its
+  one-owner-per-harness check read a contract key that did not exist, so it
+  could not report drift — while ADR 0007 and `AGENTS.md` described receipts as
+  a working mechanism. Apply now writes the receipt after strict verification
+  passes, `verify.sh --strict` reads it back and compares the device to it
+  exactly, and `harnesses.detection` in the contract gives the ownership check
+  something to check: `codex` is enforced to the prefix this repository installs
+  it into, and a second copy from a package-manager global is reported by name.
+  `claude-code` and `grok-build` are observe-only because their vendor installer
+  owns the target. Exact-version assertions are now scoped to the platforms the
+  contract actually pins, so a macOS device is no longer reported as drifting
+  from `ubuntu_*` fields Homebrew cannot honour.
+
 - Closed the macOS/Ubuntu interactive tool boundary. `templates/terminal/zshrc`
   guards every alias with `command -v`, so a tool only one platform installs
   degrades silently rather than erroring. Ubuntu now installs `eza`, `lazygit`,

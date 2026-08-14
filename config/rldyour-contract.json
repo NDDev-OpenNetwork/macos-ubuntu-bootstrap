@@ -235,6 +235,34 @@
           "x64": "76fb6555be6734fb5057dba8d2fb756430f374bb9e1af694cf1ce00e13238d63",
           "arm64": "9ee7ec49aada3dc05135d21977af089a33fc3154ada25bab102daca90b5098f2"
         }
+      },
+      "eza": {
+        "version": "0.23.5",
+        "sha256": {
+          "x64": "35c70c5c43c29108075e58b893234c67ef585f0b53a7eaf8e9e7d4eec9f339b4",
+          "arm64": "40b87ae8628aa2ff0f0d2dc24ab52f689631366385c3da630bae745671fd71ec"
+        }
+      },
+      "lazygit": {
+        "version": "0.64.1",
+        "sha256": {
+          "x64": "f8ea237c41f194cd799b48505518bfdaae4edf5a2ad6bd3d898e939785ee4532",
+          "arm64": "8b7ca3b344e60340ad1f89f29b9868ee39bcaba5bb92ee818bbe65476bb8b6e7"
+        }
+      },
+      "difft": {
+        "version": "0.70.0",
+        "sha256": {
+          "x64": "2997d2bbe620534edbd79b0049f00ce84eef3fedb15c7822456d58e38d8b05c9",
+          "arm64": "e729684907d67d1a1727a08f443877e19e40eeb2efebcd95c1b8f7fee4284e8e"
+        }
+      },
+      "jaq": {
+        "version": "3.1.1",
+        "sha256": {
+          "x64": "5922c7b67d9bd6841d6676d1f954410c6bf04b47203dcb661c4f052dfef7f454",
+          "arm64": "bdda42d5a8c060a2c7916b287a227e7750d5fccbd4c37aacf0ab863010921829"
+        }
       }
     }
   },
@@ -503,5 +531,33 @@
     "ubuntu_full_apply_user": "non-root-sudo-account",
     "ssh_match_validation": "full-live-connection-context",
     "ufw_cidr_operator_preflight": "required"
+  },
+  "terminal_tools": {
+    "_doc": "Interactive terminal tools the shell template binds aliases and abbreviations to. `shared` is published on both platforms, under the command name given; `macos_only` is deliberately not on Ubuntu. A guard in templates/terminal/zshrc for a command outside this block is a no-op and tests/test_terminal_portability.py rejects it.",
+    "shared": [
+      "atuin",
+      "bat",
+      "btop",
+      "carapace",
+      "difft",
+      "duf",
+      "eza",
+      "fd",
+      "hexyl",
+      "jaq",
+      "lazygit",
+      "starship",
+      "zoxide"
+    ],
+    "debian_renamed": {
+      "bat": "batcat",
+      "fd": "fdfind"
+    },
+    "macos_only": {
+      "duckdb": "Analytical SQL engine; no interactive alias binds it and no Ubuntu profile needs an embedded OLAP database.",
+      "jnv": "Interactive jq explorer; jaq covers the scripted path on both platforms.",
+      "xh": "HTTP client; Ubuntu installs httpie from apt for the same role.",
+      "yazi": "TUI file manager; no alias binds it, and its Ubuntu build needs a newer toolchain than the supported releases carry."
+    }
   }
 }

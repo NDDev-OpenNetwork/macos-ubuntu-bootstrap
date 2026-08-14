@@ -26,6 +26,11 @@ support or promote container/structural observations to native-host evidence.
   `rootless` or `none` alternatives.
 - All profiles receive Codex CLI, Claude Code, Grok Build, zsh configuration,
   modern terminal tools, source-quality tools, and applicable language servers.
+- `terminal_tools` in the contract owns the interactive tool boundary. Every
+  command `templates/terminal/zshrc` guards must appear in `shared` and be
+  published by both installers; `macos_only` entries each carry a reason. Do
+  not add a guard for a tool one platform does not install — the guard makes it
+  a silent no-op rather than an error, which is how six such guards survived.
 - `cx`, `cl`, and `gk` invoke the three AI CLIs in their documented unrestricted
   modes. Keep the ordinary vendor commands unchanged.
 - Google Chrome stable is the only installed browser. macOS GUI installs

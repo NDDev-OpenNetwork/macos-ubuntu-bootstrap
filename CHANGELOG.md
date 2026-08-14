@@ -28,6 +28,19 @@ remains available in immutable Git tags.
 
 ### Fixed
 
+- Closed the macOS/Ubuntu interactive tool boundary. `templates/terminal/zshrc`
+  guards every alias with `command -v`, so a tool only one platform installs
+  degrades silently rather than erroring. Ubuntu now installs `eza`, `lazygit`,
+  `difft` and `jaq` as pinned source tools, macOS gains `btop`, `duf` and
+  `hexyl`, and six guards for `dust`, `dua`, `procs`, `doggo`, `gping` and
+  `viddy` were removed because no profile has ever installed them on either
+  platform. `duckdb`, `jnv`, `xh` and `yazi` stay macOS-only, each with its
+  reason recorded. The contract now owns the boundary as `terminal_tools`, and
+  tests bind the zshrc guard set to it and it to both installers, so a future
+  addition cannot become a silent no-op. The test that previously asserted the
+  guards existed carried a literal list including all six phantom tools; it now
+  derives that list from the contract.
+
 - Bound every version the Ubuntu verifier asserts to the contract. The
   verifier checks uv with an escaped-dot regex, so it was the one pin a
   literal refresh could not reach: the installer and the verifier could

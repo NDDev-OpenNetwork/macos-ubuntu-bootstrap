@@ -7,6 +7,20 @@ remains available in immutable Git tags.
 
 ### Added
 
+- Weekly discovery of pin drift against official sources. `#66` found seven pins
+  behind their upstreams, one a whole minor version, and nothing in the
+  repository would have said so — Dependabot covers the GitHub Actions
+  ecosystem, and every pin here is a direct upstream artifact it cannot see.
+  `scripts/ci/discover_source_drift.py` reads first-party release metadata for
+  all twenty-five and reports where each stands. It is discovery only: it holds
+  no write permission, opens no pull request, downloads no install artifact, and
+  a test asserts it cannot open a file for writing. A refresh stays a reviewed
+  change with digests computed from the downloaded artifact. A source that
+  contradicts the contract — a missing architecture, a mutable download URL,
+  metadata in an unexpected shape — fails the run; a source that is merely
+  unreachable is reported as `unknown` and does not, because a report that fails
+  on a rate limit is a report people mute.
+
 - Ubuntu 26.04 hosted evidence. Every sandbox lane now runs on both supported
   releases, and the evidence matrix expands per `(lane, release, architecture)`
   so a 24.04 result can never stand in for its 26.04 twin — the artifact count

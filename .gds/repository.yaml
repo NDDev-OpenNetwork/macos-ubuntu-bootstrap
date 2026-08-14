@@ -37,11 +37,36 @@ git:
 
 verification:
   commands:
+    # Reproduces what CI runs, prerequisite included. `python3 -m pytest` alone
+    # only passed where pytest happened to be installed, which is the condition
+    # this anchor exists to rule out. `.github/workflows/pytest.yml` and
+    # `release.yml` both build the hash-locked virtualenv first.
     test:
+      - "uv venv --python 3.14"
+      - "uv pip install --require-hashes -r requirements-test.txt"
       - "bash scripts/ci/validate.sh"
-      - "python3 -m pytest"
+      - ".venv/bin/python -m pytest -q"
   required:
     - "test"
+  # The status checks the protected branch actually enforces, as check-run
+  # names. Separate from `commands` on purpose: a required context is a check
+  # run, not a command, and nothing derives one from the other. Declaring it is
+  # what lets the consuming control plane detect drift in either direction --
+  # a check the branch gains and the anchor does not name, or a check the anchor
+  # claims that the branch no longer requires.
+  #
+  # `evidence-gate` is deliberately absent: it is in the checked-in projection
+  # at .github/rulesets/branch-main.json but not yet in the live ruleset, and
+  # this list states what is enforced, not what is intended. See
+  # .github/rulesets/README.md for the pending delta.
+  required_contexts:
+    - "Dependency pin checks"
+    - "Gitleaks secret scan / Gitleaks secret scan"
+    - "bootstrap-gate"
+    - "bootstrap-pytests / python (3.14)"
+    - "cross-platform smoke (macos-latest) / smoke (macos-latest)"
+    - "cross-platform smoke (ubuntu-latest) / smoke (ubuntu-latest)"
+    - "dependency-review / Dependency review"
 
 agent:
   context_profile: "public-module"

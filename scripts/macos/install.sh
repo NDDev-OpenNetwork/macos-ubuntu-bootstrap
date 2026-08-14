@@ -43,6 +43,10 @@ BREW_SOURCE_PACKAGES=(
   ripgrep fd eza bat git-delta jq yq ast-grep
   starship atuin fzf zoxide carapace antidote zsh-completions
   gh lazygit yazi xh jaq jnv duckdb difftastic tmux
+  # The reverse of the Ubuntu gap: these three were apt packages on
+  # Ubuntu and in no macOS manifest, so their zshrc abbreviations were
+  # dead on macOS instead.
+  btop duf hexyl
 )
 
 # Registry-backed language servers, pinned to exact versions for reproducibility

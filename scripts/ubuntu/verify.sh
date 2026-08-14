@@ -241,9 +241,14 @@ if [ "$PROFILE" != "server" ]; then
     rldyour::require_cmd "$cmd" required
   done
   # Pinned source-analysis tools: the four CI-parity scanners, the Markdown
-  # language server, the git pager that ensure_git_delta_config configures, and
-  # the structured YAML/AST utilities.
-  for cmd in gitleaks osv-scanner actionlint hadolint markdown-oxide delta yq ast-grep just age age-keygen; do
+  # language server, the git pager that ensure_git_delta_config configures,
+  # the structured YAML/AST utilities, and the four interactive tools the
+  # zsh template binds aliases to. Every link published by a
+  # PINNED_SOURCE_TOOLS row is verified on both profile branches; the pinned
+  # tools install on every profile, so a tool missing here is a tool the
+  # shell would silently do without.
+  for cmd in gitleaks osv-scanner actionlint hadolint markdown-oxide delta yq ast-grep just age age-keygen \
+    eza lazygit difft jaq; do
     rldyour::require_cmd "$cmd" required
   done
   # User-selected desktop tools (herdr, telegram). Installed by install_user_tools
@@ -316,7 +321,8 @@ else
   for cmd in go gopls rustc cargo rust-analyzer dart; do
     rldyour::require_cmd "$cmd" required
   done
-  for cmd in gitleaks osv-scanner actionlint hadolint markdown-oxide delta yq ast-grep just age age-keygen; do
+  for cmd in gitleaks osv-scanner actionlint hadolint markdown-oxide delta yq ast-grep just age age-keygen \
+    eza lazygit difft jaq; do
     rldyour::require_cmd "$cmd" required
   done
   [ "$(go version 2>/dev/null | awk '{ print $3 }')" = "go1.26.6" ] || {

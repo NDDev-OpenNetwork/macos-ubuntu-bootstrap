@@ -183,6 +183,19 @@ PINNED_SOURCE_TOOLS=(
   # are deliberately not published: only the two commands the estate uses are
   # linked, so the managed PATH stays exactly what the contract declares.
   "age;1.3.1;tar1;age,age-keygen;age,age-keygen;age,age-keygen;bdc69c09cbdd6cf8b1f333d372a1f58247b3a33146406333e30c0f26e8f51377;c6878a324421b69e3e20b00ba17c04bc5c6dab0030cfe55bf8f68fa8d9e9093a;https://github.com/FiloSottile/age/releases/download/v1.3.1/age-v1.3.1-linux-amd64.tar.gz;https://github.com/FiloSottile/age/releases/download/v1.3.1/age-v1.3.1-linux-arm64.tar.gz"
+  # Interactive terminal tools that templates/terminal/zshrc binds an alias or
+  # abbreviation to. Every one of these guards was dead on Ubuntu: the tool was
+  # in the macOS brew set and in no Ubuntu manifest, so `command -v` was false
+  # and the shell silently offered less than the template describes. None is
+  # packaged acceptably across both supported releases -- eza is absent from
+  # 24.04, lazygit and difftastic are in no Ubuntu archive at all, and jaq
+  # arrived only in 24.10 -- so each is pinned rather than left to apt.
+  "eza;0.23.5;tar0;eza;eza;eza;35c70c5c43c29108075e58b893234c67ef585f0b53a7eaf8e9e7d4eec9f339b4;40b87ae8628aa2ff0f0d2dc24ab52f689631366385c3da630bae745671fd71ec;https://github.com/eza-community/eza/releases/download/v0.23.5/eza_x86_64-unknown-linux-gnu.tar.gz;https://github.com/eza-community/eza/releases/download/v0.23.5/eza_aarch64-unknown-linux-gnu.tar.gz"
+  "lazygit;0.64.1;tar0;lazygit;lazygit;lazygit;f8ea237c41f194cd799b48505518bfdaae4edf5a2ad6bd3d898e939785ee4532;8b7ca3b344e60340ad1f89f29b9868ee39bcaba5bb92ee818bbe65476bb8b6e7;https://github.com/jesseduffield/lazygit/releases/download/v0.64.1/lazygit_0.64.1_linux_x86_64.tar.gz;https://github.com/jesseduffield/lazygit/releases/download/v0.64.1/lazygit_0.64.1_linux_arm64.tar.gz"
+  # difftastic publishes its binary as `difft`; the row is named for the command
+  # it publishes, like every other row here.
+  "difft;0.70.0;tar0;difft;difft;difft;2997d2bbe620534edbd79b0049f00ce84eef3fedb15c7822456d58e38d8b05c9;e729684907d67d1a1727a08f443877e19e40eeb2efebcd95c1b8f7fee4284e8e;https://github.com/Wilfred/difftastic/releases/download/0.70.0/difft-x86_64-unknown-linux-gnu.tar.gz;https://github.com/Wilfred/difftastic/releases/download/0.70.0/difft-aarch64-unknown-linux-gnu.tar.gz"
+  "jaq;3.1.1;raw;jaq;jaq;jaq;5922c7b67d9bd6841d6676d1f954410c6bf04b47203dcb661c4f052dfef7f454;bdda42d5a8c060a2c7916b287a227e7750d5fccbd4c37aacf0ab863010921829;https://github.com/01mf02/jaq/releases/download/v3.1.1/jaq-x86_64-unknown-linux-gnu;https://github.com/01mf02/jaq/releases/download/v3.1.1/jaq-aarch64-unknown-linux-gnu"
 )
 
 # User-selected CLI tools that are not language hosts, LSPs, or scanners but

@@ -133,7 +133,38 @@ def check_payload(
     return lane_name, release, support_evidence.canonical_arch(arch)
 
 
-def verify(root: Path, *, sha: str | None = None) -> int:
+def write_verdict(path: Path, *, sha: str | None, seen: set[tuple[str, str, str]]) -> None:
+    """Record that this exact SHA was verified, for the release lane to read.
+
+    `release.yml` used to ask GitHub for the head's ``evidence-gate`` conclusion
+    and treat ``success`` as proof that evidence existed. That conclusion is now
+    reachable three ways -- verified, out of scope, and fork -- and only one of
+    them means any lane ran. A release trusting the conclusion would publish a
+    fork-authored device change that produced no evidence at all.
+
+    This file is what proves it instead: the SHA, and every (lane, release,
+    architecture) that was actually opened and checked.
+    """
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(
+        json.dumps(
+            {
+                "sha": sha,
+                "verified": True,
+                "instances": sorted(
+                    {"lane": lane, "release": release, "architecture": arch}
+                    for lane, release, arch in seen
+                ),
+            },
+            indent=2,
+            sort_keys=True,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+
+def verify(root: Path, *, sha: str | None = None, verdict: Path | None = None) -> int:
     matrix = support_evidence.load_json(support_evidence.DEFAULT_MATRIX)
     contract = support_evidence.load_json(support_evidence.DEFAULT_CONTRACT)
     support_evidence.validate_matrix(matrix, contract)
@@ -161,6 +192,9 @@ def verify(root: Path, *, sha: str | None = None) -> int:
             f"missing={sorted(expected - seen)} unexpected={sorted(seen - expected)}"
         )
 
+    if verdict is not None:
+        write_verdict(verdict, sha=sha, seen=seen)
+
     print(f"evidence-artifacts-ok: {len(payloads)} lanes")
     for lane_name, release, arch in sorted(seen):
         print(f"  {lane_name} [{release} {arch}]")
@@ -171,8 +205,12 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("root", type=Path, help="directory the artifacts were downloaded into")
     parser.add_argument("--sha", default=None, help="exact SHA every payload must carry")
+    parser.add_argument(
+        "--verdict", type=Path, default=None,
+        help="write a durable record of what was verified, for the release lane",
+    )
     args = parser.parse_args(argv)
-    return verify(args.root, sha=args.sha or None)
+    return verify(args.root, sha=args.sha or None, verdict=args.verdict)
 
 
 if __name__ == "__main__":

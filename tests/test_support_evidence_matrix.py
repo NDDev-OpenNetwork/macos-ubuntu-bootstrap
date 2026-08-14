@@ -213,8 +213,12 @@ def _artifact_producing_job_instances() -> int:
     seen_upload = False
     for block in blocks:
         name = block.strip().split(":", 1)[0]
-        if "upload-artifact" not in block:
-            continue  # evidence-gate uploads nothing; it consumes.
+        # Lane payloads only. `evidence-gate` also uploads now -- one small
+        # verdict recording what it opened, which `release.yml` reads instead of
+        # trusting a check conclusion -- and counting that as coverage would let
+        # a real lane disappear while the total stayed right.
+        if "name: platform-" not in block:
+            continue
         seen_upload = True
         matrix = re.search(r"\n      matrix:\n(.*?)(?=\n    steps:)", block, re.S)
         if matrix is None:
@@ -325,11 +329,23 @@ def test_release_requires_both_gates_before_publication() -> None:
     assert "check_name=bootstrap-gate" in job
     assert "commits/${GITHUB_SHA}/check-runs" in job
 
-    # evidence-gate is asked about the head the candidate's tree came from, and
-    # the tree identity is proven rather than assumed.
-    assert "check_name=evidence-gate" in job
+    # The tree identity is proven rather than assumed.
     assert 'candidate_tree="$(git rev-parse "${GITHUB_SHA}^{tree}")"' in job
     assert '[ "$candidate_tree" = "$head_tree" ]' in job
+
+    # And evidence is observed rather than inferred from a check conclusion.
+    #
+    # `evidence-gate` is green three ways now -- verified, out of scope, and a
+    # fork whose head cannot run the native lanes -- and only one of them means
+    # a lane ran. Asking GitHub for the conclusion would publish a fork-authored
+    # device change that produced no evidence at all, which is why this assertion
+    # is the inverse of what it used to be.
+    assert "check_name=evidence-gate" not in job, (
+        "release must not treat a green evidence-gate as proof that evidence exists"
+    )
+    assert "evidence-verdict-" in job
+    assert '"verified"' in job or "verified" in job
+    assert "produced no evidence verdict" in job
 
     # Publication must depend on it, on every trigger.
     supply = RELEASE_WORKFLOW.split("\n  supply-chain:\n", 1)[1]
@@ -610,3 +626,90 @@ def test_superseded_evidence_runs_do_not_hold_the_queue() -> None:
     assert "cancel-in-progress: true" in block
     # The group must still be per pull request, or one PR would cancel another.
     assert "github.event.pull_request.number" in block
+
+
+# ------------------- the gate reports for every topology -------------------
+
+
+def _gate_job() -> str:
+    return EVIDENCE_WORKFLOW.split("\n  evidence-gate:\n", 1)[1]
+
+
+def test_the_workflow_runs_for_every_pull_request() -> None:
+    """A path filter decides whether a *workflow runs*, not what it reports.
+
+    A workflow that does not run reports no check. That is fine for an advisory
+    lane and fatal for a required one: the context never arrives and the pull
+    request stays pending with nothing to click. The mirror declared this gate
+    required and shipped the command to apply it, so a docs-only pull request
+    was one authorized `gh api` call from being unmergeable.
+    """
+    triggers = EVIDENCE_WORKFLOW.split("\non:\n", 1)[1].split("\npermissions:", 1)[0]
+    assert not re.search(r"^\s+paths:", triggers, re.M), (
+        "the trigger has a path filter again; scope belongs in the `scope` job, "
+        "so that every pull request still receives a result"
+    )
+
+
+def test_the_scope_job_is_never_skipped() -> None:
+    """Everything downstream reads its outputs, so it must always produce them."""
+    scope = EVIDENCE_WORKFLOW.split("\n  scope:\n", 1)[1].split("\n  macos-native:", 1)[0]
+    assert not re.search(r"^    if:", scope, re.M), "the scope job must have no condition"
+    for output in ("required", "fork", "reason"):
+        assert f"{output}: ${{{{ steps.decide.outputs.{output} }}}}" in scope
+
+
+@pytest.mark.parametrize("job", [
+    "macos-native", "ubuntu-native", "ubuntu-systemd-sandbox", "ubuntu-safeguards",
+])
+def test_every_producer_runs_only_in_scope_and_only_in_repository(job: str) -> None:
+    block = EVIDENCE_WORKFLOW.split(f"\n  {job}:\n", 1)[1].split("\n    steps:", 1)[0]
+    assert "needs: scope" in block
+    assert "needs.scope.outputs.required == 'true'" in block
+    assert "needs.scope.outputs.fork == 'false'" in block
+
+
+def test_the_gate_states_an_outcome_for_all_three_cases() -> None:
+    """Out of scope, fork, and in scope each get a definite, explained result.
+
+    The fork case is the one that was actively wrong: producers were skipped by
+    their own condition, and the gate's loop turned `skipped` into `exit 1`. Not
+    absent -- red, for a contributor who had done nothing wrong and could do
+    nothing about it.
+    """
+    job = _gate_job()
+    assert "needs.scope.outputs.required != 'true'" in job, "no out-of-scope outcome"
+    assert "needs.scope.outputs.fork == 'true'" in job, "no fork outcome"
+    assert "needs.scope.outputs.fork == 'false'" in job, "no in-scope outcome"
+    # Each outcome explains itself where a reader will look.
+    assert job.count("GITHUB_STEP_SUMMARY") >= 2
+
+
+def test_the_gate_only_opens_artifacts_when_lanes_produced_them() -> None:
+    """Downloading nothing and verifying it must not be a way to pass."""
+    job = _gate_job()
+    for step in ("download-artifact@", "verify_evidence_artifacts.py"):
+        index = job.index(step)
+        preceding = job[:index]
+        clause = preceding.rsplit("- name:", 1)[1]
+        assert "needs.scope.outputs.fork == 'false'" in clause, (
+            f"the step using {step} can run when no lane produced an artifact"
+        )
+
+
+def test_the_verdict_names_the_sha_it_verified() -> None:
+    """The record release reads must be about one commit, not about a run."""
+    job = _gate_job()
+    assert "--verdict" in job
+    assert "evidence-verdict-${{ github.event.pull_request.head.sha }}" in job
+    assert "retention-days: 90" in job
+
+
+def test_a_verdict_is_written_only_after_every_instance_checks_out(tmp_path) -> None:
+    """The verifier must not record a verdict for evidence it rejected."""
+    verdict = tmp_path / "verdict.json"
+    empty = tmp_path / "downloaded"
+    empty.mkdir()
+    with pytest.raises(gate.GateError):
+        gate.verify(empty, sha="a" * 40, verdict=verdict)
+    assert not verdict.exists(), "a rejected run must leave no verdict behind"

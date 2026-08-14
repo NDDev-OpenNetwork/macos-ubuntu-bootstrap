@@ -1,13 +1,23 @@
 name: platform-evidence
 
 on:
+  # Every pull request, deliberately -- the path filter moved into the `scope`
+  # job below.
+  #
+  # A `paths:` filter decides whether the *workflow runs*, and a workflow that
+  # does not run reports no check at all. That is fine for an advisory lane and
+  # fatal for a required one: a required context that never arrives leaves the
+  # pull request pending forever, with nothing to click and no failure to read.
+  # The checked-in ruleset mirror declared `evidence-gate` required and shipped
+  # a command to apply it, so this was one authorized `gh api` call away from
+  # blocking every documentation-only pull request. See
+  # `.github/rulesets/README.md`.
+  #
+  # Running always and deciding scope inside the workflow costs one short job
+  # and makes the context deterministic: every pull request that can reach
+  # `main` gets an `evidence-gate` result, and that result says which of the
+  # three cases it is.
   pull_request:
-    paths:
-      - ".github/workflows/platform-evidence.yml"
-      - "scripts/**"
-      - "config/**"
-      - "templates/**"
-      - "VERSION"
   # `pull_request` is the ONLY trigger, deliberately (issue #75).
   #
   # These jobs check out a contributor's exact head SHA and execute it -- they
@@ -48,9 +58,77 @@ concurrency:
   # the only question that mattered.
   cancel-in-progress: true
 
+# Which paths can change what a device gets. Producer jobs run only when the
+# pull request touches one of them; `evidence-gate` reports either way.
+env:
+  EVIDENCE_PATHS: |
+    .github/workflows/platform-evidence.yml
+    scripts
+    config
+    templates
+    VERSION
+
 jobs:
+  # Always runs, never skipped, no `if:`. Everything downstream reads its
+  # outputs, so one job decides what this pull request is and there is one
+  # vocabulary for saying it.
+  scope:
+    name: Decide what evidence this change needs
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    outputs:
+      required: ${{ steps.decide.outputs.required }}
+      fork: ${{ steps.decide.outputs.fork }}
+      reason: ${{ steps.decide.outputs.reason }}
+    steps:
+      - name: Checkout the head with enough history to diff it
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Decide
+        id: decide
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          HEAD_REPO: ${{ github.event.pull_request.head.repo.full_name }}
+        run: |
+          set -euo pipefail
+          fork=false
+          [ "$HEAD_REPO" = "$GITHUB_REPOSITORY" ] || fork=true
+          echo "fork=$fork" >>"$GITHUB_OUTPUT"
+
+          git fetch --no-tags --depth=1 origin "$BASE_SHA"
+          changed="$(git diff --name-only "$BASE_SHA" "$HEAD_SHA")"
+          echo "changed files:"
+          printf '%s\n' "$changed" | sed 's/^/  /'
+
+          required=false
+          while IFS= read -r prefix; do
+            [ -n "$prefix" ] || continue
+            if printf '%s\n' "$changed" | grep -qE "^${prefix}(/|$)"; then
+              required=true
+              echo "matched evidence path: $prefix"
+            fi
+          done <<<"$EVIDENCE_PATHS"
+          echo "required=$required" >>"$GITHUB_OUTPUT"
+
+          if [ "$required" = false ]; then
+            reason="no path that can alter what a device gets was touched"
+          elif [ "$fork" = true ]; then
+            reason="native evidence does not run for a fork pull request"
+          else
+            reason="in scope"
+          fi
+          echo "reason=$reason" >>"$GITHUB_OUTPUT"
+          echo "required=$required fork=$fork -- $reason"
+
   macos-native:
-    if: github.event.pull_request.head.repo.full_name == github.repository
+    needs: scope
+    if: needs.scope.outputs.required == 'true' && needs.scope.outputs.fork == 'false'
     runs-on: macos-15
     strategy:
       fail-fast: false
@@ -80,7 +158,8 @@ jobs:
           retention-days: 1
 
   ubuntu-native:
-    if: github.event.pull_request.head.repo.full_name == github.repository
+    needs: scope
+    if: needs.scope.outputs.required == 'true' && needs.scope.outputs.fork == 'false'
     runs-on: ${{ matrix.runner }}
     strategy:
       fail-fast: false
@@ -116,11 +195,19 @@ jobs:
           retention-days: 1
 
   ubuntu-systemd-sandbox:
-    if: github.event.pull_request.head.repo.full_name == github.repository
+    needs: scope
+    if: needs.scope.outputs.required == 'true' && needs.scope.outputs.fork == 'false'
     runs-on: ${{ matrix.runner }}
     strategy:
       fail-fast: false
-      max-parallel: 2
+      # Raised from 2. Each matrix job takes its own hosted runner, so the cap
+      # throttled nothing except this workflow: fourteen sandbox lanes two at a
+      # time is seven waves, which is why a run took 25m35s against Bootstrap
+      # CI's 2m28s. It arrived as a conservative default in the first version of
+      # this file with no reason recorded, and a gate that is a ten-fold long
+      # pole is one people learn to merge around. Lower it again if the estate
+      # needs the concurrency headroom -- nothing here depends on the value.
+      max-parallel: 6
       # `release` is the container's Ubuntu release, not the runner's. A 26.04
       # sandbox runs on a 24.04 runner, so release coverage costs no dependency
       # on the public-preview `ubuntu-26.04` runner labels.
@@ -160,7 +247,8 @@ jobs:
           retention-days: 1
 
   ubuntu-safeguards:
-    if: github.event.pull_request.head.repo.full_name == github.repository
+    needs: scope
+    if: needs.scope.outputs.required == 'true' && needs.scope.outputs.fork == 'false'
     runs-on: ubuntu-24.04
     strategy:
       fail-fast: false
@@ -190,14 +278,69 @@ jobs:
           if-no-files-found: error
           retention-days: 1
 
+  # Reports for every pull request that can reach `main`, with one of three
+  # stated outcomes. It used to have only one, and it was wrong twice:
+  #
+  # * a pull request outside the old `paths:` filter never ran this workflow, so
+  #   the context never arrived at all;
+  # * a fork's pull request skipped every producer, and the loop below turned
+  #   `skipped` into `exit 1` -- not absent, but red, for a contributor who had
+  #   done nothing wrong and could do nothing about it.
+  #
+  # Both are why this could not be required, while the checked-in ruleset mirror
+  # said it was and shipped the command to make it so.
   evidence-gate:
     if: always()
     runs-on: ubuntu-24.04
-    needs: [macos-native, ubuntu-native, ubuntu-systemd-sandbox, ubuntu-safeguards]
+    needs: [scope, macos-native, ubuntu-native, ubuntu-systemd-sandbox, ubuntu-safeguards]
     permissions:
       actions: read
     steps:
+      # Out of scope: nothing this change touched can alter what a device gets,
+      # so there is no evidence to require. Stated in the summary rather than
+      # implied by a check that silently never appeared.
+      - name: No evidence required for this change
+        if: needs.scope.outputs.required != 'true'
+        run: |
+          set -euo pipefail
+          {
+            echo "## Evidence: not required"
+            echo
+            echo "${{ needs.scope.outputs.reason }}."
+            echo
+            echo "No platform evidence was produced for this commit, and none is"
+            echo "needed to merge it. A release candidate still cannot publish"
+            echo "without evidence: \`release.yml\` resolves it through the pull"
+            echo "request head whose tree matches the candidate, and a head that"
+            echo "produced none fails there."
+          } >>"$GITHUB_STEP_SUMMARY"
+          echo "evidence not required: ${{ needs.scope.outputs.reason }}"
+
+      # A fork cannot run the native lanes: they apply the bootstrap with sudo
+      # from the contributor's own head. That is a deliberate boundary, not a
+      # defect -- but the check must say so rather than fail the contributor.
+      # The consequence is carried at release time instead, where it belongs.
+      - name: Native evidence cannot run for a fork pull request
+        if: needs.scope.outputs.required == 'true' && needs.scope.outputs.fork == 'true'
+        run: |
+          set -euo pipefail
+          {
+            echo "## Evidence: not produced (fork pull request)"
+            echo
+            echo "This pull request touches paths that change what a device gets,"
+            echo "but its head is on a fork. The native lanes apply the bootstrap"
+            echo "with sudo from that head, so they do not run for code this"
+            echo "repository has not accepted."
+            echo
+            echo "**This does not block the merge, and it does not license a"
+            echo "release.** Before the commit can be released a maintainer must"
+            echo "re-run these lanes from a branch in this repository, because"
+            echo "\`release.yml\` requires evidence for the candidate's exact tree."
+          } >>"$GITHUB_STEP_SUMMARY"
+          echo "evidence not produced: fork pull request"
+
       - name: Require every evidence lane
+        if: needs.scope.outputs.required == 'true' && needs.scope.outputs.fork == 'false'
         env:
           MACOS_RESULT: ${{ needs.macos-native.result }}
           UBUNTU_NATIVE_RESULT: ${{ needs.ubuntu-native.result }}
@@ -205,15 +348,24 @@ jobs:
           UBUNTU_SAFEGUARDS_RESULT: ${{ needs.ubuntu-safeguards.result }}
         run: |
           set -euo pipefail
-          for result in "$MACOS_RESULT" "$UBUNTU_NATIVE_RESULT" "$UBUNTU_SANDBOX_RESULT" "$UBUNTU_SAFEGUARDS_RESULT"; do
-            [ "$result" = success ] || exit 1
+          failed=0
+          for lane in "macos-native=$MACOS_RESULT" \
+                      "ubuntu-native=$UBUNTU_NATIVE_RESULT" \
+                      "ubuntu-systemd-sandbox=$UBUNTU_SANDBOX_RESULT" \
+                      "ubuntu-safeguards=$UBUNTU_SAFEGUARDS_RESULT"; do
+            if [ "${lane#*=}" != success ]; then
+              echo "${lane%%=*}: ${lane#*=}" >&2
+              failed=1
+            fi
           done
+          [ "$failed" -eq 0 ] || exit 1
 
       # The job results above prove only that four jobs exited zero. They cannot
       # distinguish a lane that proved its declared capabilities from one that
       # restated them, and they cannot see a lane that silently disappeared from
       # a matrix. The steps below open every artifact.
       - name: Checkout exact public commit without credentials
+        if: needs.scope.outputs.required == 'true' && needs.scope.outputs.fork == 'false'
         env:
           EVIDENCE_SHA: ${{ github.event.pull_request.head.sha }}
         run: |
@@ -224,14 +376,39 @@ jobs:
           git checkout --detach "$EVIDENCE_SHA"
 
       - name: Download every evidence artifact
+        if: needs.scope.outputs.required == 'true' && needs.scope.outputs.fork == 'false'
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           pattern: platform-*
           path: downloaded-evidence
 
       - name: Verify the evidence supports what the matrix declares
+        if: needs.scope.outputs.required == 'true' && needs.scope.outputs.fork == 'false'
         env:
           EVIDENCE_SHA: ${{ github.event.pull_request.head.sha }}
         run: |
           set -euo pipefail
-          python3 scripts/ci/verify_evidence_artifacts.py downloaded-evidence --sha "$EVIDENCE_SHA"
+          python3 scripts/ci/verify_evidence_artifacts.py downloaded-evidence \
+            --sha "$EVIDENCE_SHA" --verdict verdict/evidence-verdict.json
+
+      # A durable record that this SHA was verified, for the release lane to
+      # read.
+      #
+      # `release.yml` used to ask GitHub for the head's `evidence-gate`
+      # conclusion and treat `success` as proof. That conclusion is now reachable
+      # three ways -- verified, out of scope, and fork -- and only one of them
+      # means evidence exists. A release that trusts the conclusion would publish
+      # a fork-authored device change that never ran a single lane.
+      #
+      # So the release lane reads this instead: a small file naming the exact SHA
+      # and what was checked. Retention is long because a release can follow a
+      # merge by weeks, while the lane payloads themselves stay at one day --
+      # twenty-one artifacts per pull request is not something to keep.
+      - name: Publish the verdict for the release lane
+        if: needs.scope.outputs.required == 'true' && needs.scope.outputs.fork == 'false'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: evidence-verdict-${{ github.event.pull_request.head.sha }}
+          path: verdict/evidence-verdict.json
+          if-no-files-found: error
+          retention-days: 90

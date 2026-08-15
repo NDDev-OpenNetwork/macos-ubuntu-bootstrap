@@ -166,6 +166,9 @@ def open_directory_chain(path: str) -> tuple[int, list[tuple[int, int, int, int,
                 )
             identities.append(current)
         return fd, identities
+    # BaseException, not Exception: `fd` is an open directory descriptor on a
+    # privileged path and is this frame's to close on every exit path. An
+    # interrupt mid-walk would otherwise leak it. Re-raised unchanged.
     except BaseException:
         os.close(fd)
         raise
@@ -248,6 +251,9 @@ def open_actor_sandbox_chain(path: str, sandbox_root: str) -> tuple[int, list[tu
                 )
             identities.append(current)
         return fd, identities
+    # BaseException, not Exception: `fd` is an open directory descriptor on a
+    # privileged path and is this frame's to close on every exit path. An
+    # interrupt mid-walk would otherwise leak it. Re-raised unchanged.
     except BaseException:
         os.close(fd)
         raise
@@ -271,6 +277,10 @@ def ensure_directory(path: str, mode: int, authority: str = AUTHORITY_ROOT, sand
             os.mkdir(leaf, mode, dir_fd=parent_fd)
             os.fsync(parent_fd)
         except FileExistsError:
+            # Already there, which is the normal idempotent case and also the
+            # outcome of a race with another publisher. Not trusted on that
+            # basis: the next statements open it and reject any directory whose
+            # owner, group or mode diverges from what was asked for.
             pass
         fd = os.open(leaf, os.O_RDONLY | os.O_DIRECTORY | os.O_CLOEXEC | os.O_NOFOLLOW, dir_fd=parent_fd)
         try:

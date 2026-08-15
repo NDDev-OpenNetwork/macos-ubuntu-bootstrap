@@ -58,6 +58,10 @@ def read_bounded(path: Path) -> str:
             or len(value) != after.st_size
         ):
             raise HarnessError(f"input changed while reading: {path}")
+    # BaseException, not Exception, on purpose: the descriptor is closed on every
+    # exit path, including KeyboardInterrupt and SystemExit, and the captured
+    # exception is re-raised below. Narrowing this would leak a descriptor
+    # exactly when the process is being torn down.
     except BaseException as error:
         primary = error
     try:
@@ -235,10 +239,18 @@ def run(source: Path, name: str, prelude: Path, call: Path, timeout: float = TIM
                 stream.flush()
                 os.fsync(stream.fileno())
                 script_identity = os.fstat(stream.fileno())
+        # BaseException, not Exception: `os.fdopen` either takes ownership of the
+        # descriptor or does not, and on any failure -- including an interrupt --
+        # this is the only place that still knows about it. The exception is
+        # re-raised immediately after.
         except BaseException:
             try:
                 os.close(descriptor)
             except OSError:
+                # Already closed, because fdopen took ownership before failing.
+                # Nothing to report: the descriptor is gone either way, and
+                # raising here would replace the real failure with a detail
+                # about cleanup.
                 pass
             raise
         current_script = os.stat("run.sh", dir_fd=stage_fd, follow_symlinks=False)
@@ -262,6 +274,8 @@ def run(source: Path, name: str, prelude: Path, call: Path, timeout: float = TIM
             pass_fds=(script_read_fd,),
         )
         result = {"returncode": completed.returncode, "stdout": completed.stdout, "stderr": completed.stderr}
+    # BaseException, not Exception: the script descriptor is closed on every exit
+    # path and the exception re-raised below, so an interrupt cannot leak it.
     except BaseException as error:
         primary = error
     if script_read_fd is not None:
@@ -319,6 +333,10 @@ def create_owned_stage() -> tuple[Path, int, os.stat_result, os.stat_result, Pat
         ):
             raise HarnessError("temporary stage ownership or mode is invalid")
         return parent, parent_fd, parent_identity, parent_path_identity, directory, stage_fd, stage_identity
+    # BaseException, not Exception: a half-created stage directory must be torn
+    # down on every exit path. An interrupt here would otherwise leave a 0700
+    # directory behind under the parent, and the cleanup residuals are attached
+    # to the original exception rather than replacing it.
     except BaseException as primary:
         if stage_name is not None and stage_fd is not None and stage_identity is not None:
             for error in cleanup_owned_stage(
@@ -570,6 +588,9 @@ def run_owned(
             argv, stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=env,
             start_new_session=True, close_fds=True, pass_fds=pass_fds,
         )
+    # BaseException, not Exception: the descriptors below belong to this frame
+    # until the child owns them, so an interrupt during spawn must still close
+    # them. Re-raised unchanged after.
     except BaseException as primary:
         # Popen owns and closes any pipes it created when construction fails.
         for descriptor in (*close_after_spawn_fds, *((readiness_fd,) if readiness_fd is not None else ())):
@@ -611,10 +632,16 @@ def run_owned(
         if readiness_fd is not None:
             os.set_blocking(readiness_fd, False)
             selector.register(readiness_fd, selectors.EVENT_READ, "readiness")
+    # BaseException, not Exception: the child is already running by this point.
+    # Failing to register its streams must not leave it alive, and that is as
+    # true of an interrupt as of an OSError.
     except BaseException as primary:
         try:
             process.kill()
             process.wait(timeout=1)
+        # A kill that cannot be reaped is recorded on the original exception; it
+        # never becomes the reported failure, because the caller needs to know
+        # what went wrong first, not what could not be cleaned up after.
         except BaseException as error:
             primary.add_note(f"setup reap residual: {error}")
         for key in list(selector.get_map().values()):
@@ -761,11 +788,17 @@ def run_owned(
                     target.extend(chunk)
         try:
             returncode = process.wait(timeout=1)
+        # BaseException, not Exception: an unreaped privileged child is worth
+        # recording even when the reason is an interrupt, and the type name is
+        # what the residual report carries. The primary failure still wins below.
         except BaseException as error:
             residuals.append(f"REAP_FAILED:{type(error).__name__}")
             if failure is None:
                 raise
             returncode = process.returncode if process.returncode is not None else -1
+    # BaseException, not Exception: an interrupt must still kill the process group
+    # and reap it. Leaving a privileged child running because the operator pressed
+    # Ctrl-C is the failure this whole function exists to prevent.
     except BaseException as primary:
         residual = _validated_group_signal(
             process, process_group, signal.SIGKILL,
@@ -776,6 +809,8 @@ def run_owned(
             residuals.append(residual)
         try:
             process.wait(timeout=1)
+        # As above: this runs while already unwinding a primary failure, so it
+        # records what it could not reap and never replaces the original.
         except BaseException as error:
             residuals.append(f"REAP_FAILED:{type(error).__name__}")
         caught_primary = primary

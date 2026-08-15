@@ -18,7 +18,7 @@ and what the receipt does and does not assert. `harnesses.detection` in the
 contract is what makes one-owner-per-harness checkable — do not describe an
 enforcement this repository cannot observe.
 
-## Contract 3.0.1
+## Contract 3.1.0
 
 - macOS supports `desktop`, with optional GUI, no Docker, and source-analysis
   plus local-check tooling.

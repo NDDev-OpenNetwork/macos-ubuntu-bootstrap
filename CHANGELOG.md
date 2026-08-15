@@ -5,6 +5,8 @@ remains available in immutable Git tags.
 
 ## [Unreleased]
 
+## [3.1.0] - 2026-08-15
+
 ### Removed
 
 - The two `cross-platform smoke` required status checks, and the workflow behind

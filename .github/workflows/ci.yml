@@ -99,6 +99,30 @@ jobs:
         run: |
           bash scripts/ci/validate.sh
 
+      # The repository-metadata contract, on both supported operating systems.
+      #
+      # This is what `cross-platform.yml` proved, through two required status
+      # checks and two runner starts on every push, pull request and weekly
+      # schedule: that four files exist and `VERSION` is readable. Both jobs ran
+      # the same block; neither ran a line of this adapter. A platform-specific
+      # regression passed both.
+      #
+      # It is a real invariant -- every consumer resolves the adapter by these
+      # four files -- so it is kept, folded into a job that already runs on both
+      # platforms and already has to be green to merge. Two required contexts
+      # become zero, and the assertion gets stronger: it now runs beside the
+      # lanes that execute the installers.
+      - name: Verify the repository metadata contract
+        if: github.event_name != 'workflow_dispatch' || inputs.platform == 'both' || inputs.platform == matrix.platform
+        run: |
+          set -euo pipefail
+          for path in README.md LICENSE NOTICE VERSION; do
+            [ -r "$path" ] || { echo "missing required path: $path" >&2; exit 1; }
+          done
+          version="$(tr -d '[:space:]' <VERSION)"
+          [ -n "$version" ] || { echo "VERSION is empty" >&2; exit 1; }
+          printf 'metadata contract ok on %s: version %s\n' "$(uname -s)" "$version"
+
       - name: Verify bootstrap entrypoint for target platform
         if: github.event_name != 'workflow_dispatch' || inputs.platform == 'both' || inputs.platform == matrix.platform
         run: |

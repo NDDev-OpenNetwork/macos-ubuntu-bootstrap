@@ -7,6 +7,50 @@ remains available in immutable Git tags.
 
 ### Fixed
 
+- `evidence-gate` could not report for two whole classes of pull request, while
+  the ruleset mirror declared it required. A pull request outside the workflow's
+  `paths:` filter never ran the workflow at all, so the context never arrived —
+  and a required context that never arrives leaves a pull request pending with
+  nothing to click. A fork's pull request skipped every producer job, and the
+  gate turned `skipped` into `exit 1`: not absent but **red**, for a contributor
+  who had done nothing wrong and could do nothing about it.
+
+  The path filter moved out of the trigger and into a `scope` job that always
+  runs. `evidence-gate` now reports for every pull request that can reach `main`
+  and states which of three cases it is — verified, out of scope, or a fork whose
+  head cannot run the native lanes — each explained in the job summary rather
+  than implied by a check that silently never appeared.
+
+- The release lane treated a green `evidence-gate` as proof that evidence
+  existed. With the gate reporting three outcomes, two of them are green without
+  a single lane having run, so that inference would publish a fork-authored
+  device change with no evidence at all. `evidence-gate` now writes a verdict
+  naming the exact SHA and every `(lane, release, architecture)` it opened, and
+  `release.yml` reads that instead of asking GitHub what a check concluded. An
+  absent verdict is a refusal, with the reason and the remedy in the message.
+  The verdict is written only after verification succeeds — a rejected run
+  leaves none behind, and a test asserts it.
+
+### Changed
+
+- Raised the evidence sandbox matrix from `max-parallel: 2` to `6`. Each matrix
+  job takes its own hosted runner, so the cap throttled nothing but this
+  workflow: fourteen lanes two at a time is seven waves, which is why a run took
+  25m35s against Bootstrap CI's 2m28s. It arrived as a conservative default in
+  the first version of the file with no reason recorded, and a gate that is a
+  ten-fold long pole is one people learn to merge around.
+
+- Folded the repository-metadata contract into `bootstrap-validate`, which
+  already runs on both supported operating systems and already has to be green
+  to merge. `cross-platform.yml` spent two required status checks and two runner
+  starts per push, pull request and weekly schedule proving that four files
+  exist — the same block on both platforms, neither running a line of this
+  adapter. The invariant is real and is kept; the ceremony around it is not.
+  Removing the two now-redundant required contexts is a separate, reversible
+  act against the live ruleset.
+
+### Fixed
+
 - Source drift was rendered and never acted on. `discover_source_drift.py`
   exited non-zero only for a `violation`; an ordinary `behind` result printed a
   row, uploaded a report and exited zero, so the scheduled run went green and the

@@ -168,6 +168,11 @@ jobs:
     permissions:
       checks: read
       contents: read
+      # Reads the evidence verdict the pull request's run published. Listing and
+      # downloading another run's artifacts needs this; `checks: read` alone
+      # only answers what a check concluded, which is exactly what stopped
+      # being proof.
+      actions: read
     steps:
       - name: Checkout the candidate with full history
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -204,7 +209,7 @@ jobs:
       # up-to-date branch has the same tree as its head. That is the property
       # relied on, and it is verified rather than assumed: a candidate whose tree
       # differs from the head that carries the evidence fails here.
-      - name: Require evidence-gate on the head this candidate's tree came from
+      - name: Require verified evidence for the tree this candidate carries
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -229,16 +234,57 @@ jobs:
             exit 1
           }
 
-          conclusion="$(
+          # A green `evidence-gate` is no longer proof that evidence exists.
+          # The gate now reports for every pull request and states which of
+          # three cases it is -- verified, out of scope, or a fork whose head
+          # cannot run the native lanes -- and two of those are green without a
+          # single lane having run. Asking for the conclusion would publish a
+          # fork-authored device change that produced no evidence at all.
+          #
+          # So this reads the artifact the gate writes only after opening and
+          # checking every lane payload. An absent verdict is the answer for
+          # both green-but-empty cases, and it is the right answer: this
+          # candidate has no evidence.
+          verdict_run="$(
             gh api -H "Accept: application/vnd.github+json" \
-              "/repos/${GITHUB_REPOSITORY}/commits/${head}/check-runs?check_name=evidence-gate&status=completed&filter=latest&per_page=1" \
-              --jq '.check_runs[0].conclusion // ""'
+              "/repos/${GITHUB_REPOSITORY}/actions/runs?head_sha=${head}&event=pull_request" \
+              --jq '[.workflow_runs[] | select(.name == "platform-evidence")]
+                    | sort_by(.run_started_at) | last | .id // ""'
           )"
-          [ "$conclusion" = success ] || {
-            echo "PR #${pr} head ${head} has evidence-gate=${conclusion:-absent}" >&2
+          [ -n "$verdict_run" ] || {
+            echo "no platform-evidence run exists for head ${head}" >&2
             exit 1
           }
-          echo "evidence-gate: success on ${head}, whose tree is identical to ${GITHUB_SHA}"
+
+          gh api "/repos/${GITHUB_REPOSITORY}/actions/runs/${verdict_run}/artifacts" \
+            --jq '.artifacts[] | select(.name == "evidence-verdict-'"${head}"'") | .archive_download_url' \
+            >verdict_url.txt
+          [ -s verdict_url.txt ] || {
+            echo "head ${head} produced no evidence verdict: its evidence-gate was green" >&2
+            echo "because the change was out of scope or the head was on a fork, not" >&2
+            echo "because any lane ran. Re-run platform-evidence from a branch in this" >&2
+            echo "repository before releasing this tree." >&2
+            exit 1
+          }
+
+          gh api "$(head -n 1 verdict_url.txt)" >verdict.zip
+          unzip -p verdict.zip evidence-verdict.json >verdict.json
+          cat verdict.json
+
+          python3 - "$head" <<'PY'
+          import json, sys
+          verdict = json.load(open("verdict.json"))
+          head = sys.argv[1]
+          if verdict.get("sha") != head:
+              raise SystemExit(f"verdict names {verdict.get('sha')!r}, expected {head!r}")
+          if verdict.get("verified") is not True:
+              raise SystemExit("verdict does not report a verified run")
+          if not verdict.get("instances"):
+              raise SystemExit("verdict lists no verified evidence instances")
+          print(f"verified {len(verdict['instances'])} evidence instances for {head}")
+          PY
+
+          echo "evidence verified on ${head}, whose tree is identical to ${GITHUB_SHA}"
 
   verify-tag:
     name: Verify exact manual release tag

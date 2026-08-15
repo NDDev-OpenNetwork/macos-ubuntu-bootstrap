@@ -5,6 +5,23 @@ remains available in immutable Git tags.
 
 ## [Unreleased]
 
+### Removed
+
+- The two `cross-platform smoke` required status checks, and the workflow behind
+  them. Both jobs ran the same block — that `README.md`, `LICENSE`, `NOTICE` and
+  `VERSION` exist and `VERSION` is readable — and neither executed a line of this
+  adapter, so a platform-specific regression passed both. The cost was two
+  required contexts and two runner starts on every push, every pull request and a
+  weekly schedule, for one assertion. That assertion moved into
+  `bootstrap-validate` in the previous change: it already runs on both supported
+  operating systems, already executes the installers in plan mode, and already
+  has to be green to merge.
+
+- `validate.yml`, which installed shellcheck and ripgrep and ran `validate.sh` on
+  ubuntu — which `ci.yml`'s `bootstrap-validate` already does on **both** ubuntu
+  and macOS. It was not a required context and proved nothing the required lane
+  did not prove more widely.
+
 ### Added
 
 - Ubuntu privileged operations are composable and fail closed (`#55`). A GUI

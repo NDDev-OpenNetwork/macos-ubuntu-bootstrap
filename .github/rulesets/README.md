@@ -75,9 +75,27 @@ python3 scripts/ci/check_required_contexts.py --live
 Step 3 is the point. A ruleset change that is not followed by a green
 `--live` run has not been finished.
 
+## Removed, and why
+
+Two required contexts left on 2026-08-15: `cross-platform smoke (ubuntu-latest)`
+and `cross-platform smoke (macos-latest)`.
+
+They ran the same block on both platforms — that `README.md`, `LICENSE`,
+`NOTICE` and `VERSION` exist and `VERSION` is readable — and neither executed a
+line of this adapter. A platform-specific regression passed both. The cost was
+two required status checks and two runner starts on every push, every pull
+request and a weekly schedule, for one assertion.
+
+The assertion is real: every consumer resolves the adapter by those four files.
+It now lives in `bootstrap-validate`, which already runs on both supported
+operating systems, already executes the installers in plan mode, and already has
+to be green to merge. One invariant, one place, zero extra required contexts.
+
 ## Pending
 
-`evidence-gate` is the one check worth requiring that cannot report yet. It
-becomes eligible once fork pull requests and out-of-path pull requests each
-receive a documented, definite result. Until then it is deliberately absent from
-all three lists.
+`evidence-gate` is the one check worth requiring that is not required yet. As of
+#86 it reports a definite result for every pull request that can reach `main` —
+verified, out of scope, or a fork whose head cannot run the native lanes — so the
+reason it was ineligible is gone. What remains is to watch it report across all
+three cases on real pull requests before making it mandatory, because a required
+check is the wrong place to discover a topology nobody exercised.

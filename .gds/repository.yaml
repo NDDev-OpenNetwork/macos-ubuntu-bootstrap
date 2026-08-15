@@ -77,8 +77,6 @@ verification:
     - "Gitleaks secret scan / Gitleaks secret scan"
     - "bootstrap-gate"
     - "bootstrap-pytests / python (3.14)"
-    - "cross-platform smoke (macos-latest) / smoke (macos-latest)"
-    - "cross-platform smoke (ubuntu-latest) / smoke (ubuntu-latest)"
     - "dependency-review / Dependency review"
 
 agent:

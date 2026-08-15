@@ -566,3 +566,69 @@ def test_ci_tool_parity_covers_every_workflow_that_names_a_pinned_tool() -> None
                 f"{path.name} passes a version for the contract-pinned tool {tool!r} "
                 "but is not in CI_TOOL_INPUTS, so nothing compares the two"
             )
+
+
+# Contract blocks that describe something real and are enforced elsewhere, but
+# are not read *through the contract*. Each is a duplicate declaration free to
+# drift from the behaviour it describes, which is why they are listed here
+# rather than tolerated silently. Tracked in #88.
+KNOWN_UNREAD = {
+    # A bare date. Nothing writes it, nothing checks it, and it can only ever
+    # become wrong.
+    "verified_on",
+    # Twelve policy statements -- plan-by-default, manual credential handoff,
+    # explicit Docker group membership, never-automatic package upgrade. All
+    # true, all enforced by the installers and their tests, none read from
+    # here. `docs/adr/0008-desktop-builds-profile.md` cites
+    # `safety.docker_group_membership: "explicit"` as though this block were the
+    # mechanism.
+    "safety",
+}
+
+
+def test_every_contract_block_has_a_reader() -> None:
+    """A contract key nothing reads is a claim nothing enforces.
+
+    Caught this recut adding one: the privilege line arrived with a
+    `ci_validation` block whose only reader was a CI framework module that this
+    branch deliberately leaves behind. The block would have shipped describing a
+    validation path that does not exist -- exactly the defect class this
+    repository keeps finding in itself, introduced by the change fixing it.
+
+    Reading is proved by the key name appearing in something that runs: a
+    script, or a test that binds the script. That is coarse, and deliberately
+    so -- a stricter check would need to model how each consumer indexes the
+    contract, and would then fail for the wrong reasons.
+    """
+    def _readable(path: Path) -> str:
+        text = path.read_text(encoding="utf-8")
+        if path == Path(__file__):
+            # Naming a block in KNOWN_UNREAD is not reading it. Without this the
+            # exemption list makes its own entries look consumed, the unread set
+            # comes back empty, and the check quietly stops checking.
+            head, _, tail = text.partition("KNOWN_UNREAD = {")
+            return head + tail.partition("\n}\n")[2]
+        return text
+
+    consumers = "\n".join(
+        _readable(path)
+        for directory in ("scripts", "tests")
+        for path in sorted((ROOT / directory).rglob("*"))
+        if path.suffix in {".sh", ".py"} and path.is_file()
+    )
+    # A quoted key, which is how every consumer indexes the contract -- in
+    # Python, in `jq`, and in the shell. Searching for the bare word instead
+    # made this test pass on its own prose: the sentence above names
+    # `ci_validation` in backticks, and that counted as a reader.
+    unread = [
+        key for key in CONTRACT
+        if not key.startswith("_")
+        and f'"{key}"' not in consumers
+        and f"'{key}'" not in consumers
+    ]
+    assert sorted(unread) == sorted(KNOWN_UNREAD), (
+        f"contract blocks nothing reads: {sorted(set(unread) - set(KNOWN_UNREAD))}. "
+        "Remove the block, or land the code that reads it -- a schema field is "
+        "not a mechanism. If one of the known-unread blocks gained a reader, "
+        "take it out of KNOWN_UNREAD."
+    )

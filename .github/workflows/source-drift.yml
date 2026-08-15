@@ -8,6 +8,17 @@ name: source-drift
 # Deliberately not self-authoring PRs: that needs `contents: write` and
 # `pull-requests: write` on a public repository, which is a privilege decision
 # separate from wanting the report. See #58.
+#
+# It does, however, *fail*. The first version of this workflow ran discovery,
+# printed `behind`, uploaded a report and exited zero, so a pin falling behind
+# produced a green scheduled run and a finding that existed only inside a job
+# summary nobody opens. #66 -- the issue this exists to prevent recurring --
+# was seven pins behind their upstreams, which this would have reported exactly
+# that quietly.
+#
+# One discovery per run. It used to call the script twice, once for `--markdown`
+# and once for `--json`: two network snapshots taken minutes apart, free to
+# disagree, each spending the rate limit the other needed.
 
 on:
   schedule:
@@ -21,7 +32,7 @@ permissions: {}
 
 concurrency:
   group: source-drift-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
   discover:
@@ -36,19 +47,25 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: Discover drift against official sources
-        id: discover
+      # Probe every source once and keep the answer. Everything downstream reads
+      # this file, so the summary, the artifact and the exit status all describe
+      # the same moment.
+      - name: Take one snapshot of every official source
+        id: snapshot
         env:
           # Raises the anonymous API rate limit. Read-only, and the script only
           # sends it to api.github.com.
           GITHUB_TOKEN: ${{ github.token }}
         run: |
           set -uo pipefail
-          python3 scripts/ci/discover_source_drift.py --markdown > report.md
-          status=$?
-          python3 scripts/ci/discover_source_drift.py --json > report.json || true
-          cat report.md >> "$GITHUB_STEP_SUMMARY"
-          exit "$status"
+          python3 scripts/ci/discover_source_drift.py --json >report.json
+          echo "status=$?" >>"$GITHUB_OUTPUT"
+
+      - name: Render the report from that snapshot
+        run: |
+          set -euo pipefail
+          python3 scripts/ci/discover_source_drift.py --markdown --from-json report.json >report.md
+          cat report.md >>"$GITHUB_STEP_SUMMARY"
 
       - name: Upload the report
         if: always()
@@ -59,4 +76,20 @@ jobs:
             report.md
             report.json
           if-no-files-found: error
-          retention-days: 30
+          # Long enough to compare consecutive weekly runs by hand, which is how
+          # a persistently unreachable source is currently noticed. The script
+          # holds no state across runs and says so.
+          retention-days: 90
+
+      # Last, so the report is in the summary and the artifact before the job
+      # goes red. A failure whose evidence was never published is a failure
+      # people re-run rather than read.
+      - name: A pin that is behind is a finding, not a note
+        run: |
+          set -euo pipefail
+          status='${{ steps.snapshot.outputs.status }}'
+          if [ "$status" != 0 ]; then
+            echo "source drift found; see the job summary and the uploaded report" >&2
+            exit 1
+          fi
+          echo "every pin is current, held, or within the unknown tolerance"

@@ -108,12 +108,12 @@ rldyour::ubuntu_verify::tool_host_provenance() {
   if [ "$arch" = "x64" ] && ! rldyour::cpu_has_avx2; then bun_arch="x64-baseline"; fi
   bun_sha=$(rldyour::ubuntu_verify::contract_hash ubuntu_bun_sha256 "$bun_arch")
   node_root="$HOME/.local/share/rldyour/node/v24.19.0"
-  uv_root="$HOME/.local/share/rldyour/uv/0.12.4"
+  uv_root="$HOME/.local/share/rldyour/uv/0.12.5"
   bun_root="$HOME/.local/share/rldyour/bun/1.3.14"
 
   rldyour::ubuntu_verify::runtime_receipt node 24.19.0 "$node_sha" "$node_root" \
     bin/node bin/npm bin/npx bin/corepack || return 1
-  rldyour::ubuntu_verify::runtime_receipt uv 0.12.4 "$uv_sha" "$uv_root" uv uvx || return 1
+  rldyour::ubuntu_verify::runtime_receipt uv 0.12.5 "$uv_sha" "$uv_root" uv uvx || return 1
   rldyour::ubuntu_verify::runtime_receipt bun 1.3.14 "$bun_sha" "$bun_root" bun || return 1
   # Only node is published to the managed PATH; npm/npx/corepack must NOT be
   # linked (uv and bun are the only package managers). Their integrity inside
@@ -228,8 +228,8 @@ done
   rldyour::log "missing" "Bun exact managed Ubuntu version 1.3.14"
   exit 1
 }
-uv --version 2>/dev/null | head -n 1 | grep -Eq '^uv 0\.12\.4([[:space:]]|$)' || {
-  rldyour::log "missing" "uv exact managed Ubuntu version 0.12.4"
+uv --version 2>/dev/null | head -n 1 | grep -Eq '^uv 0\.12\.5([[:space:]]|$)' || {
+  rldyour::log "missing" "uv exact managed Ubuntu version 0.12.5"
   exit 1
 }
 rldyour::verify_terminal_environment

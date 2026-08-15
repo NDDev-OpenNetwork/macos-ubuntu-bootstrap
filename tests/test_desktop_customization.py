@@ -3,8 +3,10 @@
 from __future__ import annotations
 
 import os
+import json
 import re
 import subprocess
+import sys
 from pathlib import Path
 
 import pytest
@@ -12,6 +14,7 @@ import pytest
 ROOT = Path(__file__).resolve().parents[1]
 DESKTOP = ROOT / "scripts/ubuntu/desktop.sh"
 INSTALL = ROOT / "scripts/ubuntu/install.sh"
+PRIVILEGED_HELPER = ROOT / "scripts/ubuntu/privileged-helper.sh"
 VERIFY = ROOT / "scripts/ubuntu/verify.sh"
 
 # Preconditions desktop.sh checks before it does anything. Each stub is the
@@ -24,7 +27,7 @@ BASE_STUBS: dict[str, str] = {
     "locale": "echo ru_RU.utf8\n",
     "sed": "exit 0\n",
     "locale-gen": "exit 0\n",
-    "dpkg-query": 'printf "install ok installed"\n',
+    "dpkg-query": 'case "$*" in *rustdesk*|*google-chrome-stable*) printf "install ok installed\\n" ;; *) exit 1 ;; esac\n',
     "dpkg": "exit 1\n",
     # `snap list firefox >/dev/null 2>&1` discards both streams, so the only
     # way a stub can prove it ran is a side effect on disk.
@@ -58,8 +61,14 @@ def write_stubs(bin_dir: Path, overrides: dict[str, str] | None = None) -> Path:
 
 
 def run_desktop(bin_dir: Path) -> subprocess.CompletedProcess[str]:
+    harness = r'''
+source "$1"
+rldyour::privilege::refresh() { return 0; }
+RLDYOUR_PRIVILEGE_MODE=root
+nddev::desktop_configure
+'''
     return subprocess.run(
-        ["bash", str(DESKTOP)],
+        ["bash", "-c", harness, "_", str(DESKTOP)],
         cwd=ROOT,
         capture_output=True,
         text=True,
@@ -143,18 +152,37 @@ def test_installer_surfaces_the_desktop_result_instead_of_warning() -> None:
 
 
 def test_every_owned_shell_script_is_linted() -> None:
-    """lint.sh discovers scripts instead of carrying a hand-maintained list."""
+    """Discovery, not an allowlist, decides what gets linted.
+
+    The property is that a shell file added to `scripts/` is checked without
+    anyone remembering to say so. A hand-maintained list silently skipped
+    `scripts/ubuntu/desktop.sh` from the day it was added.
+
+    This asserts the property against the mechanism `lint.sh` uses: it finds
+    every `*.sh` under `scripts/` and lints all of them, with an exclusion list
+    that must stay empty. An inventory file would be a second place to forget.
+    """
     lint = (ROOT / "scripts/ci/lint.sh").read_text(encoding="utf-8")
-    # What must not come back is a hand-maintained list of paths, not the name
-    # of the array that discovery fills.
-    assert "$REPO_ROOT/scripts/" not in lint, "lint.sh hardcodes a script path"
-    assert "find" in lint and "-name '*.sh'" in lint
-    discovered = sorted(p.relative_to(ROOT) for p in (ROOT / "scripts").rglob("*.sh"))
+
+    assert "find \"$REPO_ROOT/scripts\" -type f -name '*.sh'" in lint, (
+        "lint.sh must discover its subjects rather than enumerate them"
+    )
+    assert re.search(r"^EXCLUDED_PATHS=\(\)$", lint, re.M), (
+        "the exclusion list must be empty; an entry needs a recorded reason"
+    )
+    assert "shellcheck -x" in lint and "bash -n" in lint
+
+    # Discovery has to actually reach the scripts most likely to be forgotten:
+    # the two that a previous allowlist missed, and the privileged pair, which
+    # is the code where an unlinted regression matters most.
+    discovered = {p.relative_to(ROOT) for p in (ROOT / "scripts").rglob("*.sh")}
     for required in (
         Path("scripts/ubuntu/desktop.sh"),
         Path("scripts/remote-exec.sh"),
+        Path("scripts/ubuntu/privilege.sh"),
+        Path("scripts/ubuntu/privileged-helper.sh"),
     ):
-        assert required in discovered
+        assert required in discovered, f"{required} is not reachable by lint.sh's discovery"
 
 
 @pytest.mark.parametrize(
@@ -174,7 +202,6 @@ def test_discovered_script_passes_syntax_check(script: str) -> None:
 # browser to an old build is a security liability. Supply-chain control comes
 # from the signing key, so the fingerprint gate is the thing worth testing.
 
-CHROME_FINGERPRINT = "EB4C1BFD4F042F6DDDCCEC917721F63BD38B4796"
 CONTRACT = ROOT / "config/rldyour-contract.json"
 
 
@@ -190,6 +217,9 @@ def _chrome_contract() -> dict:
     raise AssertionError("google-chrome-stable is not declared in desktop_apps")
 
 
+CHROME_FINGERPRINT = _chrome_contract()["apt_source"]["key_fingerprint"]
+
+
 def test_contract_declares_chrome_as_key_verified_not_version_pinned() -> None:
     chrome = _chrome_contract()
     assert chrome["version_policy"] == "tracks-stable-channel"
@@ -200,11 +230,13 @@ def test_contract_declares_chrome_as_key_verified_not_version_pinned() -> None:
     assert source["vendor_source_policy"] == "preserve-when-key-verifies"
 
 
-def test_installer_pins_the_same_fingerprint_as_the_contract() -> None:
-    source = DESKTOP.read_text(encoding="utf-8")
-    assert f'CHROME_KEY_FINGERPRINT="{CHROME_FINGERPRINT}"' in source
+def test_helper_and_verifier_consume_the_contract_without_duplicate_fingerprint() -> None:
+    source = PRIVILEGED_HELPER.read_text(encoding="utf-8")
+    assert CHROME_FINGERPRINT not in source
+    assert 'apps["google-chrome-stable"]["apt_source"]' in source
     verify = (ROOT / "scripts/ubuntu/verify.sh").read_text(encoding="utf-8")
-    assert CHROME_FINGERPRINT in verify, "the verifier must gate on the same key"
+    assert CHROME_FINGERPRINT not in verify
+    assert "rldyour-contract.json" in verify
 
 
 def test_chrome_and_rustdesk_are_required() -> None:
@@ -239,19 +271,6 @@ def _generated_keyring(directory: Path, name: str = "Not Google") -> Path:
     keyring = directory / "keyring.asc"
     keyring.write_bytes(exported.stdout)
     return keyring
-
-
-def _run_chrome_gate(keyring: Path) -> subprocess.CompletedProcess[str]:
-    """Run the installer's Chrome key gate exactly as desktop.sh composes it."""
-    gate = _extract("nddev::_chrome_keyring_verifies", DESKTOP)
-    return subprocess.run(
-        ["bash", "-c",
-         'set -euo pipefail\n'
-         f'source "{ROOT}/scripts/lib/common.sh"\n'
-         f'CHROME_KEY_FINGERPRINT="{CHROME_FINGERPRINT}"\n{gate}\n'
-         'nddev::_chrome_keyring_verifies "$1"', "_", str(keyring)],
-        capture_output=True, text=True, check=False,
-    )
 
 
 def _extract(function: str, path: Path) -> str:
@@ -291,43 +310,43 @@ def test_chrome_key_gate_rejects_a_foreign_key(tmp_path: Path) -> None:
     )
     foreign.write_bytes(exported.stdout)
 
-    result = _run_chrome_gate(foreign)
+    result = subprocess.run(
+        ["bash", "-c",
+         'source "$1"; chrome_key_matches "$2" "$3"', "_", str(PRIVILEGED_HELPER),
+         str(foreign), CHROME_FINGERPRINT],
+        capture_output=True, text=True, check=False,
+    )
     assert result.returncode != 0, "a foreign signing key was accepted"
 
 
+def test_chrome_key_acceptance_is_contract_owned_and_rejects_override() -> None:
+    helper = PRIVILEGED_HELPER.read_text(encoding="utf-8")
+    install = helper.split("install_chrome() {", 1)[1].split("\n}", 1)[0]
+    matcher = helper.split("chrome_key_matches() {", 1)[1].split("\n}", 1)[0]
+    assert 'chrome_key_matches "$tmp_dir/chrome-key" "$fingerprint"' in install
+    assert 'observed=$(chrome_key_fingerprint "$key")' in matcher
+    assert '[ "$observed" = "$expected" ]' in matcher
+    assert CHROME_FINGERPRINT not in helper
+
+
 def test_chrome_key_gate_rejects_a_missing_keyring(tmp_path: Path) -> None:
-    assert _run_chrome_gate(tmp_path / "absent.asc").returncode != 0
+    """The privileged helper's gate must fail closed on an absent keyring."""
+    result = subprocess.run(
+        ["bash", "-c",
+         'source "$1"; chrome_key_fingerprint "$2"',
+         "_", str(PRIVILEGED_HELPER), str(tmp_path / "absent.asc")],
+        capture_output=True, text=True, check=False,
+    )
+    assert result.returncode != 0, "a missing keyring produced a fingerprint"
 
 
-def test_chrome_installer_and_verifier_share_one_identity_primitive() -> None:
-    """Four call sites used to carry four copies of the same awk program.
-
-    One of those copies -- the Ubuntu verifier's -- was written inside a
-    double-quoted command substitution, so its escaped quotes reached awk
-    verbatim, awk exited 2, and under `set -o pipefail` strict Ubuntu GUI
-    verification aborted on every device in every state. The duplication is the
-    defect; a single primitive is the fix.
-    """
-    library = (ROOT / "scripts/lib/common.sh").read_text(encoding="utf-8")
-    assert "rldyour::gpg_primary_fingerprint()" in library
-    for relative in (
-        "scripts/ubuntu/desktop.sh",
-        "scripts/ubuntu/verify.sh",
-        "scripts/ubuntu/server.sh",
-        "scripts/ubuntu/verify-server.sh",
-    ):
-        source = (ROOT / relative).read_text(encoding="utf-8")
-        assert "rldyour::gpg_primary_fingerprint" in source, relative
-        assert "--show-keys --with-colons" not in source, (
-            f"{relative} still carries its own copy of the key-identity program"
-        )
-
-
-def test_verifier_chrome_gate_accepts_only_the_contract_fingerprint(tmp_path: Path) -> None:
+def test_verifier_chrome_gate_accepts_only_its_own_keyring(tmp_path: Path) -> None:
     """Execute the verifier's gate; do not assert on its source text.
 
-    The gate this replaces was unexecutable, and the only test that touched it
-    asserted on a neighbouring line, so nothing observed the failure.
+    The gate this replaces was unexecutable -- its escaped quotes reached awk
+    verbatim inside a double-quoted command substitution -- and the only test
+    that touched it asserted on a neighbouring line, so nothing observed the
+    failure.
     """
     keyring = _generated_keyring(tmp_path)
     observed = subprocess.run(
@@ -342,6 +361,7 @@ def test_verifier_chrome_gate_accepts_only_the_contract_fingerprint(tmp_path: Pa
     assert re.fullmatch(r"[0-9A-F]{40}", fingerprint), fingerprint
 
     gate = _extract("rldyour::ubuntu_verify::chrome_key_trusted", VERIFY)
+
     def run(expected: str) -> int:
         return subprocess.run(
             ["bash", "-c",
@@ -379,104 +399,176 @@ def test_verifier_chrome_gate_rejects_a_keyring_with_a_second_primary_key(
     assert result.returncode != 0, "a two-primary-key keyring was treated as one identity"
 
 
-def test_verifier_survives_a_device_without_any_chrome_source() -> None:
-    """grep exits 1 when it finds nothing; under `set -o pipefail` an unguarded
-    command substitution would abort the whole verifier on such a device."""
-    verify = (ROOT / "scripts/ubuntu/verify.sh").read_text(encoding="utf-8")
-    block = verify.split("chrome_source=", 1)[1].split("\n\n", 1)[0]
-    assert "|| true" in block, "the Chrome source lookup must not abort under pipefail"
-
-
-def test_both_google_repository_paths_are_recognised() -> None:
-    """Google's cron writes linux/chrome/deb; repolib writes
-    linux/chrome-stable/deb. Matching only the former left a real device's
-    source invisible to both the installer and the verifier."""
-    for path in (DESKTOP, ROOT / "scripts/ubuntu/verify.sh"):
-        text = path.read_text(encoding="utf-8")
-        assert "dl.google.com/linux/chrome" in text, path.name
-        assert "dl.google.com/linux/chrome/deb'" not in text, (
-            f"{path.name} still matches only the cron path"
+def test_chrome_key_gate_rejects_multiple_primary_keys(tmp_path: Path) -> None:
+    gnupg = tmp_path / "gnupg"
+    gnupg.mkdir(mode=0o700)
+    for index in (1, 2):
+        batch = tmp_path / f"batch-{index}"
+        batch.write_text(
+            "%no-protection\nKey-Type: eddsa\nKey-Curve: ed25519\n"
+            f"Name-Real: Foreign {index}\nName-Email: foreign-{index}@example.invalid\n%commit\n",
+            encoding="utf-8",
         )
-
-
-# ------------------- pinned .deb applications (one installer) -------------------
-
-
-def _deb_rows() -> list[list[str]]:
-    source = DESKTOP.read_text(encoding="utf-8")
-    block = re.search(r"^DESKTOP_DEBS=\((.*?)^\)", source, re.M | re.S)
-    assert block, "DESKTOP_DEBS table missing"
-    return [
-        line.strip().strip('"').split(";")
-        for line in block.group(1).splitlines()
-        if line.strip().startswith('"')
-    ]
-
-
-def test_every_deb_application_goes_through_one_installer() -> None:
-    source = DESKTOP.read_text(encoding="utf-8")
-    assert source.count("nddev::_install_desktop_deb()") == 1
-    assert {row[0] for row in _deb_rows()} == {"rustdesk"}
-
-
-def test_every_deb_row_is_well_formed_and_digest_pinned() -> None:
-    for row in _deb_rows():
-        assert len(row) == 6, f"malformed row: {row}"
-        name, package, url_x64, sha_x64, url_arm64, sha_arm64 = row
-        assert name and package
-        assert url_x64.startswith("https://")
-        assert re.fullmatch(r"[0-9a-f]{64}", sha_x64), f"{name}: bad x64 digest"
-        # An arm64 build is optional, but a URL without a digest is never valid.
-        assert bool(url_arm64) == bool(sha_arm64), f"{name}: half-declared arm64"
-        if url_arm64:
-            assert url_arm64.startswith("https://")
-            assert re.fullmatch(r"[0-9a-f]{64}", sha_arm64), f"{name}: bad arm64 digest"
-
-
-def test_deb_rows_match_the_contract() -> None:
-    """One shape for one concept: every declared .deb is per-architecture."""
-    import json
-
-    apps = json.loads(CONTRACT.read_text(encoding="utf-8"))["ubuntu_apt_packages"][
-        "desktop_apps"
-    ]
-    declared = {
-        entry["name"]: entry
-        for entry in apps
-        if isinstance(entry, dict) and "sha256" in entry
-    }
-    rows = {row[0]: row for row in _deb_rows()}
-    assert set(rows) == set(declared), "installer table and contract disagree"
-
-    for name, row in rows.items():
-        _name, _package, url_x64, sha_x64, url_arm64, sha_arm64 = row
-        spec = declared[name]
-        assert isinstance(spec["sha256"], dict), f"{name}: flat digest, expected per-arch"
-        assert spec["sha256"]["x64"] == sha_x64, name
-        assert spec["url"]["x64"] == url_x64, name
-        # An architecture upstream does not publish must be absent from both
-        # sides, never half-declared.
-        assert ("arm64" in spec["sha256"]) == bool(sha_arm64), name
-        if sha_arm64:
-            assert spec["sha256"]["arm64"] == sha_arm64, name
-            assert spec["url"]["arm64"] == url_arm64, name
-
-
-def test_unknown_deb_row_is_refused(tmp_path: Path) -> None:
-    source = DESKTOP.read_text(encoding="utf-8")
-    table_match = re.search(r"^DESKTOP_DEBS=\(.*?^\)", source, re.M | re.S)
-    assert table_match, "DESKTOP_DEBS table missing"
-    table = table_match.group(0)
-    fn = _extract("nddev::_install_desktop_deb", DESKTOP)
+        generated = subprocess.run(
+            ["gpg", "--batch", "--homedir", str(gnupg), "--gen-key", str(batch)],
+            capture_output=True, text=True, check=False,
+        )
+        if generated.returncode != 0:
+            pytest.skip(f"gpg could not generate test keys: {generated.stderr[:200]}")
+    combined = tmp_path / "multiple.asc"
+    exported = subprocess.run(
+        ["gpg", "--batch", "--homedir", str(gnupg), "--armor", "--export"],
+        capture_output=True, check=False,
+    )
+    combined.write_bytes(exported.stdout)
     result = subprocess.run(
-        ["bash", "-c",
-         "info(){ :; }; ok(){ :; }; warn(){ printf '%s\\n' \"$*\"; }\n"
-         "nddev::_record(){ :; }; nddev::_sudo_refresh(){ :; }\n"
-         f"{table}\n{fn}\nnddev::_install_desktop_deb nonesuch"],
+        ["bash", "-c", 'source "$1"; chrome_key_fingerprint "$2"', "_", str(PRIVILEGED_HELPER), str(combined)],
         capture_output=True, text=True, check=False,
     )
     assert result.returncode != 0
-    assert "no DESKTOP_DEBS row named nonesuch" in result.stdout
+
+
+def test_verifier_fails_typed_when_no_chrome_source_is_installed(tmp_path: Path) -> None:
+    """The structured consumer owns absence handling; no shell grep model remains."""
+    empty_sources = tmp_path / "sources.list.d"
+    empty_sources.mkdir()
+    result = subprocess.run(
+        [sys.executable, "-I", str(ROOT / "scripts/ci/shell_contract.py"), "chrome-runtime",
+         "--contract", str(CONTRACT), "--source", str(empty_sources)],
+        capture_output=True, text=True, check=False,
+    )
+    assert result.returncode == 3
+    assert result.stdout == ""
+    assert result.stderr == "shell-contract: Chrome apt source identity or binding is invalid\n"
+    verify = (ROOT / "scripts/ubuntu/verify.sh").read_text(encoding="utf-8")
+    docs = (ROOT / "docs/reference/source-register.md").read_text(encoding="utf-8")
+    assert "--require-root-owned-contract" in verify
+    assert 'rldyour::log "missing" "valid Chrome source and trust contract"' in verify
+    normalized_docs = " ".join(docs.split())
+    assert "typed exit 3" in normalized_docs and "no accepted installed source" in normalized_docs
+    stale = "chrome_" + "source="
+    tests = Path(__file__).read_text(encoding="utf-8")
+    assert stale not in verify and stale not in docs and stale not in tests
+
+
+def test_both_google_repository_paths_are_recognised(tmp_path: Path) -> None:
+    """Google's cron writes linux/chrome/deb; repolib writes
+    linux/chrome-stable/deb. Matching only the former left a real device's
+    source invisible to both the installer and the verifier."""
+    chrome = _chrome_contract()["apt_source"]
+    assert chrome["uri"] == "https://dl.google.com/linux/chrome/deb/"
+    helper = PRIVILEGED_HELPER.read_text(encoding="utf-8")
+    verifier = (ROOT / "scripts/ubuntu/verify.sh").read_text(encoding="utf-8")
+    desktop = DESKTOP.read_text(encoding="utf-8")
+    assert 'chrome["uri"]' in helper
+    assert "shell_contract.py" in verifier and "chrome-runtime" in verifier
+    assert chrome["uri"] not in desktop
+    assert chrome["key_fingerprint"] not in desktop
+    identities = chrome["accepted_source_identities"]
+    assert identities == [
+        {"scheme": "https", "host": "dl.google.com", "path": "/linux/chrome/deb"},
+        {"scheme": "https", "host": "dl.google.com", "path": "/linux/chrome-stable/deb"},
+    ]
+    for index, identity in enumerate(identities):
+        source = tmp_path / f"chrome-{index}.list"
+        source.write_text(
+            "deb [arch=amd64 signed-by=/etc/apt/keyrings/rldyour-google-chrome.asc] "
+            f"{identity['scheme']}://{identity['host']}{identity['path']}/ stable main\n",
+            encoding="utf-8",
+        )
+        result = subprocess.run(
+            [sys.executable, "-I", str(ROOT / "scripts/ci/shell_contract.py"), "chrome-runtime",
+             "--contract", str(CONTRACT), "--source", str(source)],
+            capture_output=True, text=True, check=False,
+        )
+        assert result.returncode == 0, result.stderr
+        observed = json.loads(result.stdout)["result"]
+        assert observed["fingerprint"] == CHROME_FINGERPRINT
+        assert observed["matched_identities"] == [[identity["scheme"], identity["host"], identity["path"]]]
+
+
+@pytest.mark.parametrize("uri", [
+    "http://dl.google.com/linux/chrome/deb/",
+    "https://dl.google.com.evil.invalid/linux/chrome/deb/",
+    "https://evil.invalid/dl.google.com/linux/chrome/deb/",
+    "https://user@dl.google.com/linux/chrome/deb/",
+    "https://dl.google.com:443/linux/chrome/deb/",
+    "https://dl.google.com/linux/chrome/deb.evil/",
+    "https://dl.google.com/linux/chrome/deb/?query=1",
+    "https://dl.google.com/linux/chrome/deb/#fragment",
+])
+def test_chrome_source_authority_rejects_lookalikes(tmp_path: Path, uri: str) -> None:
+    source = tmp_path / "chrome.list"
+    source.write_text(
+        "deb [arch=amd64 signed-by=/etc/apt/keyrings/rldyour-google-chrome.asc] "
+        f"{uri} stable main\n",
+        encoding="utf-8",
+    )
+    result = subprocess.run(
+        [sys.executable, "-I", str(ROOT / "scripts/ci/shell_contract.py"), "chrome-runtime",
+         "--contract", str(CONTRACT), "--source", str(source)],
+        capture_output=True, text=True, check=False,
+    )
+    assert result.returncode == 3
+
+
+def test_chrome_source_authority_accepts_deb822_and_rejects_binding_drift(tmp_path: Path) -> None:
+    source = tmp_path / "chrome.sources"
+    valid = (
+        "Types: deb\nURIs: https://dl.google.com/linux/chrome-stable/deb/\n"
+        "Suites: stable\nComponents: main\nArchitectures: amd64\n"
+        "Signed-By: /etc/apt/keyrings/rldyour-google-chrome.asc\n"
+    )
+    command = [
+        sys.executable, "-I", str(ROOT / "scripts/ci/shell_contract.py"), "chrome-runtime",
+        "--contract", str(CONTRACT), "--source", str(source),
+    ]
+    source.write_text(valid, encoding="utf-8")
+    accepted = subprocess.run(command, capture_output=True, text=True, check=False)
+    assert accepted.returncode == 0, accepted.stderr
+    for old, new in (
+        ("Suites: stable", "Suites: testing"),
+        ("Components: main", "Components: contrib"),
+        ("Architectures: amd64", "Architectures: arm64"),
+        ("rldyour-google-chrome.asc", "unmanaged-google.asc"),
+        ("Types: deb", "Types: deb-src"),
+    ):
+        source.write_text(valid.replace(old, new), encoding="utf-8")
+        refused = subprocess.run(command, capture_output=True, text=True, check=False)
+        assert refused.returncode == 3, (old, new, refused.stdout, refused.stderr)
+
+
+# ------------------- privileged .deb ownership -------------------
+
+
+def test_rustdesk_identity_has_one_contract_owner() -> None:
+    source = DESKTOP.read_text(encoding="utf-8")
+    helper = PRIVILEGED_HELPER.read_text(encoding="utf-8")
+    assert "REQUIRED_DESKTOP_PACKAGES" not in source
+    assert "rustdesk/releases/download" not in source
+    apps = json.loads(CONTRACT.read_text(encoding="utf-8"))["ubuntu_apt_packages"]["desktop_apps"]
+    rustdesk = next(item for item in apps if item["name"] == "rustdesk")
+    assert all(value.startswith("https://") for value in rustdesk["url"].values())
+    assert all(re.fullmatch(r"[0-9a-f]{64}", value) for value in rustdesk["sha256"].values())
+    assert 'rustdesk = apps["rustdesk"]' in helper
+    assert 'nddev::_install_desktop_deb rustdesk' in source
+
+
+def test_unknown_required_desktop_package_is_refused(tmp_path: Path) -> None:
+    prelude = tmp_path / "prelude.sh"
+    call = tmp_path / "call.sh"
+    prelude.write_text('info(){ :; }; ok(){ :; }; warn(){ printf "%s\\n" "$*"; }\n', encoding="utf-8")
+    call.write_text("nddev::_install_desktop_deb nonesuch\n", encoding="utf-8")
+    result = subprocess.run(
+        [sys.executable, str(ROOT / "scripts/ci/shell_function_harness.py"), "run",
+         "--source", str(DESKTOP), "--function", "nddev::_install_desktop_deb",
+         "--prelude", str(prelude), "--call", str(call)],
+        capture_output=True, text=True, check=False,
+    )
+    assert result.returncode == 0, result.stderr
+    observed = json.loads(result.stdout)["result"]
+    assert observed["returncode"] != 0
+    assert "unknown required desktop package" in observed["stdout"]
 
 
 # ------------------- macOS: an optional layer cannot strand the rest -------------------
@@ -621,8 +713,14 @@ def test_macos_path_scripts_avoid_bash4_only_features(script: str) -> None:
             )
 
 
-def test_the_macos_path_list_covers_every_non_ubuntu_script() -> None:
-    """A new top-level script must be classified, not silently unchecked."""
+def test_the_macos_path_list_covers_every_applicable_script() -> None:
+    """A new script on the macOS path must be classified, not silently unchecked.
+
+    The list is enumerated rather than derived: `scripts/ubuntu/` is Linux-only
+    by definition, and everything else runs on a machine that still ships bash
+    3.2. Deriving it would mean trusting a directory name to carry the claim.
+    """
+    assert MACOS_PATH_SCRIPTS
     owned = {
         str(p.relative_to(ROOT))
         for p in (ROOT / "scripts").rglob("*.sh")
@@ -630,4 +728,41 @@ def test_the_macos_path_list_covers_every_non_ubuntu_script() -> None:
     }
     assert owned == set(MACOS_PATH_SCRIPTS), (
         f"unclassified scripts: {sorted(owned ^ set(MACOS_PATH_SCRIPTS))}"
+    )
+
+
+def test_key_identity_is_one_primitive_with_no_surviving_copies() -> None:
+    """Four call sites used to carry four copies of the same awk program.
+
+    One of those copies -- the Ubuntu verifier's -- was written inside a
+    double-quoted command substitution, so its escaped quotes reached awk
+    verbatim, awk exited 2, and under `set -o pipefail` strict Ubuntu GUI
+    verification aborted on every device in every state. The duplication was the
+    defect; one primitive is the fix.
+
+    The file list differs from `main`'s version of this test: on this line
+    Chrome is installed by the root helper, so `desktop.sh` no longer performs
+    key identity at all and `privileged-helper.sh` does.
+    """
+    library = (ROOT / "scripts/lib/common.sh").read_text(encoding="utf-8")
+    assert "rldyour::gpg_primary_fingerprint()" in library
+
+    for relative in (
+        "scripts/ubuntu/verify.sh",
+        "scripts/ubuntu/server.sh",
+        "scripts/ubuntu/verify-server.sh",
+    ):
+        source = (ROOT / relative).read_text(encoding="utf-8")
+        assert "rldyour::gpg_primary_fingerprint" in source, relative
+        assert "--show-keys --with-colons" not in source, (
+            f"{relative} still carries its own copy of the key-identity program"
+        )
+
+    # The privileged helper cannot source the unprivileged library -- it runs as
+    # root from a fixed path with a scrubbed environment -- so it carries its
+    # own gate. What must not come back is the broken spelling.
+    helper = PRIVILEGED_HELPER.read_text(encoding="utf-8")
+    assert "chrome_key_fingerprint" in helper
+    assert 'awk -F: \'$1 == \\"fpr\\"' not in helper, (
+        "the helper regained the escaped-quote awk program that aborted the verifier"
     )

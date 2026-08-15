@@ -5,6 +5,56 @@ remains available in immutable Git tags.
 
 ## [Unreleased]
 
+### Added
+
+- Ubuntu privileged operations are composable and fail closed (`#55`). A GUI
+  session authorizes a narrowly scoped PolicyKit action; a terminal, headless or
+  SSH session takes the TTY sudo path. The installer is never run opaquely under
+  `pkexec`, no password travels through argv, environment, stdin, a file, an
+  artifact or telemetry, and user-owned files stay owned by the invoking user.
+  `scripts/ubuntu/privileged-helper.sh` executes only allowlisted operations with
+  allowlisted arguments.
+
+  Recut from current `main` rather than merged from the `#55` lineage. The three
+  open pull requests on that line were one branch, not three options, and the
+  latest carried a CI framework — a validation-path indirection, a script
+  inventory, a locked test audit — alongside the privilege work. That framework
+  is left behind: it broke the command `AGENTS.md` documents (`validate.sh`
+  exited 2 unless invoked through a wrapper) and duplicated discovery `lint.sh`
+  already does better. What came with the privilege layer is the two tools it
+  genuinely uses: `shell_contract.py`, which the Ubuntu verifier calls at
+  runtime, and `shell_function_harness.py`, which is how a 520-line root helper
+  gets unit-tested at all.
+
+### Fixed
+
+- The privileged descendant supervisor, verified in containers rather than
+  reviewed (`#64`). `timeout --foreground` does not bound the children of the
+  command it runs — GNU documents exactly that — so `apt-get`, `dpkg` and `curl`
+  started by the root helper outlived a launcher reporting timeout. The helper
+  now owns its process group and escalates TERM → KILL over it.
+
+  Four defects in that supervisor were invisible to `shellcheck` and `bash -n`,
+  and a container caught each: an enumeration that counted its own pipeline;
+  `kill -- -$$` when `$$` is 1, which POSIX defines as *every process the caller
+  may signal* and a root helper in a container **is** PID 1; a group signal
+  reaching the caller, so the KILL round killed the supervisor mid-cleanup after
+  its traps were cleared; and a bare `wait` blocking on a job in another process
+  group. Re-verified before this recut: five scenarios pass, and the old spelling
+  still exits 137 — the supervisor killing itself.
+
+- Firefox removal was rejected by the helper's own allowlist, after partial
+  mutation, and was semantically inverted. `apt_install --purge firefox` neither
+  passed `apt_arguments_allowed` nor removed anything — it is an install command.
+  Removal is now its own `apt_remove` operation using `apt-get purge`, and the
+  install channel was not widened to accommodate it.
+
+- Four of the seven container cases covering these paths **did not pass, and
+  nothing said so**: the module is gated on `RLDYOUR_CONTAINER_TESTS=1` and no
+  workflow set it. The container was missing `python3` and `locales`. Two more
+  need systemd as PID 1, which `docker run` cannot provide; they are skipped with
+  that reason stated rather than left failing in a lane nobody runs.
+
 ### Fixed
 
 - `evidence-gate` could not report for two whole classes of pull request, while

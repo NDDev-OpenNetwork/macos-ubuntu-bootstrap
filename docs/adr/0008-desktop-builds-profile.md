@@ -38,10 +38,13 @@ chrony) is NOT installed.
 
 - The server baseline (no openssh-server, no unattended-upgrades, no chrony)
 - Server hardening (no UFW, no SSH hardening, no fail2ban)
-- The `docker` group membership is NOT automatically granted
-  (`safety.docker_group_membership: "explicit"`). The developer must opt in
-  manually (`sudo usermod -aG docker $USER`) after understanding that docker
-  group membership is root-equivalent.
+- The `docker` group membership is NOT automatically granted. The developer
+  must opt in manually (`sudo usermod -aG docker $USER`) after understanding
+  that docker group membership is root-equivalent.
+  `tests/test_ubuntu_server_safety.py::test_no_script_grants_docker_group_membership`
+  fails if any script starts doing it. This used to cite
+  `safety.docker_group_membership: "explicit"` in the contract, which read as
+  the mechanism and was a key nothing read.
 
 ### Profile matrix
 

@@ -31,10 +31,16 @@ results are reported and tolerated. Above ``UNKNOWN_TOLERANCE`` the run has not
 learned enough to be evidence of anything and fails as such -- a report that is
 mostly "could not tell" should not be indistinguishable from a clean one.
 
-The residual limit, stated rather than hidden: a *single* source that is
-unreachable every week stays inside the tolerance and stays green. Catching that
-needs state across runs, which this script deliberately does not have. The
-JSON snapshot is uploaded on every run so the history is inspectable.
+A source that is unreachable *every* week is a different thing from one that
+was rate-limited once, and the tolerance alone cannot tell them apart: one
+unknown out of twenty-five stays green forever. ``--previous`` closes that.
+Given the snapshot from the last run, a pin that was ``unknown`` then and is
+``unknown`` now has failed twice in a row for reasons that are no longer
+plausibly transient, and it fails the run by name.
+
+That is the whole of the state this script keeps: one previous snapshot, passed
+in, never written. It cannot tell you a pin has been unknown for a month -- for
+that, read the retained artifacts.
 
 One network snapshot per run. Rendering reads a snapshot rather than probing
 again -- the workflow used to call this script twice, once for Markdown and once
@@ -377,7 +383,12 @@ def load_snapshot(path: Path) -> list[Finding]:
     ]
 
 
-def report(findings: list[Finding], *, unknown_tolerance: int = UNKNOWN_TOLERANCE) -> int:
+def report(
+    findings: list[Finding],
+    *,
+    unknown_tolerance: int = UNKNOWN_TOLERANCE,
+    previous: list[Finding] | None = None,
+) -> int:
     """The exit status the findings justify, and why, on stderr."""
     failed = False
 
@@ -399,6 +410,20 @@ def report(findings: list[Finding], *, unknown_tolerance: int = UNKNOWN_TOLERANC
     unknown = [item for item in findings if item.status == "unknown"]
     for item in unknown:
         print(f"source-drift-unknown: {item.name}: {item.detail}", file=sys.stderr)
+
+    # Unknown twice running is not a rate limit any more.
+    if previous is not None:
+        previously_unknown = {item.name for item in previous if item.status == "unknown"}
+        persistent = sorted(item.name for item in unknown if item.name in previously_unknown)
+        for name in persistent:
+            print(
+                f"source-drift-unknown-persists: {name}: unreachable in this run and "
+                "in the previous one. One failure is a rate limit; two in a row is a "
+                "source this repository can no longer check.",
+                file=sys.stderr,
+            )
+            failed = True
+
     if len(unknown) > unknown_tolerance:
         print(
             f"source-drift-unknown: {len(unknown)} of {len(findings)} sources could "
@@ -424,6 +449,10 @@ def main(argv: list[str] | None = None) -> int:
         "--unknown-tolerance", type=int, default=UNKNOWN_TOLERANCE,
         help="how many unreachable sources a run may report and still be evidence",
     )
+    parser.add_argument(
+        "--previous", type=Path, default=None,
+        help="the previous run's snapshot; a source unknown in both fails this run",
+    )
     args = parser.parse_args(argv)
 
     if args.from_json is not None:
@@ -439,7 +468,19 @@ def main(argv: list[str] | None = None) -> int:
     else:
         print(render_text(findings), end="")
 
-    return report(findings, unknown_tolerance=args.unknown_tolerance)
+    previous = None
+    if args.previous is not None and args.previous.is_file():
+        try:
+            previous = load_snapshot(args.previous)
+        except (OSError, json.JSONDecodeError, KeyError) as exc:
+            # An unreadable previous snapshot is not evidence about a pin, and
+            # refusing to run because last week's artifact expired would make
+            # this check fail for a reason that has nothing to do with drift.
+            print(f"source-drift: previous snapshot unusable ({exc}); "
+                  "persistence check skipped", file=sys.stderr)
+    return report(
+        findings, unknown_tolerance=args.unknown_tolerance, previous=previous,
+    )
 
 
 if __name__ == "__main__":

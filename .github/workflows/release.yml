@@ -1,0 +1,360 @@
+name: release
+
+on:
+  push:
+    tags:
+      - "[0-9]+.[0-9]+.[0-9]+"
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Existing numeric release tag; must match VERSION and origin/main."
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.workflow }}-${{ inputs.version || github.ref_name }}
+  cancel-in-progress: false
+
+jobs:
+  resolve:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Resolve version
+        id: version
+        env:
+          RELEASE_EVENT_NAME: ${{ github.event_name }}
+          RELEASE_INPUT_VERSION: ${{ inputs.version }}
+          RELEASE_REF_NAME: ${{ github.ref_name }}
+          RELEASE_REF_TYPE: ${{ github.ref_type }}
+        run: |
+          set -euo pipefail
+          case "$RELEASE_EVENT_NAME" in
+            push)
+              [ "$RELEASE_REF_TYPE" = "tag" ] || {
+                echo "release push must run from a tag ref" >&2
+                exit 1
+              }
+              version="$RELEASE_REF_NAME"
+              ;;
+            workflow_dispatch)
+              version="$RELEASE_INPUT_VERSION"
+              ;;
+            *)
+              echo "unsupported release event '$RELEASE_EVENT_NAME'" >&2
+              exit 1
+              ;;
+          esac
+          printf '%s' "$version" | grep -Eq \
+            '^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$' || {
+            echo "release version '$version' must be numeric SemVer X.Y.Z without leading zeros" >&2
+            exit 1
+          }
+          file_version="$(tr -d '[:space:]' < VERSION)"
+          [ "$version" = "$file_version" ] || {
+            echo "release '$version' does not match VERSION '$file_version'" >&2
+            exit 1
+          }
+          grep -q "^## \[$version\]" CHANGELOG.md || {
+            echo "CHANGELOG.md has no release entry for $version" >&2
+            exit 1
+          }
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+      - name: Require release commit on main
+        env:
+          RELEASE_EVENT_NAME: ${{ github.event_name }}
+        run: |
+          set -euo pipefail
+          git fetch --no-tags origin main
+          git merge-base --is-ancestor "$GITHUB_SHA" origin/main || {
+            echo "release tag commit must be reachable from origin/main" >&2
+            exit 1
+          }
+          if [ "$RELEASE_EVENT_NAME" = "workflow_dispatch" ]; then
+            main_sha="$(git rev-parse --verify origin/main)"
+            [ "$GITHUB_SHA" = "$main_sha" ] || {
+              echo "manual release must dispatch the exact origin/main commit" >&2
+              exit 1
+            }
+          fi
+
+      # The pytest lane installs its dependencies from the hash-locked lock file
+      # through uv, and records that pip is forbidden estate-wide. This lane used
+      # `pip install pytest==9.1.1`: a second, weaker dependency contract for the
+      # same test suite, on the one commit that becomes an immutable release.
+      # uv itself is acquired the way this repository acquires every pinned
+      # artifact -- exact version and SHA-256 read from the contract, verified
+      # before execution, never a network pipe into a shell.
+      - name: Prepare release validation tools
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends shellcheck ripgrep zsh
+          uv_version="$(jq -er '.runtime_support.ubuntu_uv' config/rldyour-contract.json)"
+          uv_sha256="$(jq -er '.runtime_support.ubuntu_uv_sha256.x64' config/rldyour-contract.json)"
+          archive="$(mktemp)"
+          curl --proto '=https' --tlsv1.2 --fail --silent --show-error --location \
+            "https://github.com/astral-sh/uv/releases/download/${uv_version}/uv-x86_64-unknown-linux-gnu.tar.gz" \
+            --output "$archive"
+          echo "${uv_sha256}  ${archive}" | sha256sum --check --status
+          mkdir -p "$RUNNER_TEMP/uv"
+          tar -xzf "$archive" --strip-components=1 -C "$RUNNER_TEMP/uv"
+          rm -f "$archive"
+          "$RUNNER_TEMP/uv/uv" --version | grep -Fq "uv ${uv_version}"
+          echo "$RUNNER_TEMP/uv" >>"$GITHUB_PATH"
+
+      - name: Validate release source snapshot
+        run: |
+          set -euo pipefail
+          uv venv --python 3.14
+          uv pip install --require-hashes -r requirements-test.txt
+          bash scripts/ci/validate.sh
+          .venv/bin/python -m pytest -q
+
+      # Acquired the same way as uv above, and for the same reason: the commit
+      # being released must lint with the program the contract names, not with
+      # whatever `latest` resolves to on the day the release runs.
+      # `raven-actions/actionlint` was pinned to a commit but defaults its tool
+      # version to `latest` and verifies no checksum, so the action SHA bound
+      # the wrapper and nothing bound the bytes. Reading version and digest from
+      # the contract keeps this in step with the device by construction --
+      # there is no second copy of the value here to drift.
+      - name: Validate workflow syntax
+        run: |
+          set -euo pipefail
+          version="$(jq -er '.runtime_support.ubuntu_pinned_source_tools.actionlint.version' \
+            config/rldyour-contract.json)"
+          sha256="$(jq -er '.runtime_support.ubuntu_pinned_source_tools.actionlint.sha256.x64' \
+            config/rldyour-contract.json)"
+          archive="$(mktemp)"
+          curl --proto '=https' --tlsv1.2 --fail --silent --show-error --location \
+            "https://github.com/rhysd/actionlint/releases/download/v${version}/actionlint_${version}_linux_amd64.tar.gz" \
+            --output "$archive"
+          echo "${sha256}  ${archive}" | sha256sum --check --status
+          mkdir -p "$RUNNER_TEMP/actionlint"
+          tar -xzf "$archive" -C "$RUNNER_TEMP/actionlint" actionlint
+          rm -f "$archive"
+          "$RUNNER_TEMP/actionlint/actionlint" --version | grep -Fq "$version"
+          "$RUNNER_TEMP/actionlint/actionlint" -color
+
+  # Both mandatory gates must be green on the exact commit being released, on
+  # every trigger. This used to live inside verify-tag, which runs only on
+  # workflow_dispatch and asked for bootstrap-gate alone -- so a tag push
+  # published without anyone asking whether the hosted evidence passed.
+  #
+  # A tag push still validates after the tag exists, and this repository cannot
+  # change that: root automation is the sole tag creator. What it can do is
+  # refuse to publish a release for a candidate whose gates are not green, which
+  # turns "immutable tag burned and release published" into "tag burned, release
+  # refused" -- recoverable by bumping VERSION.
+  verify-candidate:
+    name: Verify release candidate gates
+    needs: resolve
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      checks: read
+      contents: read
+      # Reads the evidence verdict the pull request's run published. Listing and
+      # downloading another run's artifacts needs this; `checks: read` alone
+      # only answers what a check concluded, which is exactly what stopped
+      # being proof.
+      actions: read
+    steps:
+      - name: Checkout the candidate with full history
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          ref: ${{ github.sha }}
+          persist-credentials: false
+
+      - name: Require bootstrap-gate on the exact candidate commit
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          conclusion="$(
+            gh api -H "Accept: application/vnd.github+json" \
+              "/repos/${GITHUB_REPOSITORY}/commits/${GITHUB_SHA}/check-runs?check_name=bootstrap-gate&status=completed&filter=latest&per_page=1" \
+              --jq '.check_runs[0].conclusion // ""'
+          )"
+          [ "$conclusion" = success ] || {
+            echo "candidate ${GITHUB_SHA} has bootstrap-gate=${conclusion:-absent}" >&2
+            exit 1
+          }
+          echo "bootstrap-gate: success on ${GITHUB_SHA}"
+
+      # `platform-evidence` runs on `pull_request`, so `evidence-gate` reports
+      # against the PR head rather than the merge commit that lands. Rather than
+      # give that workflow a default-branch trigger -- it checks out a
+      # contributor's head SHA and runs it, so a default-branch trigger would
+      # hand it write access to the default-branch cache scope -- this proves the
+      # candidate is the same tree the evidence was produced from.
+      #
+      # `main`'s ruleset sets strict_required_status_checks_policy, so a branch
+      # must be up to date before it merges, and the merge commit of an
+      # up-to-date branch has the same tree as its head. That is the property
+      # relied on, and it is verified rather than assumed: a candidate whose tree
+      # differs from the head that carries the evidence fails here.
+      - name: Require verified evidence for the tree this candidate carries
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          pr="$(
+            gh api -H "Accept: application/vnd.github+json" \
+              "/repos/${GITHUB_REPOSITORY}/commits/${GITHUB_SHA}/pulls" \
+              --jq '.[0].number // ""'
+          )"
+          [ -n "$pr" ] || {
+            echo "candidate ${GITHUB_SHA} belongs to no pull request; evidence cannot be located" >&2
+            exit 1
+          }
+          head="$(gh api "/repos/${GITHUB_REPOSITORY}/pulls/${pr}" --jq '.head.sha')"
+          git fetch --no-tags --depth=1 origin "$head"
+
+          candidate_tree="$(git rev-parse "${GITHUB_SHA}^{tree}")"
+          head_tree="$(git rev-parse "${head}^{tree}")"
+          [ "$candidate_tree" = "$head_tree" ] || {
+            echo "candidate ${GITHUB_SHA} tree ${candidate_tree} differs from PR #${pr} head ${head} tree ${head_tree};" >&2
+            echo "the evidence was produced from a different tree -- re-run platform-evidence for this commit" >&2
+            exit 1
+          }
+
+          # A green `evidence-gate` is no longer proof that evidence exists.
+          # The gate now reports for every pull request and states which of
+          # three cases it is -- verified, out of scope, or a fork whose head
+          # cannot run the native lanes -- and two of those are green without a
+          # single lane having run. Asking for the conclusion would publish a
+          # fork-authored device change that produced no evidence at all.
+          #
+          # So this reads the artifact the gate writes only after opening and
+          # checking every lane payload. An absent verdict is the answer for
+          # both green-but-empty cases, and it is the right answer: this
+          # candidate has no evidence.
+          verdict_run="$(
+            gh api -H "Accept: application/vnd.github+json" \
+              "/repos/${GITHUB_REPOSITORY}/actions/runs?head_sha=${head}&event=pull_request" \
+              --jq '[.workflow_runs[] | select(.name == "platform-evidence")]
+                    | sort_by(.run_started_at) | last | .id // ""'
+          )"
+          [ -n "$verdict_run" ] || {
+            echo "no platform-evidence run exists for head ${head}" >&2
+            exit 1
+          }
+
+          gh api "/repos/${GITHUB_REPOSITORY}/actions/runs/${verdict_run}/artifacts" \
+            --jq '.artifacts[] | select(.name == "evidence-verdict-'"${head}"'") | .archive_download_url' \
+            >verdict_url.txt
+          [ -s verdict_url.txt ] || {
+            echo "head ${head} produced no evidence verdict: its evidence-gate was green" >&2
+            echo "because the change was out of scope or the head was on a fork, not" >&2
+            echo "because any lane ran. Re-run platform-evidence from a branch in this" >&2
+            echo "repository before releasing this tree." >&2
+            exit 1
+          }
+
+          gh api "$(head -n 1 verdict_url.txt)" >verdict.zip
+          unzip -p verdict.zip evidence-verdict.json >verdict.json
+          cat verdict.json
+
+          python3 - "$head" <<'PY'
+          import json, sys
+          verdict = json.load(open("verdict.json"))
+          head = sys.argv[1]
+          if verdict.get("sha") != head:
+              raise SystemExit(f"verdict names {verdict.get('sha')!r}, expected {head!r}")
+          if verdict.get("verified") is not True:
+              raise SystemExit("verdict does not report a verified run")
+          if not verdict.get("instances"):
+              raise SystemExit("verdict lists no verified evidence instances")
+          print(f"verified {len(verdict['instances'])} evidence instances for {head}")
+          PY
+
+          echo "evidence verified on ${head}, whose tree is identical to ${GITHUB_SHA}"
+
+  verify-tag:
+    name: Verify exact manual release tag
+    if: github.event_name == 'workflow_dispatch'
+    needs: resolve
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      checks: read
+      contents: read
+    steps:
+      - name: Checkout exact dispatch commit
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          ref: ${{ github.sha }}
+          persist-credentials: false
+
+      - name: Require existing exact release tag
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_VERSION: ${{ needs.resolve.outputs.version }}
+        run: |
+          set -euo pipefail
+          git fetch --no-tags origin main
+          main_sha="$(git rev-parse --verify origin/main)"
+          [ "$GITHUB_SHA" = "$main_sha" ] || {
+            echo "manual release commit is no longer the exact origin/main commit" >&2
+            exit 1
+          }
+          # Gate conclusions are verified once, for every trigger, by
+          # verify-candidate. This job owns tag and branch identity only.
+          if gh release view "$RELEASE_VERSION" >/dev/null 2>&1; then
+            echo "release '$RELEASE_VERSION' already exists and is immutable; bump VERSION" >&2
+            exit 1
+          fi
+
+          tag_ref="refs/tags/${RELEASE_VERSION}"
+          remote_tag="$(git ls-remote --refs origin "$tag_ref" | awk 'NR == 1 { print $1 }')"
+          [ -n "$remote_tag" ] || {
+            echo "manual release requires the existing tag '$RELEASE_VERSION'; root automation creates tags" >&2
+            exit 1
+          }
+          git fetch --no-tags origin "${tag_ref}:${tag_ref}"
+          tag_commit="$(git rev-parse --verify "${tag_ref}^{commit}")"
+          [ "$tag_commit" = "$GITHUB_SHA" ] || {
+            echo "existing tag '$RELEASE_VERSION' points to a different commit" >&2
+            exit 1
+          }
+          echo "verified existing exact tag '$RELEASE_VERSION' at '$tag_commit'"
+
+  # The pinned reusable workflow owns immutable `gh release create`
+  # publication with `--verify-tag`; manual dispatch only verifies an existing tag.
+  supply-chain:
+    needs: [resolve, verify-candidate, verify-tag]
+    if: ${{ always() && needs.resolve.result == 'success' && needs.verify-candidate.result == 'success' && (needs.verify-tag.result == 'success' || needs.verify-tag.result == 'skipped') }}
+    permissions:
+      contents: write
+      id-token: write
+      attestations: write
+      artifact-metadata: write   # actions/attest artifact storage record (required at v4.1.1)
+    uses: NDDev-OpenNetwork/ci-workflows/.github/workflows/release-supply-chain.yml@91c8c164edef1fee225f6e6289a1197a38988cc6 # 0.13.3
+    with:
+      # Public repo: pull_request runs untrusted fork code. Pin the hosted runner
+      # explicitly. The estate runner platform forbids public/fork code on a
+      # trusted runner group (modules/github-actions, docs/threat-model.md),
+      # and this repository is public. The reusable's default belongs to the
+      # pinned commit, not here. A wrong value does not fail loudly either:
+      # a job asking for a label no runner advertises queues indefinitely.
+      runner: ubuntu-latest
+      version: ${{ needs.resolve.outputs.version }}
+      package_name: macos-ubuntu-bootstrap
+      archive_paths: "README.md LICENSE NOTICE SECURITY.md VERSION CHANGELOG.md AGENTS.md .claude .github config scripts templates docs"

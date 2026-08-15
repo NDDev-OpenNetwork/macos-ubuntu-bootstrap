@@ -1,0 +1,53 @@
+name: dependency-check
+
+# `Dependency pin checks` is a required status check on `main`, and for most of
+# its life it did not check a pin. It searched the installers for variable and
+# function *names* -- `RLDYOUR_CODEX_SHA512`, `rldyour::download_verified_file`
+# -- and reported success when it found them. Every one of those names survives
+# changing the version it holds, the digest it holds and the URL it fetches
+# from, which is the whole content of a pin. The gate could not fail for any
+# mutation it was there to catch. Its network-pipe guard had the matching
+# weakness: `"curl -fsSL https://" in data and "| sh" in data` is a test on the
+# whole file, so two unrelated lines satisfied it while `wget ... | sh` did not.
+#
+# It now compares values: the tools CI runs against the versions and digests the
+# contract pins for a device, the shape of every vendor pin, and -- parsed
+# rather than grepped -- the property that nothing reaches a shell straight from
+# the network.
+#
+# The job name is deliberately unchanged. It is a required context, and renaming
+# a required context does not rename the requirement -- it detaches the branch
+# rule from the job, leaving a check that can never report and a gate that never
+# blocks.
+
+on:
+  schedule:
+    - cron: "40 6 * * 1"
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: dependency-check-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  dependency-pins:
+    name: Dependency pin checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: CI runs the tools the contract pins
+        run: python3 scripts/ci/check_ci_tool_parity.py

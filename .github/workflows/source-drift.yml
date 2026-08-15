@@ -1,0 +1,127 @@
+name: source-drift
+
+# Discovery only. This workflow reads first-party release metadata and publishes
+# a report; it has no write permission, opens no pull request, and cannot edit a
+# pin. A refresh stays a reviewed change made by a person, with every digest
+# computed from the downloaded artifact rather than copied from a release note.
+#
+# Deliberately not self-authoring PRs: that needs `contents: write` and
+# `pull-requests: write` on a public repository, which is a privilege decision
+# separate from wanting the report. See #58.
+#
+# It does, however, *fail*. The first version of this workflow ran discovery,
+# printed `behind`, uploaded a report and exited zero, so a pin falling behind
+# produced a green scheduled run and a finding that existed only inside a job
+# summary nobody opens. #66 -- the issue this exists to prevent recurring --
+# was seven pins behind their upstreams, which this would have reported exactly
+# that quietly.
+#
+# One discovery per run. It used to call the script twice, once for `--markdown`
+# and once for `--json`: two network snapshots taken minutes apart, free to
+# disagree, each spending the rate limit the other needed.
+
+on:
+  schedule:
+    # Monday morning, after the Dependabot window. Dependabot covers the
+    # github-actions ecosystem; every pin this checks is a direct upstream
+    # artifact it cannot see.
+    - cron: "20 7 * * 1"
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: source-drift-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  discover:
+    name: Official source drift
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      # Last run's snapshot, if it is still retained. A source that was
+      # unreachable then and is unreachable now has failed twice for reasons
+      # that are no longer plausibly transient -- which the tolerance alone
+      # cannot see, because one unknown out of twenty-five stays green forever.
+      #
+      # Best-effort by design: an expired or absent artifact skips the
+      # comparison rather than failing the run. Refusing to check for drift
+      # because last week's artifact aged out would be a failure about
+      # retention, not about pins.
+      - name: Fetch the previous snapshot, if there is one
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -uo pipefail
+          run_id="$(
+            gh api "/repos/${GITHUB_REPOSITORY}/actions/workflows/source-drift.yml/runs?status=completed&per_page=10" \
+              --jq "[.workflow_runs[] | select(.id != ${GITHUB_RUN_ID})] | first | .id // empty"
+          )" || run_id=""
+          [ -n "$run_id" ] || { echo "no previous run to compare against"; exit 0; }
+          url="$(
+            gh api "/repos/${GITHUB_REPOSITORY}/actions/runs/${run_id}/artifacts" \
+              --jq '.artifacts[] | select(.expired == false) | select(.name | startswith("source-drift-")) | .archive_download_url' \
+              | head -n 1
+          )" || url=""
+          [ -n "$url" ] || { echo "previous run ${run_id} has no retained artifact"; exit 0; }
+          gh api "$url" >previous.zip && unzip -p previous.zip report.json >previous.json
+          echo "comparing against run ${run_id}"
+
+      # Probe every source once and keep the answer. Everything downstream reads
+      # this file, so the summary, the artifact and the exit status all describe
+      # the same moment.
+      - name: Take one snapshot of every official source
+        id: snapshot
+        env:
+          # Raises the anonymous API rate limit. Read-only, and the script only
+          # sends it to api.github.com.
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          set -uo pipefail
+          previous=()
+          [ -f previous.json ] && previous=(--previous previous.json)
+          python3 scripts/ci/discover_source_drift.py --json \
+            ${previous[@]+"${previous[@]}"} >report.json
+          echo "status=$?" >>"$GITHUB_OUTPUT"
+
+      - name: Render the report from that snapshot
+        run: |
+          set -euo pipefail
+          python3 scripts/ci/discover_source_drift.py --markdown --from-json report.json >report.md
+          cat report.md >>"$GITHUB_STEP_SUMMARY"
+
+      - name: Upload the report
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: source-drift-${{ github.run_id }}
+          path: |
+            report.md
+            report.json
+          if-no-files-found: error
+          # Long enough to compare consecutive weekly runs by hand, which is how
+          # a persistently unreachable source is currently noticed. The script
+          # holds no state across runs and says so.
+          retention-days: 90
+
+      # Last, so the report is in the summary and the artifact before the job
+      # goes red. A failure whose evidence was never published is a failure
+      # people re-run rather than read.
+      - name: A pin that is behind is a finding, not a note
+        run: |
+          set -euo pipefail
+          status='${{ steps.snapshot.outputs.status }}'
+          if [ "$status" != 0 ]; then
+            echo "source drift found; see the job summary and the uploaded report" >&2
+            exit 1
+          fi
+          echo "every pin is current, held, or within the unknown tolerance"

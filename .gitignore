@@ -1,0 +1,16 @@
+.serena/*
+!.serena/project.yml
+!.serena/memories/
+!.serena/memories/**
+tests/__pycache__/
+.pytest_cache/
+__pycache__/
+*.pyc
+dist/
+.DS_Store
+*.swp
+.idea/
+.vscode/
+
+# uv-created test environment (CI builds it from requirements-test.txt).
+.venv/

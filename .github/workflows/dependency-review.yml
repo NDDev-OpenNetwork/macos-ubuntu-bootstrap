@@ -1,0 +1,27 @@
+name: dependency-review
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions: {}
+
+concurrency:
+  group: dependency-review-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  review:
+    name: dependency-review
+    permissions:
+      contents: read
+      pull-requests: write
+    uses: NDDev-OpenNetwork/ci-workflows/.github/workflows/public-dependency-review.yml@91c8c164edef1fee225f6e6289a1197a38988cc6 # 0.13.3
+    with:
+      # Public repo: pull_request runs untrusted fork code. Pin the hosted runner
+      # explicitly — the reusable's `runner` default belongs to the pinned commit,
+      # not to this repository, so inheriting it would let a pin bump move fork
+      # PRs onto trusted private infrastructure with no diff here to review.
+      runner: ubuntu-latest
+      fail_on_severity: high
+      vulnerability_check: true

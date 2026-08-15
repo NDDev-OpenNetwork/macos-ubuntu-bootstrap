@@ -1,0 +1,28 @@
+# Managed by macos-ubuntu-bootstrap: terminal-zshenv-v1
+# ~/.zshenv — sourced by EVERY zsh (interactive, login, and `zsh -c` agent
+# shells). Keep it tiny, side-effect-free, and PATH-complete: Codex/OpenCode
+# run `zsh -l -c` and never read .zshrc, so anything an agent needs lives here.
+# Managed template: macos-ubuntu-bootstrap (templates/terminal/zshenv).
+
+typeset -U path PATH
+
+path=(
+  "$HOME/.local/bin"                # uv tools, owner launchers (cx/cl/gk)
+  "$HOME/.bun/bin"
+  "$HOME/.cargo/bin"
+  "$HOME/.claude/bin"
+  /opt/homebrew/bin
+  /opt/homebrew/sbin
+  /usr/local/bin
+  /home/linuxbrew/.linuxbrew/bin
+  $path
+)
+
+# Secrets are NOT sourced here. ~/.zshenv is evaluated by every zsh, including
+# non-interactive `zsh -c` and `zsh -l -c` agent subprocesses; sourcing secret
+# shell code here would leak it into every agent and hook. Secrets are delivered
+# per consumer instead (browser/harness wrappers load an explicit allowlist, and
+# scripts/auth-handoff.sh performs owner sign-in). Keep this file non-secret.
+
+export EDITOR="${EDITOR:-nano}"
+export LANG="${LANG:-en_US.UTF-8}"

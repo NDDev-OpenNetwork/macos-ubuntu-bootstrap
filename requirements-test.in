@@ -1,0 +1,6 @@
+# Test-only dependency set for the pytest lane. Hash-locked: the estate
+# forbids pip and requires --require-hashes everywhere a lock is installed.
+# Recompile with:
+#   uv pip compile --generate-hashes --universal --python-version 3.14 \
+#     requirements-test.in -o requirements-test.txt
+pytest==9.1.1

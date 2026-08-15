@@ -1,0 +1,25 @@
+[Desktop Entry]
+Name=Telegram
+Comment=New era of messaging
+# Managed by macos-ubuntu-bootstrap: desktop-entry-telegram-v3
+# The official Qt build currently fails to create a Wayland EGL context on the
+# estate's NVIDIA Ubuntu desktop. XCB keeps the app on supported XWayland.
+TryExec=telegram-desktop
+Exec=env QT_QPA_PLATFORM=xcb telegram-desktop -- %U
+Icon=org.telegram.desktop
+Terminal=false
+StartupWMClass=TelegramDesktop
+Type=Application
+Categories=Chat;Network;InstantMessaging;Qt;
+MimeType=x-scheme-handler/tg;x-scheme-handler/tonsite;
+Keywords=tg;chat;im;messaging;messenger;sms;tdesktop;
+Actions=quit;
+DBusActivatable=false
+SingleMainWindow=true
+X-GNOME-UsesNotifications=true
+X-GNOME-SingleWindow=true
+
+[Desktop Action quit]
+Exec=env QT_QPA_PLATFORM=xcb telegram-desktop -quit
+Name=Quit Telegram
+Icon=application-exit

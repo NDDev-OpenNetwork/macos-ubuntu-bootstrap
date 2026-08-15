@@ -1,0 +1,1006 @@
+{
+  "schema_version": 2,
+  "adapter": {
+    "id": "macos-ubuntu-bootstrap",
+    "version": "0.1.1"
+  },
+  "support_evidence": {
+    "path": "config/support-evidence-matrix.json",
+    "schema_version": 1,
+    "required_capability_policy": "successful evidence requires PROVEN",
+    "optional_unproven_policy": "typed stronger tier and tracking issue required"
+  },
+  "targets": {
+    "macos": {
+      "architectures": [
+        "arm64"
+      ],
+      "profile": "desktop",
+      "gui_modes": [
+        "enabled",
+        "disabled"
+      ],
+      "docker_modes": [
+        "none"
+      ],
+      "execution_policy": "source-lsp-only"
+    },
+    "ubuntu": {
+      "releases": [
+        "24.04",
+        "26.04"
+      ],
+      "architectures": [
+        "amd64",
+        "arm64"
+      ],
+      "gui_architectures": [
+        "amd64"
+      ],
+      "profiles": {
+        "desktop": {
+          "gui_modes": [
+            "enabled",
+            "disabled"
+          ],
+          "docker_modes": [
+            "none"
+          ],
+          "execution_policy": "source-lsp-only"
+        },
+        "desktop-builds": {
+          "gui_modes": [
+            "enabled",
+            "disabled"
+          ],
+          "docker_modes": [
+            "rootful"
+          ],
+          "default_docker_mode": "rootful",
+          "execution_policy": "local-dev-with-builds"
+        },
+        "server": {
+          "gui_modes": [
+            "disabled"
+          ],
+          "docker_modes": [
+            "none",
+            "rootful",
+            "rootless"
+          ],
+          "default_docker_mode": "rootful",
+          "execution_policy": "container-execution-only"
+        }
+      }
+    }
+  },
+  "remote_execution": {
+    "client_profiles": [
+      "desktop"
+    ],
+    "executor_profile": "server",
+    "transport": "openssh-exact-head",
+    "entrypoint": "scripts/remote-exec.sh",
+    "workspace_transfer": "forbidden",
+    "dirty_worktree": "forbidden",
+    "remote_head_match": "required",
+    "credentials": "owner-managed-ssh-agent"
+  },
+  "harnesses": {
+    "policy": "vendor-official",
+    "active": [
+      "codex",
+      "claude-code",
+      "grok-build"
+    ],
+    "codex": {
+      "version": "0.147.0",
+      "install_method": "verified-npm-tarball",
+      "launcher": "cx",
+      "sha512": "1102c45de7001b6a6dc48ed4a41328d9347f81ae79f7afdcfceb1817fd0ba140e1e4900d67b2281aa97304459bb84550efa25e3c86ed4d6fe2842929d5aed9df"
+    },
+    "claude-code": {
+      "channel": "stable",
+      "install_method": "verified-vendor-script",
+      "launcher": "cl",
+      "installer_url": "https://claude.ai/install.sh",
+      "installer_sha256": "cde4f1702d3b1695f92b73d26888364e17bca476e17f0fd676484c951d36c125"
+    },
+    "grok-build": {
+      "channel": "stable",
+      "install_method": "verified-vendor-script",
+      "launcher": "gk",
+      "installer_url": "https://x.ai/cli/install.sh",
+      "installer_sha256": "43d0943123edade1383a476a4f778674877acee7c1f98a00f094c4a0f7349321"
+    },
+    "detection": {
+      "_doc": "Where each active harness must resolve on an installed device, so the one-owner-per-harness policy is checkable instead of prose. `enforcement: owned-prefix` means this repository installs the harness and a resolution outside `owned_prefix_default` is drift -- normally a second copy from a package-manager global shadowing the managed one. `enforcement: observe-only` means the vendor's own installer chooses the target: the path is recorded so drift is visible, but this repository does not own it and will not fail on it.",
+      "codex": {
+        "command": "codex",
+        "enforcement": "owned-prefix",
+        "owned_prefix_default": "${HOME}/.local/share/rldyour/npm",
+        "owned_prefix_env": "RLDYOUR_CODEX_NPM_PREFIX",
+        "owner": "rldyour::install_vendor_ai_clis",
+        "rationale": "Installed from the verified npm tarball into a prefix this repository chooses, then linked as ~/.local/bin/codex. A codex resolving anywhere else means another installer won."
+      },
+      "claude-code": {
+        "command": "claude",
+        "enforcement": "observe-only",
+        "owned_prefix_default": "${HOME}/.local/share/claude",
+        "owned_prefix_env": "RLDYOUR_CLAUDE_HOME",
+        "owner": "vendor installer https://claude.ai/install.sh",
+        "rationale": "The reviewed vendor script picks its own target and may change it between releases. Recording where claude resolves is evidence; enforcing a path this repository does not choose would fail on a correct install."
+      },
+      "grok-build": {
+        "command": "grok",
+        "enforcement": "observe-only",
+        "owned_prefix_default": "${HOME}/.grok",
+        "owned_prefix_env": "RLDYOUR_GROK_HOME",
+        "owner": "vendor installer https://x.ai/cli/install.sh",
+        "rationale": "Same boundary as claude-code: the vendor installer owns the target."
+      }
+    }
+  },
+  "runtime_support": {
+    "ubuntu_node_lts": "24.19.0",
+    "ubuntu_node_sha256": {
+      "x64": "14b342e71204f811bde6153be8e04b62aef63c236fef92b55f9c83154b409647",
+      "arm64": "01443c1e1a29e531ccad5a46fefa6df490d2189c49f7955904aecdbb0fe86fdc"
+    },
+    "ubuntu_uv": "0.12.5",
+    "ubuntu_uv_sha256": {
+      "x64": "68a509da24b06b4223a1c0175fb5eb5bc79342b76cbeff0cfe51ac3f5b17b6b2",
+      "arm64": "9bf43b4d1a07665bf64d4c4e710930b382321a785e0eb10aac07f46471f86a31"
+    },
+    "ubuntu_bun": "1.3.14",
+    "ubuntu_bun_sha256": {
+      "x64": "951ee2aee855f08595aeec6225226a298d3fea83a3dcd6465c09cbccdf7e848f",
+      "x64-baseline": "a063908ae08b7852ca10939bbdc6ceed3ddabce8fb9402dce83d65d73b36e6c7",
+      "arm64": "a27ffb63a8310375836e0d6f668ae17fa8d8d18b88c37c821c65331973a19a3b"
+    },
+    "ubuntu_go": "1.26.6",
+    "ubuntu_go_sha256": {
+      "amd64": "708effb774be8237570d0add163225abbdfaf4fca28b2611df167beba4feef89",
+      "arm64": "d0507e9e9d7fe012aae570108cbd76c15de879e17130ab8cb90d4d7445cb1f2e"
+    },
+    "ubuntu_gopls": "v0.23.0",
+    "ubuntu_gopls_provenance": "go-module-checksum-database",
+    "ubuntu_rust": "1.97.1",
+    "ubuntu_rust_channel_date": "2026-07-16",
+    "ubuntu_rust_sha256": {
+      "x86_64": "88f28fa9af20594179f85d6df67078dfd6fa93e2f6da5e1e9b0ac4997988ca4f",
+      "aarch64": "9a7a2c336b4787f1b72f6bab7c35d5b7af2fd03cbd39b4fc721466a70d402a7d"
+    },
+    "ubuntu_rust_components": [
+      "rustc",
+      "cargo",
+      "rust-std",
+      "clippy-preview",
+      "rustfmt-preview",
+      "rust-analyzer-preview"
+    ],
+    "ubuntu_dart": "3.13.0",
+    "ubuntu_dart_sha256": {
+      "x64": "87902573facd8acacac7ee1fe73fa8d0668e06065016068e2ed6c5c99c6b1ee0",
+      "arm64": "20141a0653327939bb20c4b87b231226beba1128d8a9aedbb30cb5af1a2790d4"
+    },
+    "ubuntu_dart_provides": [
+      "dart",
+      "dart language-server",
+      "dart mcp-server"
+    ],
+    "purpose": "ai-cli-and-language-server-host-only",
+    "managed_receipt": "ubuntu-runtime-v1",
+    "ubuntu_pinned_source_tools": {
+      "gitleaks": {
+        "version": "8.30.1",
+        "sha256": {
+          "x64": "551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb",
+          "arm64": "e4a487ee7ccd7d3a7f7ec08657610aa3606637dab924210b3aee62570fb4b080"
+        }
+      },
+      "osv-scanner": {
+        "version": "2.5.0",
+        "sha256": {
+          "x64": "edcfc41d257db36148f065055655fe3fcfc434b0b423ea67468a84c207524e0c",
+          "arm64": "fe152e1a546af223e6c557cc3111a8bb3e5dc02fcbf7dbe95d26567c0f0041f2"
+        }
+      },
+      "actionlint": {
+        "version": "1.7.12",
+        "sha256": {
+          "x64": "8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8",
+          "arm64": "325e971b6ba9bfa504672e29be93c24981eeb1c07576d730e9f7c8805afff0c6"
+        }
+      },
+      "hadolint": {
+        "version": "2.15.1",
+        "sha256": {
+          "x64": "c7187db94eeeeca956519a6af171adc31453941a1e777961f6e680f697c8c507",
+          "arm64": "f6198ef8090f404dbb771abfee086eb8c48ac177f30da7fd3510aca35b344b5d"
+        }
+      },
+      "markdown-oxide": {
+        "version": "0.25.12",
+        "sha256": {
+          "x64": "ad4248cf5d3f0e9d9f120b579501c45dad9c46bfcb4ddec36d2cb85d68a58828",
+          "arm64": "6634b644ff0bcc1b8fb27cc518f82618547ec43fe19d515a890e8e8756950020"
+        }
+      },
+      "delta": {
+        "version": "0.19.2",
+        "sha256": {
+          "x64": "8e695c5f586a8c53d6c3b01be0b4a422ed218bfed2a56191caebe373a1c18ab2",
+          "arm64": "0bfce159a5cddd5feb3d6db4a616d883ff51253ce08ac7ec11cb1d208cfaab9e"
+        }
+      },
+      "yq": {
+        "version": "4.53.3",
+        "sha256": {
+          "x64": "b4077cab0f9ee5ce8381e602d090daa69a0afb7e57eb9a5b20e9cb416d7f6794",
+          "arm64": "42600522e7455282e11c71c9fc62dc8e98b05bcdb830210fe16eb673a871e866"
+        }
+      },
+      "just": {
+        "version": "1.58.0",
+        "sha256": {
+          "x64": "4a5cc2f53e6f0f8c59092a6cc38291eb729d46a7dd95d3ae582008881b84931d",
+          "arm64": "748237128c4c40cbdabc65e841d05ceba13cc23a91eaba395495894c1d9764df"
+        }
+      },
+      "age": {
+        "version": "1.3.1",
+        "sha256": {
+          "x64": "bdc69c09cbdd6cf8b1f333d372a1f58247b3a33146406333e30c0f26e8f51377",
+          "arm64": "c6878a324421b69e3e20b00ba17c04bc5c6dab0030cfe55bf8f68fa8d9e9093a"
+        }
+      },
+      "ast-grep": {
+        "version": "0.45.1",
+        "sha256": {
+          "x64": "76fb6555be6734fb5057dba8d2fb756430f374bb9e1af694cf1ce00e13238d63",
+          "arm64": "9ee7ec49aada3dc05135d21977af089a33fc3154ada25bab102daca90b5098f2"
+        }
+      },
+      "eza": {
+        "version": "0.23.5",
+        "sha256": {
+          "x64": "35c70c5c43c29108075e58b893234c67ef585f0b53a7eaf8e9e7d4eec9f339b4",
+          "arm64": "40b87ae8628aa2ff0f0d2dc24ab52f689631366385c3da630bae745671fd71ec"
+        }
+      },
+      "lazygit": {
+        "version": "0.64.1",
+        "sha256": {
+          "x64": "f8ea237c41f194cd799b48505518bfdaae4edf5a2ad6bd3d898e939785ee4532",
+          "arm64": "8b7ca3b344e60340ad1f89f29b9868ee39bcaba5bb92ee818bbe65476bb8b6e7"
+        }
+      },
+      "difft": {
+        "version": "0.70.0",
+        "sha256": {
+          "x64": "2997d2bbe620534edbd79b0049f00ce84eef3fedb15c7822456d58e38d8b05c9",
+          "arm64": "e729684907d67d1a1727a08f443877e19e40eeb2efebcd95c1b8f7fee4284e8e"
+        }
+      },
+      "jaq": {
+        "version": "3.1.1",
+        "sha256": {
+          "x64": "5922c7b67d9bd6841d6676d1f954410c6bf04b47203dcb661c4f052dfef7f454",
+          "arm64": "bdda42d5a8c060a2c7916b287a227e7750d5fccbd4c37aacf0ab863010921829"
+        }
+      }
+    }
+  },
+  "gui": {
+    "macos": [
+      "ghostty",
+      "cmux",
+      "google-chrome",
+      "chatgpt",
+      "claude",
+      "rustdesk",
+      "telegram"
+    ],
+    "ubuntu": [
+      "google-chrome",
+      "rustdesk",
+      "telegram"
+    ]
+  },
+  "supply_chain": {
+    "homebrew_pkg_version": "6.0.17",
+    "homebrew_pkg_sha256": "70079078573ca0acafbb487c2442f806706a54bf973fe8390da0bd3ac1536d04",
+    "homebrew_installer_team": "927JGANW46"
+  },
+  "user_tools": {
+    "herdr": {
+      "version": "0.8.0",
+      "summary": "Terminal workspace manager for AI coding agents (tmux-style multiplexer with agent session support).",
+      "install_method": {
+        "linux": "verified-github-release-binary",
+        "macos": "verified-github-release-binary"
+      },
+      "source": {
+        "repository": "https://github.com/herdrdev/herdr",
+        "tag": "v0.8.0",
+        "tag_object": "857196dee1ce98df53efdd3f437aa2ac8a75b608",
+        "commit": "346411fa21afd297f5ed3b3fa56f9e3fbf7654b7",
+        "release": "https://github.com/herdrdev/herdr/releases/tag/v0.8.0",
+        "release_feed": "https://github.com/herdrdev/herdr/releases.atom",
+        "upstream_manifest": "https://herdr.dev/latest.json",
+        "verified_at": "2026-08-13",
+        "assets": {
+          "macos-aarch64": {
+            "url": "https://github.com/herdrdev/herdr/releases/download/v0.8.0/herdr-macos-aarch64",
+            "sha256": "d53a9f93fccfdfcc55632927bf51002f5add0aa7990bcdf508ffbd84ac658178"
+          },
+          "linux-x86_64": {
+            "url": "https://github.com/herdrdev/herdr/releases/download/v0.8.0/herdr-linux-x86_64",
+            "sha256": "b872ea7e40fa2cb17e857ac9b62b1bf26db7b403c622f5d2f3f5b35f6e9acd28"
+          },
+          "linux-aarch64": {
+            "url": "https://github.com/herdrdev/herdr/releases/download/v0.8.0/herdr-linux-aarch64",
+            "sha256": "f647ac66468d9efbc642fe534fb284468f0aea60641606fc008dfc0d82a3ca87"
+          }
+        }
+      },
+      "update_policy": "pinned-bootstrap-managed; never invoke mutable herdr update during install or verify",
+      "arch_map": {
+        "amd64": "x86_64",
+        "x64": "x86_64",
+        "arm64": "aarch64"
+      },
+      "bin_target": "${HOME}/.local/bin/herdr",
+      "managed_receipt": {
+        "linux": "ubuntu-runtime-v1",
+        "macos": "macos-herdr-runtime-v1"
+      },
+      "os": [
+        "linux",
+        "macos"
+      ],
+      "profiles": [
+        "desktop",
+        "desktop-builds",
+        "server"
+      ]
+    },
+    "telegram": {
+      "version": "7.0.9",
+      "summary": "Telegram Desktop messenger from the official telegramdesktop/tdesktop GitHub release.",
+      "install_method": "verified-github-release-tarball",
+      "repo": "telegramdesktop/tdesktop",
+      "url": "https://github.com/telegramdesktop/tdesktop/releases/download/v7.0.9/tsetup.7.0.9.tar.xz",
+      "archive_sha256": "d3c05df0259ab116d11d8c1cdc1403019d2a3be303ad3b46d16a84e19df6615f",
+      "architectures": [
+        "x86_64"
+      ],
+      "archive_kind": "tarx",
+      "archive_members": [
+        "Telegram/Telegram"
+      ],
+      "bin_target": "${HOME}/.local/bin/telegram-desktop",
+      "version_probe": "presence-only",
+      "auto_update": "disabled-by-externalupdater.d",
+      "external_updater_policy_target": "${HOME}/.local/share/TelegramDesktop/externalupdater.d/macos-ubuntu-bootstrap",
+      "external_updater_policy_marker": "# Managed by macos-ubuntu-bootstrap: telegram-external-updater-v1",
+      "managed_receipt": "ubuntu-runtime-v1",
+      "os": [
+        "linux"
+      ],
+      "profiles": [
+        "desktop",
+        "desktop-builds"
+      ],
+      "gui_required": true
+    }
+  },
+  "desktop_entries": {
+    "herdr": {
+      "source": "templates/desktop/herdr.desktop",
+      "target": "${HOME}/.local/share/applications/herdr.desktop",
+      "icon": "utilities-terminal",
+      "categories": "Development",
+      "wm_class": "Ptyxis",
+      "profiles": [
+        "desktop",
+        "desktop-builds"
+      ],
+      "os": [
+        "ubuntu"
+      ]
+    },
+    "telegram": {
+      "source": "templates/desktop/org.telegram.desktop.desktop",
+      "target": "${HOME}/.local/share/applications/org.telegram.desktop.desktop",
+      "icon": "org.telegram.desktop",
+      "upstream_source_commit": "a1e89e1f64f08cb058caf1c61ff43f319f98a6ec",
+      "upstream_desktop_entry": "https://github.com/telegramdesktop/tdesktop/blob/v7.0.9/lib/xdg/org.telegram.desktop.desktop",
+      "icon_assets": [
+        {
+          "source_url": "https://raw.githubusercontent.com/telegramdesktop/tdesktop/a1e89e1f64f08cb058caf1c61ff43f319f98a6ec/Telegram/Resources/art/logo_256.png",
+          "target": "${HOME}/.local/share/icons/hicolor/256x256/apps/org.telegram.desktop.png",
+          "sha256": "3fb1400c7dc9bbc3b5cb3ffedcbf4a9b09c53e28b57a7ff33a8a6b9048864090"
+        },
+        {
+          "source_url": "https://raw.githubusercontent.com/telegramdesktop/tdesktop/a1e89e1f64f08cb058caf1c61ff43f319f98a6ec/Telegram/Resources/icons/tray_monochrome.svg",
+          "target": "${HOME}/.local/share/icons/hicolor/symbolic/apps/org.telegram.desktop-symbolic.svg",
+          "sha256": "a93380f2c7e6aae4d5fde8940020bd966e97ad8c4880f45c016edfef3f5193e1"
+        },
+        {
+          "source_url": "https://raw.githubusercontent.com/telegramdesktop/tdesktop/a1e89e1f64f08cb058caf1c61ff43f319f98a6ec/Telegram/Resources/icons/tray_monochrome_attention.svg",
+          "target": "${HOME}/.local/share/icons/hicolor/symbolic/apps/org.telegram.desktop-attention-symbolic.svg",
+          "sha256": "2b67ee19839dbbb9f57f2d7433fd6dc1059634d6d081c5e4c422c14f53fcfcc7"
+        },
+        {
+          "source_url": "https://raw.githubusercontent.com/telegramdesktop/tdesktop/a1e89e1f64f08cb058caf1c61ff43f319f98a6ec/Telegram/Resources/icons/tray_monochrome_mute.svg",
+          "target": "${HOME}/.local/share/icons/hicolor/symbolic/apps/org.telegram.desktop-mute-symbolic.svg",
+          "sha256": "efa1439bd60b58db7b755f5d21be854ea686a0e1e2f1aa6e43bf35c083ee72fc"
+        }
+      ],
+      "categories": "Network;InstantMessaging;",
+      "wm_class": "TelegramDesktop",
+      "launch_environment": {
+        "QT_QPA_PLATFORM": "xcb"
+      },
+      "dbus_activatable": false,
+      "profiles": [
+        "desktop",
+        "desktop-builds"
+      ],
+      "os": [
+        "ubuntu"
+      ]
+    }
+  },
+  "ubuntu_apt_packages": {
+    "_doc": "Packages for terminal, source analysis, LSP hosts, and profile-specific build support.",
+    "baseline": [
+      "ca-certificates",
+      "curl",
+      "gpg",
+      "gnupg",
+      "git",
+      "jq",
+      "python3",
+      "python3-venv",
+      "shellcheck",
+      "shfmt",
+      "clangd",
+      "zsh",
+      "unzip",
+      "xz-utils",
+      "wget",
+      "zip",
+      "lsb-release",
+      "yamllint",
+      "fd-find",
+      "bat",
+      "fzf",
+      "zoxide",
+      "tmux",
+      "btop",
+      "duf",
+      "hexyl",
+      "gh",
+      "ripgrep",
+      "httpie",
+      "miller",
+      "software-properties-common",
+      "wl-clipboard",
+      "libsecret-tools"
+    ],
+    "desktop_build": [
+      "build-essential"
+    ],
+    "desktop_gui_fonts": [
+      "fonts-jetbrains-mono"
+    ],
+    "desktop_apps": [
+      {
+        "name": "google-chrome-stable",
+        "version_policy": "tracks-stable-channel",
+        "apt_source": {
+          "uri": "https://dl.google.com/linux/chrome/deb/",
+          "accepted_source_identities": [
+            {
+              "scheme": "https",
+              "host": "dl.google.com",
+              "path": "/linux/chrome/deb"
+            },
+            {
+              "scheme": "https",
+              "host": "dl.google.com",
+              "path": "/linux/chrome-stable/deb"
+            }
+          ],
+          "suites": "stable",
+          "components": "main",
+          "architectures": "amd64",
+          "key_url": "https://dl.google.com/linux/linux_signing_key.pub",
+          "key_fingerprint": "EB4C1BFD4F042F6DDDCCEC917721F63BD38B4796",
+          "managed_keyring": "/etc/apt/keyrings/rldyour-google-chrome.asc",
+          "managed_source": "/etc/apt/sources.list.d/rldyour-google-chrome.sources",
+          "vendor_repo_add_once": "false",
+          "vendor_source_policy": "preserve-when-key-verifies"
+        }
+      },
+      {
+        "name": "rustdesk",
+        "requirement": "required",
+        "version": "1.4.9",
+        "sha256": {
+          "x64": "7244ba47c40e804172044bfbe659467c54ce46554c98e78c8c0406f1d612fda3",
+          "arm64": "ce62c996f14d33f3bbe3a330e953644a44bace7f05885a7953f7395d69fb49c0"
+        },
+        "url": {
+          "x64": "https://github.com/rustdesk/rustdesk/releases/download/1.4.9/rustdesk-1.4.9-x86_64.deb",
+          "arm64": "https://github.com/rustdesk/rustdesk/releases/download/1.4.9/rustdesk-1.4.9-aarch64.deb"
+        }
+      }
+    ],
+    "profiles": {
+      "desktop": [
+        "baseline",
+        "desktop_build",
+        "desktop_apps"
+      ],
+      "desktop-builds": [
+        "baseline",
+        "desktop_build",
+        "desktop_apps"
+      ],
+      "server": [
+        "baseline"
+      ]
+    }
+  },
+  "terminal_tools": {
+    "_doc": "Interactive terminal tools the shell template binds aliases and abbreviations to. `shared` is published on both platforms, under the command name given; `macos_only` is deliberately not on Ubuntu. A guard in templates/terminal/zshrc for a command outside this block is a no-op and tests/test_terminal_portability.py rejects it.",
+    "shared": [
+      "atuin",
+      "bat",
+      "btop",
+      "carapace",
+      "difft",
+      "duf",
+      "eza",
+      "fd",
+      "hexyl",
+      "jaq",
+      "lazygit",
+      "starship",
+      "zoxide"
+    ],
+    "debian_renamed": {
+      "bat": "batcat",
+      "fd": "fdfind"
+    },
+    "macos_only": {
+      "duckdb": "Analytical SQL engine; no interactive alias binds it and no Ubuntu profile needs an embedded OLAP database.",
+      "jnv": "Interactive jq explorer; jaq covers the scripted path on both platforms.",
+      "xh": "HTTP client; Ubuntu installs httpie from apt for the same role.",
+      "yazi": "TUI file manager; no alias binds it, and its Ubuntu build needs a newer toolchain than the supported releases carry."
+    }
+  },
+  "macos_package_determinism": {
+    "_doc": "The determinism class of every package this adapter installs on macOS. ADR 0010 records the decision and why. A package in BREW_SOURCE_PACKAGES or GUI_CASKS with no class here fails tests/test_contract_parity.py, and provenance metadata may only claim what its class can support.",
+    "_adr": "docs/adr/0010-macos-package-determinism.md",
+    "classes": {
+      "immutable-upstream-artifact": "Exact URL and digest tracked in this repository; Homebrew is not the source.",
+      "rolling-homebrew-formula": "Whatever homebrew/core currently serves. An already installed keg is preserved, so two Macs may carry different patch versions of one release. A version floor is the enforced property, not an exact version.",
+      "rolling-homebrew-cask": "Whatever the cask currently serves, on the same terms as a rolling formula.",
+      "registry-pinned": "Exact version from a package registry, integrity from that registry's own transparency or digest contract."
+    },
+    "immutable-upstream-artifact": [
+      "homebrew-pkg",
+      "herdr"
+    ],
+    "rolling-homebrew-formula": [
+      "actionlint",
+      "antidote",
+      "ast-grep",
+      "atuin",
+      "basedpyright",
+      "bat",
+      "biome",
+      "btop",
+      "bun",
+      "ca-certificates",
+      "carapace",
+      "cmake-language-server",
+      "curl",
+      "dart-sdk",
+      "difftastic",
+      "docker-language-server",
+      "duckdb",
+      "duf",
+      "eza",
+      "fd",
+      "fzf",
+      "gh",
+      "git",
+      "git-delta",
+      "gitleaks",
+      "go",
+      "gopls",
+      "hadolint",
+      "helm-ls",
+      "hexyl",
+      "jaq",
+      "jnv",
+      "jq",
+      "lazygit",
+      "llvm",
+      "markdown-oxide",
+      "markdownlint-cli2",
+      "marksman",
+      "node",
+      "osv-scanner",
+      "oxlint",
+      "prettier",
+      "pyright",
+      "python",
+      "ripgrep",
+      "ruff",
+      "rust",
+      "rust-analyzer",
+      "semgrep",
+      "shellcheck",
+      "shfmt",
+      "starship",
+      "taplo",
+      "terraform-ls",
+      "tmux",
+      "ty",
+      "uv",
+      "vscode-langservers-extracted",
+      "xh",
+      "yamllint",
+      "yazi",
+      "yq",
+      "zoxide",
+      "zsh-completions"
+    ],
+    "rolling-homebrew-cask": [
+      "chatgpt",
+      "claude",
+      "cmux",
+      "ghostty",
+      "google-chrome",
+      "rustdesk",
+      "telegram"
+    ],
+    "registry-pinned": [
+      "@vtsls/language-server@0.3.0",
+      "bash-language-server@5.6.0",
+      "dockerfile-language-server-nodejs@0.15.0",
+      "gh-actions-language-server@0.0.3",
+      "typescript@7.0.2",
+      "yaml-language-server@1.24.0",
+      "@openai/codex"
+    ],
+    "provenance_may_declare": [
+      "homebrew_prefix",
+      "keg_path",
+      "keg_owner",
+      "keg_mode",
+      "executable_is_regular_file_inside_keg",
+      "reported_version"
+    ],
+    "provenance_must_not_declare": {
+      "formula_revision": "describes a build this repository does not control or pin",
+      "bottle_tag": "describes a build this repository does not control or pin",
+      "bottle_rebuild": "moves on every homebrew-core rebuild",
+      "bottle_sha256": "cannot be re-derived from an installed keg",
+      "executable_sha256": "not a pin under a rolling class: it changes whenever homebrew-core rebuilds, so freezing it turns a normal upstream event into a red required check"
+    }
+  },
+  "privilege": {
+    "schema_version": 1,
+    "authority_diagnostics": {
+      "schema": "rldyour.secure-publish-authority/v1",
+      "maximum_bytes": 4096,
+      "path_disclosure": "class-and-component-index-only",
+      "directory_replacement_identity": [
+        "device",
+        "inode",
+        "type"
+      ],
+      "directory_policy_revalidation": [
+        "uid",
+        "gid",
+        "mode"
+      ],
+      "directory_operational_metadata": [
+        "nlink",
+        "size",
+        "timestamps"
+      ]
+    },
+    "publication_authorities": {
+      "root-production": {
+        "owner": "root",
+        "group": "root",
+        "ancestor_writable_mask": "0022",
+        "destination_scope": "canonical-absolute-production"
+      },
+      "actor-sandbox": {
+        "owner": "effective-actor",
+        "group": "effective-actor-primary-group",
+        "anchor_mode": "0700",
+        "ancestor_writable_mask": "0022",
+        "destination_scope": "strictly-beneath-explicit-fd-anchored-root",
+        "production_paths": "forbidden"
+      }
+    },
+    "shell_control_flow": {
+      "canonical_form": "explicit-if-v1",
+      "guards": [
+        {
+          "id": "capture-size",
+          "path": "scripts/ubuntu/privileged-helper.sh",
+          "function": "load_contract_values",
+          "predicate": "integer-range",
+          "minimum": 1,
+          "maximum": 4096,
+          "failure_exit": 1,
+          "before": "record-parse"
+        },
+        {
+          "id": "capture-record",
+          "path": "scripts/ubuntu/privileged-helper.sh",
+          "function": "load_contract_values",
+          "predicate": "nonempty-no-cr-key-value",
+          "failure_exit": 1,
+          "before": "record-append"
+        },
+        {
+          "id": "policykit-uid",
+          "path": "scripts/ubuntu/privileged-helper.sh",
+          "function": "policykit_subject_valid",
+          "predicate": "positive-decimal",
+          "failure_exit": 1,
+          "before": "pkexec-parent-validation"
+        },
+        {
+          "id": "policykit-runtime",
+          "path": "scripts/ubuntu/privileged-helper.sh",
+          "function": "policykit_subject_valid",
+          "predicate": "directory-not-symlink",
+          "failure_exit": 1,
+          "before": "runtime-owner-validation"
+        },
+        {
+          "id": "trusted-root-input",
+          "path": "scripts/ubuntu/privilege.sh",
+          "function": "rldyour::privilege::trusted_root_path",
+          "predicate": "absolute-existing-not-symlink",
+          "failure_exit": 1,
+          "before": "ancestry-walk"
+        },
+        {
+          "id": "trusted-record",
+          "path": "scripts/ubuntu/privilege.sh",
+          "function": "rldyour::privilege::record_valid",
+          "predicate": "trusted-regular-file",
+          "failure_exit": 1,
+          "before": "receipt-read"
+        },
+        {
+          "id": "trusted-bundle-entry",
+          "path": "scripts/ubuntu/privilege.sh",
+          "function": "rldyour::privilege::bundle_matches_record",
+          "predicate": "trusted-regular-file",
+          "failure_exit": 1,
+          "before": "hash-compare"
+        },
+        {
+          "id": "published-bundle-entry",
+          "path": "scripts/ubuntu/privilege.sh",
+          "function": "rldyour::privilege::provision_bundle",
+          "predicate": "regular-not-symlink",
+          "failure_exit": 1,
+          "before": "published-hash-compare"
+        }
+      ]
+    },
+    "authority_graph": {
+      "chrome_trust": {
+        "producer": "config/rldyour-contract.json#ubuntu_apt_packages.desktop_apps[name=google-chrome-stable].apt_source",
+        "installer": "scripts/ubuntu/privileged-helper.sh",
+        "verifier": "scripts/ubuntu/verify.sh",
+        "unprivileged_observer": "scripts/ubuntu/desktop.sh"
+      },
+      "privilege_dispatch": {
+        "authority": "scripts/ubuntu/privilege.sh",
+        "collection_semantics": {
+          "callers": "keyed-identity-set",
+          "direct_tool_owners": "keyed-identity-set",
+          "module_owned_root_execution": "keyed-identity-set"
+        },
+        "callers": {
+          "scripts/ubuntu/install.sh": [
+            "rldyour::privilege::operation",
+            "rldyour::privilege::preflight"
+          ],
+          "scripts/ubuntu/desktop.sh": [
+            "rldyour::privilege::refresh"
+          ],
+          "scripts/ubuntu/server.sh": [
+            "rldyour::privilege::as_root"
+          ]
+        },
+        "direct_tool_owners": {
+          "/usr/bin/pkexec": [
+            "rldyour::privilege::policykit_wait",
+            "rldyour::privilege::preflight"
+          ],
+          "/usr/bin/sudo": [
+            "rldyour::privilege::as_root",
+            "rldyour::privilege::operation",
+            "rldyour::privilege::preflight",
+            "rldyour::privilege::refresh",
+            "rldyour::privilege::root_exec"
+          ]
+        },
+        "module_owned_root_execution": {
+          "scripts/ubuntu/server.sh": [
+            "rldyour::ubuntu_server::probe_as_root",
+            "rldyour::ubuntu_server::root_file_equals"
+          ]
+        }
+      }
+    },
+    "system_python_minimum": "3.12",
+    "system_python_surfaces": [
+      {
+        "id": "privilege-source-contract",
+        "path": "scripts/ubuntu/privilege.sh",
+        "kind": "heredoc"
+      },
+      {
+        "id": "privilege-profile-allowance",
+        "path": "scripts/ubuntu/privilege.sh",
+        "kind": "heredoc"
+      },
+      {
+        "id": "publisher-record",
+        "path": "scripts/ubuntu/privilege.sh",
+        "kind": "script"
+      },
+      {
+        "id": "publisher-file",
+        "path": "scripts/ubuntu/privilege.sh",
+        "kind": "script"
+      },
+      {
+        "id": "publisher-directory",
+        "path": "scripts/ubuntu/privilege.sh",
+        "kind": "script"
+      },
+      {
+        "id": "helper-trusted-path",
+        "path": "scripts/ubuntu/privileged-helper.sh",
+        "kind": "heredoc"
+      },
+      {
+        "id": "helper-contract-values",
+        "path": "scripts/ubuntu/privileged-helper.sh",
+        "kind": "heredoc"
+      },
+      {
+        "id": "helper-pkexec-parent",
+        "path": "scripts/ubuntu/privileged-helper.sh",
+        "kind": "heredoc"
+      },
+      {
+        "id": "verifier-runtime-contract",
+        "path": "scripts/ubuntu/verify.sh",
+        "kind": "heredoc"
+      },
+      {
+        "id": "verifier-herdr-contract",
+        "path": "scripts/ubuntu/verify.sh",
+        "kind": "heredoc"
+      },
+      {
+        "id": "verifier-chrome-trust",
+        "path": "scripts/ubuntu/verify.sh",
+        "kind": "script"
+      },
+      {
+        "id": "server-cidr",
+        "path": "scripts/ubuntu/server.sh",
+        "kind": "heredoc"
+      },
+      {
+        "id": "server-operator-source",
+        "path": "scripts/ubuntu/server.sh",
+        "kind": "heredoc"
+      },
+      {
+        "id": "server-ssh-address",
+        "path": "scripts/ubuntu/server.sh",
+        "kind": "heredoc"
+      }
+    ],
+    "runtime": {
+      "helper": "/usr/local/libexec/rldyour-bootstrap-privileged",
+      "contract": "/usr/local/share/rldyour-bootstrap/rldyour-contract.json",
+      "policy": "/usr/share/polkit-1/actions/com.nddev.rldyour.bootstrap.policy"
+    },
+    "operations": [
+      "ubuntu-desktop-system",
+      "ubuntu-desktop-gui-system",
+      "ubuntu-server-system"
+    ],
+    "operation_owners": {
+      "ubuntu-desktop-system": "scripts/ubuntu/privileged-helper.sh",
+      "ubuntu-desktop-gui-system": "scripts/ubuntu/privileged-helper.sh",
+      "ubuntu-server-system": "scripts/ubuntu/server.sh"
+    },
+    "profiles": {
+      "desktop:gui-0": {
+        "operations": [
+          "ubuntu-desktop-system"
+        ],
+        "mechanisms": [
+          "plan",
+          "root",
+          "sudo-noninteractive",
+          "sudo-tty"
+        ]
+      },
+      "desktop:gui-1": {
+        "operations": [
+          "ubuntu-desktop-gui-system"
+        ],
+        "mechanisms": [
+          "plan",
+          "root",
+          "sudo-noninteractive",
+          "sudo-tty",
+          "policykit"
+        ]
+      },
+      "desktop-builds:gui-0": {
+        "operations": [
+          "ubuntu-desktop-system",
+          "ubuntu-server-system"
+        ],
+        "mechanisms": [
+          "plan",
+          "root",
+          "sudo-noninteractive",
+          "sudo-tty"
+        ]
+      },
+      "desktop-builds:gui-1": {
+        "operations": [
+          "ubuntu-desktop-gui-system",
+          "ubuntu-server-system"
+        ],
+        "mechanisms": [
+          "plan",
+          "root",
+          "sudo-noninteractive",
+          "sudo-tty"
+        ]
+      },
+      "server:gui-0": {
+        "operations": [
+          "ubuntu-server-system"
+        ],
+        "mechanisms": [
+          "plan",
+          "root",
+          "sudo-noninteractive",
+          "sudo-tty"
+        ]
+      }
+    },
+    "gui_authorization_evidence": "NOT_PROVEN_REAL_HOST_REQUIRED"
+  }
+}

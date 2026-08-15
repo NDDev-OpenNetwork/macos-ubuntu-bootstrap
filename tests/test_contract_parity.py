@@ -606,3 +606,35 @@ def test_every_contract_block_has_a_reader() -> None:
         f"contract blocks nothing reads: {unread}. Remove the block, or land the "
         "code that reads it -- a schema field is not a mechanism."
     )
+
+
+def test_every_adr_citation_of_a_test_resolves() -> None:
+    """An ADR that names a test as its enforcement must name one that exists.
+
+    ADR 0008 used to cite `safety.docker_group_membership: "explicit"` -- a
+    contract key nothing read -- as though the key were the mechanism. It now
+    cites the test that actually fails when a script grants the group. That is
+    an improvement only while the name resolves: a renamed test would leave the
+    ADR asserting enforcement by something that no longer exists, which is the
+    same defect wearing a different hat.
+
+    `docs/adr/README.md` already holds that a citation resolving to nothing is a
+    defect; this checks the direction the contract-side test does not.
+    """
+    defined = set()
+    for path in sorted((ROOT / "tests").glob("*.py")):
+        for match in re.finditer(r"^def (test_[A-Za-z0-9_]+)", path.read_text(encoding="utf-8"), re.M):
+            defined.add(f"{path.name}::{match.group(1)}")
+
+    unresolved = []
+    for adr in sorted((ROOT / "docs/adr").glob("*.md")):
+        for match in re.finditer(r"`tests/([A-Za-z0-9_]+\.py)::(test_[A-Za-z0-9_]+)`",
+                                 adr.read_text(encoding="utf-8")):
+            citation = f"{match.group(1)}::{match.group(2)}"
+            if citation not in defined:
+                unresolved.append(f"{adr.name} cites {citation}")
+
+    assert unresolved == [], (
+        f"these ADR citations name a test that does not exist: {unresolved}. "
+        "Rename the citation with the test, or cite what does enforce the decision."
+    )

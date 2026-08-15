@@ -7,6 +7,15 @@ remains available in immutable Git tags.
 
 ### Added
 
+- An ADR that names a test as its enforcement must name one that exists. ADR 0008
+  now cites `test_no_script_grants_docker_group_membership` in place of the
+  contract key nothing read — an improvement only while the name resolves, since
+  a renamed test would leave the ADR asserting enforcement by something gone.
+  `docs/adr/README.md` already held that a citation resolving to nothing is a
+  defect; this checks the direction the contract-side test does not.
+
+### Added
+
 - Two safety policies the contract stated and nothing enforced now have tests.
   **No script may grant `docker` group membership** — it is root-equivalent, ADR
   0008 records that it must stay a manual act, and that ADR cited a contract key

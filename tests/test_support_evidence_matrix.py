@@ -740,3 +740,26 @@ def test_a_complete_run_writes_a_readable_verdict(tmp_path) -> None:
     ), "instances must be ordered so two runs of the same evidence match byte for byte"
     for instance in written["instances"]:
         assert set(instance) == {"lane", "release", "architecture"}
+
+
+def test_the_privileged_container_lane_is_required_by_the_gate() -> None:
+    """A suite nobody runs is a gate that cannot fail.
+
+    `tests/test_container_apply.py` is gated on `RLDYOUR_CONTAINER_TESTS=1`, and
+    for its whole life nothing set it. Seven cases covering the root helper --
+    descendant supervision, the PID-1 guard, Firefox removal against a real deb
+    -- existed and never executed, and four of them did not even pass.
+    """
+    assert "\n  privileged-container:\n" in EVIDENCE_WORKFLOW
+    lane = EVIDENCE_WORKFLOW.split("\n  privileged-container:\n", 1)[1].split("\n  # Reports", 1)[0]
+    assert 'RLDYOUR_CONTAINER_TESTS: "1"' in lane, (
+        "the lane must set the opt-in the module gates on, or it runs nothing"
+    )
+    assert "tests/test_container_apply.py" in lane
+    assert "needs.scope.outputs.fork == 'false'" in lane
+
+    gate_job = _gate_job()
+    assert "privileged-container" in gate_job.split("\n    steps:", 1)[0], (
+        "evidence-gate must need the lane, or it can pass while the lane fails"
+    )
+    assert "privileged-container=$PRIVILEGED_CONTAINER_RESULT" in gate_job

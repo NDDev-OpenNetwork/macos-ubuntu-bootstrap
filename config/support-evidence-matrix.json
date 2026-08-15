@@ -70,11 +70,13 @@
         "none"
       ],
       "apply_privilege": [
-        "non-root-sudo"
+        "non-root-sudo",
+        "preprovisioned-policykit-helper"
       ],
       "interaction": [
         "interactive-terminal",
-        "noninteractive-passwordless-sudo"
+        "noninteractive-passwordless-sudo",
+        "interactive-gui-authorization"
       ],
       "support": "SUPPORTED"
     },
@@ -374,7 +376,7 @@
         "noninteractive-passwordless-sudo"
       ],
       "support": "UNSUPPORTED_FAIL_CLOSED",
-      "reason": "contract 3.0.1 supports Apple Silicon only"
+      "reason": "contract 3.1.0 supports Apple Silicon only"
     },
     {
       "id": "full-apply-as-root",

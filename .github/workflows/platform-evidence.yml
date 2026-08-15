@@ -278,6 +278,42 @@ jobs:
           if-no-files-found: error
           retention-days: 1
 
+  # The privileged apply paths, against a real Ubuntu container.
+  #
+  # `tests/test_container_apply.py` is gated on `RLDYOUR_CONTAINER_TESTS=1` and
+  # nothing set it, so seven cases covering the privileged helper -- descendant
+  # supervision, the PID-1 guard, Firefox removal against a real deb, digest-
+  # pinned installs -- existed and never ran. Four of them did not even pass:
+  # the container was missing `python3` and `locales`, and no one could see it.
+  #
+  # A test suite nobody executes is the same defect as a gate that cannot fail,
+  # and this is the code where it matters most -- the helper runs as root.
+  privileged-container:
+    needs: scope
+    if: needs.scope.outputs.required == 'true' && needs.scope.outputs.fork == 'false'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout exact public commit without credentials
+        env:
+          EVIDENCE_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+          git init .
+          git remote add origin "https://github.com/${GITHUB_REPOSITORY}.git"
+          git fetch --depth=1 origin "$EVIDENCE_SHA"
+          git checkout --detach "$EVIDENCE_SHA"
+
+      - name: Build the hash-locked test environment
+        run: bash scripts/ci/setup-test-env.sh
+
+      - name: Run the privileged apply paths against a real container
+        env:
+          RLDYOUR_CONTAINER_TESTS: "1"
+        run: .venv/bin/python -m pytest -q tests/test_container_apply.py
+
   # Reports for every pull request that can reach `main`, with one of three
   # stated outcomes. It used to have only one, and it was wrong twice:
   #
@@ -292,7 +328,7 @@ jobs:
   evidence-gate:
     if: always()
     runs-on: ubuntu-24.04
-    needs: [scope, macos-native, ubuntu-native, ubuntu-systemd-sandbox, ubuntu-safeguards]
+    needs: [scope, macos-native, ubuntu-native, ubuntu-systemd-sandbox, ubuntu-safeguards, privileged-container]
     permissions:
       actions: read
     steps:
@@ -346,13 +382,15 @@ jobs:
           UBUNTU_NATIVE_RESULT: ${{ needs.ubuntu-native.result }}
           UBUNTU_SANDBOX_RESULT: ${{ needs.ubuntu-systemd-sandbox.result }}
           UBUNTU_SAFEGUARDS_RESULT: ${{ needs.ubuntu-safeguards.result }}
+          PRIVILEGED_CONTAINER_RESULT: ${{ needs.privileged-container.result }}
         run: |
           set -euo pipefail
           failed=0
           for lane in "macos-native=$MACOS_RESULT" \
                       "ubuntu-native=$UBUNTU_NATIVE_RESULT" \
                       "ubuntu-systemd-sandbox=$UBUNTU_SANDBOX_RESULT" \
-                      "ubuntu-safeguards=$UBUNTU_SAFEGUARDS_RESULT"; do
+                      "ubuntu-safeguards=$UBUNTU_SAFEGUARDS_RESULT" \
+                      "privileged-container=$PRIVILEGED_CONTAINER_RESULT"; do
             if [ "${lane#*=}" != success ]; then
               echo "${lane%%=*}: ${lane#*=}" >&2
               failed=1

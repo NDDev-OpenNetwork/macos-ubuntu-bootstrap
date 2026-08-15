@@ -9,7 +9,8 @@ source "$SCRIPT_DIR/../lib/common.sh"
 REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 
 rldyour::ubuntu_verify::contract_hash() {
-  python3 - "$REPO_ROOT/config/rldyour-contract.json" "$1" "$2" <<'PY'
+  # python-surface: verifier-runtime-contract
+  /usr/bin/python3 -I - "$REPO_ROOT/config/rldyour-contract.json" "$1" "$2" <<'PY'
 import json
 import sys
 
@@ -19,25 +20,30 @@ print(contract["runtime_support"][sys.argv[2]][sys.argv[3]])
 PY
 }
 
-rldyour::ubuntu_verify::herdr_provenance() {
-  local arch_key version sha root target
-  version="$(python3 - "$REPO_ROOT/config/rldyour-contract.json" <<'PY'
+rldyour::ubuntu_verify::herdr_contract_value() {
+  # python-surface: verifier-herdr-contract
+  /usr/bin/python3 -I - "$REPO_ROOT/config/rldyour-contract.json" "$@" <<'PY'
 import json, sys
 with open(sys.argv[1], encoding="utf-8") as handle:
-    print(json.load(handle)["user_tools"]["herdr"]["version"])
+    herdr = json.load(handle)["user_tools"]["herdr"]
+if sys.argv[2] == "version" and len(sys.argv) == 3:
+    print(herdr["version"])
+elif sys.argv[2] == "sha256" and len(sys.argv) == 4:
+    print(herdr["source"]["assets"][sys.argv[3]]["sha256"])
+else:
+    raise SystemExit(2)
 PY
-)"
+}
+
+rldyour::ubuntu_verify::herdr_provenance() {
+  local arch_key version sha root target
+  version="$(rldyour::ubuntu_verify::herdr_contract_value version)"
   case "$(uname -m)" in
     x86_64|amd64) arch_key=linux-x86_64 ;;
     aarch64|arm64) arch_key=linux-aarch64 ;;
     *) rldyour::log "missing" "Herdr has no managed Ubuntu artifact for $(uname -m)"; return 1 ;;
   esac
-  sha="$(python3 - "$REPO_ROOT/config/rldyour-contract.json" "$arch_key" <<'PY'
-import json, sys
-with open(sys.argv[1], encoding="utf-8") as handle:
-    print(json.load(handle)["user_tools"]["herdr"]["source"]["assets"][sys.argv[2]]["sha256"])
-PY
-)"
+  sha="$(rldyour::ubuntu_verify::herdr_contract_value sha256 "$arch_key")"
   root="$HOME/.local/share/rldyour/herdr/${version}"
   target="$root/herdr"
   rldyour::ubuntu_verify::runtime_receipt herdr "$version" "$sha" "$root" herdr || {
@@ -185,6 +191,16 @@ rldyour::ubuntu_verify::telegram_policy() {
 STRICT=0
 PROFILE="${RLDYOUR_PROFILE:-server}"
 GUI_ENABLED="${RLDYOUR_GUI_ENABLED:-0}"
+
+rldyour::ubuntu_verify::chrome_contract_fingerprint() {
+  # python-surface: verifier-chrome-trust
+  /usr/bin/python3 -I "$SCRIPT_DIR/../ci/shell_contract.py" chrome-runtime \
+    --contract /usr/local/share/rldyour-bootstrap/rldyour-contract.json \
+    --require-root-owned-contract \
+    --source /etc/apt/sources.list --source /etc/apt/sources.list.d |
+    jq -er 'select(.schema == "rldyour.shell-contract/v1" and .operation == "chrome-runtime") | .result.fingerprint'
+}
+
 DOCKER_MODE="${RLDYOUR_DOCKER_MODE:-rootful}"
 for arg in "$@"; do
   case "$arg" in
@@ -303,13 +319,23 @@ if [ "$PROFILE" != "server" ]; then
   if [ "$GUI_ENABLED" -eq 1 ]; then
     command -v google-chrome-stable >/dev/null 2>&1 || { rldyour::log "missing" "Google Chrome stable"; exit 1; }
     command -v rustdesk >/dev/null 2>&1 || { rldyour::log "missing" "RustDesk"; exit 1; }
-    chrome_source="$(grep -RslE 'dl.google.com/linux/chrome(/|-stable/)deb' /etc/apt/sources.list /etc/apt/sources.list.d 2>/dev/null || true)"
-    [ -n "$chrome_source" ] || { rldyour::log "missing" "Google Chrome apt source"; exit 1; }
+    # The contract owns the expected fingerprint and the apt-source check; the
+    # shared primitive owns key identity. Both lines of work are kept: the
+    # checkpoint's contract-derived expectation, and main's repaired identity
+    # check, which rejects a keyring carrying a second primary key.
+    #
+    # The `gpg --show-keys | awk` that used to follow was the #62 defect: its
+    # escaped quotes reached awk verbatim inside a double-quoted command
+    # substitution, so under `pipefail` the verifier aborted before checking
+    # anything. chrome_key_trusted supersedes it and chrome_fingerprint_set_valid
+    # with it -- that helper counted matching fingerprint lines, which accepts a
+    # keyring whose *subkey* matches.
+    chrome_expected_fingerprint="$(rldyour::ubuntu_verify::chrome_contract_fingerprint)" || {
+      rldyour::log "missing" "valid Chrome source and trust contract"; exit 1;
+    }
     rldyour::ubuntu_verify::chrome_key_trusted \
-      /etc/apt/keyrings/rldyour-google-chrome.asc \
-      EB4C1BFD4F042F6DDDCCEC917721F63BD38B4796 || {
-      rldyour::log "missing" "verified Google Chrome signing key"
-      exit 1
+      /etc/apt/keyrings/rldyour-google-chrome.asc "$chrome_expected_fingerprint" || {
+      rldyour::log "missing" "verified Google Chrome signing key"; exit 1;
     }
     if command -v firefox >/dev/null 2>&1 || { command -v snap >/dev/null 2>&1 && snap list firefox >/dev/null 2>&1; }; then
       rldyour::log "missing" "Firefox must be absent from the Ubuntu GUI profile"

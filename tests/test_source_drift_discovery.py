@@ -281,3 +281,62 @@ def test_the_token_goes_only_to_the_github_api_host(monkeypatch, url, expected) 
     drift._get(url)
     carried = any("secret-value" in value for value in seen.values())
     assert carried is expected, f"{url}: token carried={carried}, expected {expected}"
+
+
+# ----------------- unknown twice running is not a rate limit -----------------
+
+
+def test_one_unknown_run_is_still_tolerated(capsys) -> None:
+    """The transient case the tolerance exists for must stay green."""
+    previous = [_finding("a", "current"), _finding("b", "current")]
+    now = [_finding("a", "unknown"), _finding("b", "current")]
+    assert drift.report(now, previous=previous) == 0
+    assert "source-drift-unknown-persists" not in capsys.readouterr().err
+
+
+def test_unknown_in_two_consecutive_runs_fails(capsys) -> None:
+    """One unknown out of twenty-five stays inside the tolerance forever.
+
+    That is the residual the tolerance alone cannot close: a source that is
+    unreachable every single week looks exactly like one that was rate-limited
+    once. Two runs is enough to tell them apart.
+    """
+    previous = [_finding("a", "unknown"), _finding("b", "current")]
+    now = [_finding("a", "unknown"), _finding("b", "current")]
+    assert drift.report(now, previous=previous) == 1
+    err = capsys.readouterr().err
+    assert "source-drift-unknown-persists: a" in err
+    assert "no longer plausibly transient" in err or "can no longer check" in err
+
+
+def test_a_recovered_source_does_not_fail(capsys) -> None:
+    """Unknown last week, readable now, is the system working."""
+    previous = [_finding("a", "unknown")]
+    now = [_finding("a", "current")]
+    assert drift.report(now, previous=previous) == 0
+    assert capsys.readouterr().err == ""
+
+
+def test_a_newly_unknown_source_does_not_fail_on_its_first_run() -> None:
+    previous = [_finding("a", "current"), _finding("b", "current")]
+    now = [_finding("a", "current"), _finding("b", "unknown")]
+    assert drift.report(now, previous=previous) == 0
+
+
+def test_without_a_previous_snapshot_nothing_escalates() -> None:
+    """A first run, or an expired artifact, must not invent a persistent failure."""
+    now = [_finding("a", "unknown"), _finding("b", "current")]
+    assert drift.report(now, previous=None) == 0
+
+
+def test_an_unusable_previous_snapshot_skips_the_check(tmp_path, capsys) -> None:
+    """Retention is not evidence about a pin.
+
+    Refusing to check for drift because last week's artifact aged out, or came
+    back as HTML from a redirect, would be a failure about storage rather than
+    about the thing being watched.
+    """
+    broken = tmp_path / "previous.json"
+    broken.write_text("<!DOCTYPE html>not json", encoding="utf-8")
+    assert drift.main(["--json", "--previous", str(broken)]) in (0, 1)
+    assert "previous snapshot unusable" in capsys.readouterr().err

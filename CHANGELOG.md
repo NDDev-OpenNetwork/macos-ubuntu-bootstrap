@@ -33,6 +33,16 @@ remains available in immutable Git tags.
 
   `verified_on` was a bare date nothing wrote, read or checked; it could only
   ever become wrong, invisibly.
+- Source drift escalates a source that is unreachable twice running. The
+  tolerance alone cannot see this: one `unknown` out of twenty-five stays inside
+  it forever, so a source that fails every single week looks exactly like one
+  that was rate-limited once. The scheduled run now compares against the previous
+  run's retained snapshot and fails by name on any pin that was `unknown` then
+  and is `unknown` now.
+
+  Best-effort by design. An expired or unreadable previous snapshot skips the
+  comparison and says so, because refusing to check for drift is a failure about
+  artifact retention rather than about pins.
 
 ## [3.1.0] - 2026-08-15
 

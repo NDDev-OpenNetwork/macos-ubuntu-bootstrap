@@ -68,6 +68,34 @@ enforcement this repository cannot observe.
   `executable_sha256` for a rolling formula, because homebrew-core rebuilds move
   it and freezing it turns an ordinary upstream event into a red required check.
 
+## Ubuntu privilege boundary
+
+Privileged work is composable and never opaque. The installer is never run whole
+under `pkexec`; `scripts/ubuntu/privilege.sh` chooses a path per operation and
+`scripts/ubuntu/privileged-helper.sh` executes only allowlisted operations with
+allowlisted arguments. A GUI session authorizes a narrowly scoped PolicyKit
+action; a terminal, headless or SSH session takes the TTY sudo path. The choice
+is explicit, never inferred from `uname`.
+
+No password may reach argv, the environment, stdin, a file, an artifact or
+telemetry. Files a user owns stay owned by that user.
+
+Two rules exist because a container found what review did not:
+
+- Anything that starts privileged descendants must **own its process group** and
+  escalate TERM to KILL over it. `timeout --foreground` does not bound children
+  -- GNU documents that -- so root `apt-get`, `dpkg` and `curl` outlive a
+  launcher reporting timeout. Never signal the group with `kill -- -$$`: a root
+  helper in a container is PID 1, where POSIX defines that as *every process the
+  caller may signal*, and the signal reaches the caller, killing the supervisor
+  mid-cleanup.
+- Process, signal and privilege changes are proven by `tests/test_container_apply.py`,
+  written **before** the code. `shellcheck` and `bash -n` say nothing about
+  group membership, PID identity, signal delivery or job ownership; four
+  separate defects passed both. That lane runs in `platform-evidence.yml` and
+  `evidence-gate` requires it -- it spent its whole prior life gated on an
+  environment variable nothing set.
+
 ## Ubuntu server safeguards
 
 The full compositor runs as the non-root sudo-capable owner. Never grant Docker

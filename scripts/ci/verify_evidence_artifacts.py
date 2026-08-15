@@ -151,10 +151,14 @@ def write_verdict(path: Path, *, sha: str | None, seen: set[tuple[str, str, str]
             {
                 "sha": sha,
                 "verified": True,
-                "instances": sorted(
+                # Sort the tuples, then build the records. Sorting the records
+                # directly raises: dicts are not orderable, and the only test
+                # that touched this function exercised the failure path, where
+                # `verify` raises before reaching it.
+                "instances": [
                     {"lane": lane, "release": release, "architecture": arch}
-                    for lane, release, arch in seen
-                ),
+                    for lane, release, arch in sorted(seen)
+                ],
             },
             indent=2,
             sort_keys=True,

@@ -713,3 +713,30 @@ def test_a_verdict_is_written_only_after_every_instance_checks_out(tmp_path) -> 
     with pytest.raises(gate.GateError):
         gate.verify(empty, sha="a" * 40, verdict=verdict)
     assert not verdict.exists(), "a rejected run must leave no verdict behind"
+
+
+def test_a_complete_run_writes_a_readable_verdict(tmp_path) -> None:
+    """The other direction, which the failure fixture above cannot reach.
+
+    `verify` raises before writing when evidence is rejected, so a test that only
+    checks rejection never executes `write_verdict` at all. The first version of
+    that function sorted a set of dicts -- a `TypeError` no local test could see
+    and the hosted gate found on its first run, after all 21 lanes had passed.
+    """
+    sha = "a" * 40
+    root = tmp_path / "downloaded"
+    root.mkdir()
+    _complete_evidence(root)
+    verdict = tmp_path / "verdict.json"
+
+    assert gate.verify(root, sha=sha, verdict=verdict) == 0
+
+    written = json.loads(verdict.read_text(encoding="utf-8"))
+    assert written["sha"] == sha
+    assert written["verified"] is True
+    assert len(written["instances"]) == MATRIX["expected_hosted_artifact_instances"]
+    assert written["instances"] == sorted(
+        written["instances"], key=lambda i: (i["lane"], i["release"], i["architecture"])
+    ), "instances must be ordered so two runs of the same evidence match byte for byte"
+    for instance in written["instances"]:
+        assert set(instance) == {"lane", "release", "architecture"}

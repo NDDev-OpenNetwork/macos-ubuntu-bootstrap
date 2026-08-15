@@ -1,3 +1,4 @@
+import re
 import os
 import subprocess
 from pathlib import Path
@@ -317,4 +318,79 @@ def test_authorized_keys_readability_is_not_probed_with_external_test() -> None:
     for predicate in ("test -L", "test -f", "test -d"):
         assert f"probe_as_root {predicate}" in block, (
             f"{predicate} was changed without cause; it is stat-based and portable"
+        )
+
+
+# --------------- policies the contract stated and nothing enforced ---------------
+#
+# `config/rldyour-contract.json` carried a `safety` block of twelve policy
+# statements that no script and no test read. Ten of them turned out to be
+# enforced elsewhere under different names. Two were not enforced at all: the
+# block was the only statement, and a statement is not a mechanism.
+#
+# The block is gone; these are what replaced it.
+
+
+def test_no_script_grants_docker_group_membership() -> None:
+    """Docker group membership is root-equivalent and must stay a manual act.
+
+    ADR 0008 records the decision and cited `safety.docker_group_membership:
+    "explicit"` as though the contract were enforcing it. Nothing was. No
+    installer does this today, and this is what would notice if one started.
+    """
+    offenders = []
+    for path in sorted((ROOT / "scripts").rglob("*")):
+        if path.suffix not in {".sh", ".py"} or not path.is_file():
+            continue
+        for number, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
+            if line.lstrip().startswith("#"):
+                continue
+            if re.search(r"\b(?:usermod|gpasswd|adduser)\b.*\bdocker\b", line):
+                offenders.append(f"{path.relative_to(ROOT)}:{number}: {line.strip()}")
+    assert offenders == [], (
+        "these grant docker group membership, which is root-equivalent and must "
+        f"stay a manual act the operator takes knowingly: {offenders}"
+    )
+
+
+# Two call sites install packages into a disposable CI environment rather than
+# onto anyone's device, so the never-upgrade policy does not apply to them. Named
+# rather than pattern-matched: a new exemption should be an argued edit.
+CI_FIXTURE_INSTALLERS = {
+    "scripts/ci/platform-evidence.sh",
+    "scripts/ci/setup-test-env.sh",
+}
+
+
+def test_every_device_apt_install_refuses_to_upgrade() -> None:
+    """Installing a package must never silently upgrade one the operator has.
+
+    A bootstrap that upgrades existing packages turns "set up my tools" into an
+    unrequested system change, on a machine whose state the operator chose.
+    """
+    missing = []
+    for path in sorted((ROOT / "scripts").rglob("*")):
+        if path.suffix not in {".sh", ".py"} or not path.is_file():
+            continue
+        relative = str(path.relative_to(ROOT))
+        if relative in CI_FIXTURE_INSTALLERS:
+            continue
+        for number, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
+            if line.lstrip().startswith("#") or "apt-get install" not in line:
+                continue
+            if "--no-upgrade" not in line:
+                missing.append(f"{relative}:{number}: {line.strip()}")
+    assert missing == [], (
+        "these install packages onto a device without --no-upgrade, so an "
+        f"install could silently upgrade what the operator already had: {missing}"
+    )
+
+
+def test_the_ci_fixture_exemptions_still_exist_and_still_install() -> None:
+    """An exemption for a file that no longer installs anything is stale."""
+    for relative in sorted(CI_FIXTURE_INSTALLERS):
+        path = ROOT / relative
+        assert path.is_file(), f"{relative} is exempted but does not exist"
+        assert "apt-get install" in path.read_text(encoding="utf-8"), (
+            f"{relative} is exempted from the never-upgrade rule but installs nothing"
         )

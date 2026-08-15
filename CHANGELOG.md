@@ -5,6 +5,35 @@ remains available in immutable Git tags.
 
 ## [Unreleased]
 
+### Added
+
+- Two safety policies the contract stated and nothing enforced now have tests.
+  **No script may grant `docker` group membership** — it is root-equivalent, ADR
+  0008 records that it must stay a manual act, and that ADR cited a contract key
+  as though the key were the mechanism. No installer does it today; nothing would
+  have noticed if one started. And **every apt install that touches a device
+  carries `--no-upgrade`**, so setting up tools cannot silently upgrade packages
+  the operator chose to keep. The two CI-fixture installers that build disposable
+  environments are exempt by name, and a test fails if an exemption stops
+  installing anything.
+
+### Removed
+
+- The `safety` contract block and `verified_on`, and with them the exemption
+  mechanism that recorded them (#88). `safety` stated twelve policies that no
+  script and no test read. Ten were enforced elsewhere under different names;
+  **two were not enforced at all**, which is why the tests above came first — a
+  duplicate can be deleted, but a sole statement cannot.
+
+  Binding the block instead was considered and rejected. The only binding
+  available to a unit test is a text pattern over the implementation, and this
+  release spent its effort removing exactly that from `dependency-check.yml`,
+  where marker-matching could not fail for any mutation it existed to catch.
+  Adding a second such layer to fix the first would not have been an improvement.
+
+  `verified_on` was a bare date nothing wrote, read or checked; it could only
+  ever become wrong, invisibly.
+
 ## [3.1.0] - 2026-08-15
 
 ### Removed

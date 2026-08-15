@@ -568,24 +568,6 @@ def test_ci_tool_parity_covers_every_workflow_that_names_a_pinned_tool() -> None
             )
 
 
-# Contract blocks that describe something real and are enforced elsewhere, but
-# are not read *through the contract*. Each is a duplicate declaration free to
-# drift from the behaviour it describes, which is why they are listed here
-# rather than tolerated silently. Tracked in #88.
-KNOWN_UNREAD = {
-    # A bare date. Nothing writes it, nothing checks it, and it can only ever
-    # become wrong.
-    "verified_on",
-    # Twelve policy statements -- plan-by-default, manual credential handoff,
-    # explicit Docker group membership, never-automatic package upgrade. All
-    # true, all enforced by the installers and their tests, none read from
-    # here. `docs/adr/0008-desktop-builds-profile.md` cites
-    # `safety.docker_group_membership: "explicit"` as though this block were the
-    # mechanism.
-    "safety",
-}
-
-
 def test_every_contract_block_has_a_reader() -> None:
     """A contract key nothing reads is a claim nothing enforces.
 
@@ -602,12 +584,6 @@ def test_every_contract_block_has_a_reader() -> None:
     """
     def _readable(path: Path) -> str:
         text = path.read_text(encoding="utf-8")
-        if path == Path(__file__):
-            # Naming a block in KNOWN_UNREAD is not reading it. Without this the
-            # exemption list makes its own entries look consumed, the unread set
-            # comes back empty, and the check quietly stops checking.
-            head, _, tail = text.partition("KNOWN_UNREAD = {")
-            return head + tail.partition("\n}\n")[2]
         return text
 
     consumers = "\n".join(
@@ -626,9 +602,7 @@ def test_every_contract_block_has_a_reader() -> None:
         and f'"{key}"' not in consumers
         and f"'{key}'" not in consumers
     ]
-    assert sorted(unread) == sorted(KNOWN_UNREAD), (
-        f"contract blocks nothing reads: {sorted(set(unread) - set(KNOWN_UNREAD))}. "
-        "Remove the block, or land the code that reads it -- a schema field is "
-        "not a mechanism. If one of the known-unread blocks gained a reader, "
-        "take it out of KNOWN_UNREAD."
+    assert unread == [], (
+        f"contract blocks nothing reads: {unread}. Remove the block, or land the "
+        "code that reads it -- a schema field is not a mechanism."
     )

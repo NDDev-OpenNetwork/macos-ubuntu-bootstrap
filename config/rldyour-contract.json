@@ -4,7 +4,6 @@
     "id": "macos-ubuntu-bootstrap",
     "version": "3.1.0"
   },
-  "verified_on": "2026-08-14",
   "support_evidence": {
     "path": "config/support-evidence-matrix.json",
     "schema_version": 1,
@@ -556,20 +555,6 @@
         "baseline"
       ]
     }
-  },
-  "safety": {
-    "default_mode": "plan",
-    "ubuntu_profile_selection": "explicit",
-    "system_configuration": "backup-validate-rollback",
-    "credentials": "manual-handoff-only",
-    "desktop_local_runtime": false,
-    "server_firewall_mutation": "explicit-only",
-    "server_ssh_hardening": "explicit-only",
-    "docker_group_membership": "explicit",
-    "package_upgrade": "never-automatic",
-    "ubuntu_full_apply_user": "non-root-sudo-account",
-    "ssh_match_validation": "full-live-connection-context",
-    "ufw_cidr_operator_preflight": "required"
   },
   "terminal_tools": {
     "_doc": "Interactive terminal tools the shell template binds aliases and abbreviations to. `shared` is published on both platforms, under the command name given; `macos_only` is deliberately not on Ubuntu. A guard in templates/terminal/zshrc for a command outside this block is a no-op and tests/test_terminal_portability.py rejects it.",

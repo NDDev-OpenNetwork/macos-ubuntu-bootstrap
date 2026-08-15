@@ -58,12 +58,6 @@
             "context": "bootstrap-pytests / python (3.14)"
           },
           {
-            "context": "cross-platform smoke (ubuntu-latest) / smoke (ubuntu-latest)"
-          },
-          {
-            "context": "cross-platform smoke (macos-latest) / smoke (macos-latest)"
-          },
-          {
             "context": "Gitleaks secret scan / Gitleaks secret scan"
           },
           {

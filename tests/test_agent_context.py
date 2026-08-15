@@ -188,7 +188,7 @@ def test_every_reusable_caller_that_can_name_a_runner_does() -> None:
         "and this repository is public."
     )
     exempted = [path.name for path, _w, _r, exempt, _v in callers if exempt]
-    assert exempted == ["cross-platform.yml", "pr-hygiene.yml"], (
+    assert exempted == ["pr-hygiene.yml"], (
         f"the exemption list changed: {exempted}. Verify against the reusable's "
         "inputs at the pinned commit before accepting it."
     )

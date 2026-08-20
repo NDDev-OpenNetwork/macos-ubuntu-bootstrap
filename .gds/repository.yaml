@@ -33,7 +33,7 @@ product:
       path: "tests"
 
 policy:
-  profiles: ["repository-default", "public-module", "macos-ubuntu-bootstrap"]
+  profiles: ["repository-default", "public-module"]
   rollout_ring: "standard"
 
 git:

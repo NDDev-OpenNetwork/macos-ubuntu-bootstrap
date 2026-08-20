@@ -1,0 +1,66 @@
+schema_version: 1
+
+repository:
+  id: "repo_01M0EZ7TXGSFT0CSY7D9E00CAF"
+  display_name: "macos-ubuntu-bootstrap"
+  roles: ["project", "module"]
+  lifecycle: "active"
+
+provider:
+  type: "github"
+  installation: "installation:github-opennetwork"
+  repository_id: 1335382421
+  owner: "NDDev-OpenNetwork"
+  name: "macos-ubuntu-bootstrap"
+
+classification:
+  portfolios: ["portfolio:opennetwork-projects"]
+  visibility_contract: "public"
+  data_classification: "public"
+
+product:
+  purpose: "Plan-first, verifiable macOS and Ubuntu workstation/server bootstrap adapter."
+  capabilities:
+    - "Explicit platform profiles"
+    - "Idempotent plan/apply/verify lifecycle"
+    - "Pinned artifact integrity and device receipts"
+  entrypoints:
+    - change: "Bootstrap entrypoint"
+      path: "scripts/bootstrap.sh"
+    - change: "Portable public contract"
+      path: "config/rldyour-contract.json"
+    - change: "Verification suite"
+      path: "tests"
+
+policy:
+  profiles: ["repository-default", "public-module", "macos-ubuntu-bootstrap"]
+  rollout_ring: "standard"
+
+git:
+  default_branch: "main"
+  integration: "pull-request"
+  branch_model: "task-branches"
+  handoff_pr: "preferred"
+  cleanup: "merged-only"
+
+verification:
+  commands:
+    lint: ["bash scripts/ci/lint.sh"]
+    test: [".venv/bin/python -m pytest"]
+    build: ["bash scripts/ci/validate.sh"]
+  required: ["lint", "test", "build"]
+
+agent:
+  context_profile: "project-default"
+  generated_agents: false
+  serena: {enabled: false, provenance_required: false}
+
+module:
+  contract: "public"
+  consumption: ["git-submodule"]
+  compatibility: "semver"
+  pin_policy: "version-tag"
+  publication: {registry: "none", github_release: "required"}
+
+release:
+  mode: "bundle"

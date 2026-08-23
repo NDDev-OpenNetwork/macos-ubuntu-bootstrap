@@ -3,15 +3,17 @@ Type=Application
 Name=Herdr
 GenericName=Terminal Workspace Manager
 Comment=Launch herdr terminal workspace manager for AI coding agents
-# Managed by macos-ubuntu-bootstrap: desktop-entry-herdr-v1
+# Managed by macos-ubuntu-bootstrap: desktop-entry-herdr-v2
 # Opens herdr in a new Ptyxis window. Ptyxis is the default GNOME terminal
 # on Ubuntu 26.04. The trailing exec replaces the bash process with herdr
 # so the window closes cleanly on exit.
+# The oom-guard units are started first so systemd-oomd can kill MCP/LSP
+# processes without taking the multiplexer and agent CLIs with them.
 # TryExec keeps the entry hidden where Ptyxis is absent -- Ubuntu 24.04 ships
 # GNOME Terminal and has no ptyxis package -- instead of showing a launcher
 # that starts nothing.
 TryExec=ptyxis
-Exec=ptyxis --new-window --title "Herdr" -x "bash -lc 'exec herdr'"
+Exec=ptyxis --new-window --title "Herdr" -x "bash -lc 'systemctl --user start herdr-reclaim.service herdr-oom-guard.service >/dev/null 2>&1; exec herdr'"
 Icon=utilities-terminal
 Terminal=false
 Categories=Development;

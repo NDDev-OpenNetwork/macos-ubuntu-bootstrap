@@ -65,6 +65,60 @@ rldyour::ubuntu_verify::herdr_provenance() {
   rldyour::log "ok" "Herdr exact managed Ubuntu runtime ${version} (${arch_key})"
 }
 
+rldyour::ubuntu_verify::herdr_oom_guard() {
+  local script="$HOME/.local/lib/rldyour/herdr-oom-guard.sh"
+  local unit_dir="$HOME/.config/systemd/user"
+  local unit login_home
+
+  [ -f "$script" ] && [ ! -L "$script" ] && [ -x "$script" ] || {
+    rldyour::log "missing" "Herdr oom-guard script"
+    return 1
+  }
+  grep -Fxq '# Managed by macos-ubuntu-bootstrap: herdr-oom-guard-v1' "$script" || {
+    rldyour::log "missing" "Herdr oom-guard script managed marker"
+    return 1
+  }
+  cmp -s "$REPO_ROOT/scripts/lib/herdr-oom-guard.sh" "$script" || {
+    rldyour::log "missing" "Herdr oom-guard script diverged from repository"
+    return 1
+  }
+  for unit in herdr-reclaim.service herdr-oom-guard.service; do
+    [ -f "$unit_dir/$unit" ] && [ ! -L "$unit_dir/$unit" ] || {
+      rldyour::log "missing" "Herdr oom-guard unit ${unit}"
+      return 1
+    }
+    grep -Fxq '# Managed by macos-ubuntu-bootstrap: herdr-oom-guard-unit-v1' "$unit_dir/$unit" || {
+      rldyour::log "missing" "Herdr oom-guard unit ${unit} managed marker"
+      return 1
+    }
+    cmp -s "$REPO_ROOT/templates/systemd/user/${unit}" "$unit_dir/$unit" || {
+      rldyour::log "missing" "Herdr oom-guard unit ${unit} diverged from repository"
+      return 1
+    }
+  done
+  rldyour::log "ok" "Herdr oom-guard files"
+
+  if ! command -v getent >/dev/null 2>&1 || ! command -v systemctl >/dev/null 2>&1; then
+    return 0
+  fi
+  login_home="$(getent passwd "$(id -u)" | cut -d: -f6)" || login_home=
+  if [ -z "$login_home" ] || [ "$HOME" != "$login_home" ]; then
+    return 0
+  fi
+  if [ -z "${XDG_RUNTIME_DIR:-}" ] || [ ! -S "${XDG_RUNTIME_DIR}/systemd/private" ]; then
+    return 0
+  fi
+  systemctl --user is-enabled herdr-reclaim.service >/dev/null 2>&1 || {
+    rldyour::log "missing" "herdr-reclaim.service is not enabled"
+    return 1
+  }
+  systemctl --user is-enabled herdr-oom-guard.service >/dev/null 2>&1 || {
+    rldyour::log "missing" "herdr-oom-guard.service is not enabled"
+    return 1
+  }
+  rldyour::log "ok" "Herdr oom-guard units enabled"
+}
+
 rldyour::ubuntu_verify::runtime_receipt() {
   local runtime=$1 version=$2 archive_sha256=$3 root=$4
   local receipt="$root/.rldyour-runtime-receipt" relative key expected
@@ -217,6 +271,7 @@ rldyour::ensure_path
 rldyour::section "Verify Ubuntu $PROFILE profile"
 rldyour::ubuntu_verify::tool_host_provenance
 rldyour::ubuntu_verify::herdr_provenance
+rldyour::ubuntu_verify::herdr_oom_guard
 
 # Every command this bootstrap publishes on every Ubuntu profile. A tool that is
 # installed but never verified is a tool whose failed install is invisible --

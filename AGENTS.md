@@ -45,7 +45,9 @@ enforcement this repository cannot observe.
   asset on macOS and every Ubuntu profile; `config/rldyour-contract.json` owns
   its tag, source URLs, architecture hashes, and receipt identities. Never
   substitute a downstream Homebrew formula for that exact managed artifact,
-  even when its version has caught up. Telegram is GUI-only and is installed
+  even when its version has caught up. On Ubuntu the installer also publishes
+  `herdr-oom-guard` user units so systemd-oomd can kill MCP/LSP children
+  without taking the multiplexer. Telegram is GUI-only and is installed
   on supported Linux architectures.
 
 ## Implementation rules

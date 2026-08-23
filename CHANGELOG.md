@@ -7,6 +7,19 @@ remains available in immutable Git tags.
 
 ### Added
 
+- Ubuntu Herdr is isolated from systemd-oomd. Ptyxis launches the multiplexer
+  in one transient scope, so a memory-pressure kill previously took every agent
+  pane, MCP server and language server with it. Bootstrap now installs
+  `herdr-reclaim.service` plus `herdr-oom-guard.service`: the guard moves MCP/LSP
+  processes into the reclaim cgroup, marks the Herdr unit
+  `ManagedOOMPreference=omit`, and SIGKILLs the reclaim cgroup when user-session
+  PSI crosses 25% for ~9s. cgroup v2 does not migrate existing memory charges,
+  so systemd-oomd would not pick the reclaim unit on its own. systemd enable is
+  skipped when `HOME` is not the login home so installer tests cannot touch the
+  live user systemd.
+
+### Added
+
 - An ADR that names a test as its enforcement must name one that exists. ADR 0008
   now cites `test_no_script_grants_docker_group_membership` in place of the
   contract key nothing read — an improvement only while the name resolves, since

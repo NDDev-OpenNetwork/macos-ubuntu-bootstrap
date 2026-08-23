@@ -581,6 +581,42 @@ install_desktop_entries() {
   done
 }
 
+# Isolate Herdr from systemd-oomd. MCP/LSP children of a Ptyxis-launched
+# multiplexer share one leaf cgroup; oomd kills that whole scope. Publish a
+# sibling reclaim unit and a guard that moves those children there, then mark
+# the Herdr unit ManagedOOMPreference=omit. Enable is skipped when HOME is not
+# the login home so installer tests cannot talk to the live user systemd.
+rldyour::ubuntu::install_herdr_oom_guard() {
+  local script_src="$REPO_ROOT/scripts/lib/herdr-oom-guard.sh"
+  local script_dst="$HOME/.local/lib/rldyour/herdr-oom-guard.sh"
+  local unit_src="$REPO_ROOT/templates/systemd/user"
+  local unit_dst="$HOME/.config/systemd/user"
+  local script_marker="# Managed by macos-ubuntu-bootstrap: herdr-oom-guard-v1"
+  local unit_marker="# Managed by macos-ubuntu-bootstrap: herdr-oom-guard-unit-v1"
+  local login_home
+
+  rldyour::install_managed_file "$script_dst" "$script_marker" 0755 <"$script_src" || return 1
+  rldyour::install_managed_file "$unit_dst/herdr-reclaim.service" "$unit_marker" 0644 <"$unit_src/herdr-reclaim.service" || return 1
+  rldyour::install_managed_file "$unit_dst/herdr-oom-guard.service" "$unit_marker" 0644 <"$unit_src/herdr-oom-guard.service" || return 1
+
+  [ "${RLDYOUR_DRY_RUN:-1}" -eq 0 ] || return 0
+  if ! command -v getent >/dev/null 2>&1 || ! command -v systemctl >/dev/null 2>&1; then
+    rldyour::log "info" "herdr oom-guard files installed; systemd enable skipped (tools absent)"
+    return 0
+  fi
+  login_home="$(getent passwd "$(id -u)" | cut -d: -f6)" || login_home=
+  if [ -z "$login_home" ] || [ "$HOME" != "$login_home" ]; then
+    rldyour::log "info" "herdr oom-guard units installed; systemd enable skipped (HOME is not the login home)"
+    return 0
+  fi
+  if [ -z "${XDG_RUNTIME_DIR:-}" ] || [ ! -S "${XDG_RUNTIME_DIR}/systemd/private" ]; then
+    rldyour::log "info" "herdr oom-guard units installed; systemd user session is not available to enable them"
+    return 0
+  fi
+  systemctl --user daemon-reload || return 1
+  systemctl --user enable --now herdr-reclaim.service herdr-oom-guard.service
+}
+
 # v1/v2 used the generic telegram.desktop filename, while Telegram itself sets
 # QGuiApplication::desktopFileName to org.telegram.desktop when the updater is
 # disabled. Retire only our marker-owned legacy entry so the desktop file ID,
@@ -1708,6 +1744,9 @@ main() {
   # Herdr is useful locally and over SSH, so it is installed on every profile.
   # Telegram and desktop integration remain GUI-only.
   if ! install_user_tools; then
+    user_tools_failed=1
+  fi
+  if ! rldyour::ubuntu::install_herdr_oom_guard; then
     user_tools_failed=1
   fi
   if [ "$GUI_ENABLED" -eq 1 ]; then

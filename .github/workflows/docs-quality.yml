@@ -26,10 +26,23 @@ jobs:
       # pinned commit, not here. A wrong value does not fail loudly either:
       # a job asking for a label no runner advertises queues indefinitely.
       runner: ubuntu-latest
-      # Broken-link detection (lychee). Exclude openai.com: its marketing pages
-      # return 403 to link-checkers (bot-blocked) — a false positive, valid in a
-      # browser.
-      lychee_args: '--no-progress --max-concurrency 8 --exclude "openai\.com" "**/*.md"'
+      # Broken-link detection (lychee). Two accepted non-2xx answers, both cases
+      # where the server replied and the link is fine:
+      #
+      #   openai.com  403 to link-checkers (bot-blocked), valid in a browser — excluded
+      #   429         rate limiting, which says nothing about the link
+      #
+      # documentation.ubuntu.com returns 429 to GitHub-hosted runner IPs and does
+      # so repeatably: a rerun of the same job failed identically. It cannot be
+      # reproduced from a developer machine, so the check fails only in CI, on
+      # documentation nobody touched. Retries do not help against an IP-scoped
+      # limit; accepting 429 does, and costs nothing real — a 429 is the server
+      # answering, so it never proved the link broken in the first place.
+      #
+      # Verified against lychee 0.24.2, the version lychee-action v2.9.0 pins,
+      # that a genuine 404 is still reported with this exact argument string.
+      # Concurrency dropped 8 -> 4 to stop provoking the limit in the first place.
+      lychee_args: '--no-progress --max-concurrency 4 --max-retries 4 --retry-wait-time 3 --accept "200..=299, 429" --exclude "openai\.com" "**/*.md"'
       # Spell-check and markdown-lint are disabled: `typos` scans the whole repo
       # and flags project identifiers as misspellings (the NDDev brand, hex
       # SHA-256 fragments), and default markdownlint rules (e.g. line length) are

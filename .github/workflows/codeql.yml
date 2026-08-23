@@ -1,18 +1,20 @@
-# INERT — this workflow does not run. CodeQL *default setup* owns code scanning
-# for this repository (configured 2026-07-31 for `actions` and `python`), and
-# enabling it disabled this advanced-setup workflow: the platform reports
-# `state: disabled_manually` for this file. Its last run was 2026-07-03 and
-# every recorded run failed.
+# Advanced setup owns code scanning for this repository. CodeQL *default setup*
+# is `not-configured` here and this workflow is `active`; every analysis on
+# record was produced by this file.
 #
-# It is kept, not deleted, because default setup cannot express a pinned
-# reusable caller and switching back is a one-setting change. Nothing here can
-# tell you the file is disabled — check
-# `GET /repos/{owner}/{repo}/actions/workflows` before assuming a committed
-# workflow runs. Re-enabling it means disabling default setup first: attachment
-# is atomic, and forcing default setup onto a repository with an active
-# advanced setup fails the whole attachment.
+# It used to say the opposite. On the archived `NDDev-it-com` repository default
+# setup did own scanning, from 2026-07-31, and this file was disabled. The header
+# moved here with the republication and kept asserting it, so a reader was told
+# the only thing scanning the repository does nothing — and was told to disable
+# a default setup that does not exist before touching it. Verify with
+# `GET /repos/{owner}/{repo}/code-scanning/default-setup` and
+# `GET /repos/{owner}/{repo}/actions/workflows` rather than trusting this header;
+# that is how the contradiction was found.
 #
-# Exactly one CodeQL mode is intended at a time. The current mode is `default`.
+# Exactly one CodeQL mode is intended at a time. The current mode is `advanced`.
+# Attachment is atomic: forcing default setup onto a repository with an active
+# advanced setup fails the whole attachment, so switching means disabling this
+# workflow first.
 name: codeql-analysis
 
 on:
@@ -33,7 +35,7 @@ concurrency:
 
 jobs:
   analyze:
-    name: codeql-analysis-actions
+    name: codeql-analysis
     permissions:
       actions: read
       contents: read
@@ -45,4 +47,8 @@ jobs:
       # not to this repository, so inheriting it would let a pin bump move fork
       # PRs onto trusted private infrastructure with no diff here to review.
       runner: ubuntu-latest
-      languages: '["actions"]'
+      # Python is 61.7% of this repository by bytes and went unscanned from the
+      # republication until 2026-08-23, because only `actions` was listed here
+      # while the header claimed a default setup covering `actions` and `python`
+      # was in charge. Both halves of that are now true in one place.
+      languages: '["actions","python"]'

@@ -91,6 +91,7 @@ require_file "$REPO_ROOT/scripts/ubuntu/verify.sh"
 require_file "$REPO_ROOT/scripts/ubuntu/verify-server.sh"
 
 python3 "$REPO_ROOT/scripts/support_evidence.py" validate
+python3 "$REPO_ROOT/scripts/ci/check_reusable_workflow_pins.py"
 
 bash "$REPO_ROOT/scripts/ci/lint.sh"
 

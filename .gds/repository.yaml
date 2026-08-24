@@ -49,6 +49,12 @@ verification:
     test: [".venv/bin/python -m pytest"]
     build: ["bash scripts/ci/validate.sh"]
   required: ["lint", "test", "build"]
+  required_contexts:
+    - "Dependency pin checks"
+    - "Gitleaks secret scan / Gitleaks secret scan"
+    - "bootstrap-gate"
+    - "bootstrap-pytests / python (3.14)"
+    - "dependency-review / Dependency review"
 
 agent:
   context_profile: "project-default"

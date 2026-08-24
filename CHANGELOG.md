@@ -5,8 +5,12 @@ Versioning; the contract version in `config/rldyour-contract.json` moves with it
 
 ## [Unreleased]
 
+## [0.1.2] - 2026-08-25
+
 ### Fixed
 
+- Refreshed the Anthropic-hosted Claude Code installer digest after two
+  independent official-source downloads produced identical new bytes.
 - Replaced twelve untagged reusable-workflow pins falsely labeled `0.13.3`
   with the signed public `0.1.3` release commit, and added an offline registry
   validator that rejects mismatched SHA/version comments and undeclared pins.

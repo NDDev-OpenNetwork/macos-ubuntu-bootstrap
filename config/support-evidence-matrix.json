@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "adapter_version": "0.1.1",
+  "adapter_version": "0.1.2",
   "verified_on": "2026-08-13",
   "expected_hosted_artifact_instances": 21,
   "status_vocabulary": [
@@ -376,7 +376,7 @@
         "noninteractive-passwordless-sudo"
       ],
       "support": "UNSUPPORTED_FAIL_CLOSED",
-      "reason": "contract 0.1.1 supports Apple Silicon only"
+      "reason": "contract 0.1.2 supports Apple Silicon only"
     },
     {
       "id": "full-apply-as-root",

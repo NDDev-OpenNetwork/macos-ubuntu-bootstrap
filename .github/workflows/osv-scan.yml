@@ -39,6 +39,6 @@ jobs:
       # `config/rldyour-contract.json`. The provider downloads
       # `osv-scanner_linux_amd64`, which is the asset the contract's x64 digest
       # covers, so the value transfers exactly rather than by resemblance.
-      osv_scanner_version: '2.5.0'
-      osv_scanner_sha256: 'edcfc41d257db36148f065055655fe3fcfc434b0b423ea67468a84c207524e0c'
+      osv_scanner_version: '2.5.1'
+      osv_scanner_sha256: 'f9f25499a2c8cc367b3af45df2ea7eeca7fbccceab9c35079968f4b3652194be'
       scan_args: '--recursive .'

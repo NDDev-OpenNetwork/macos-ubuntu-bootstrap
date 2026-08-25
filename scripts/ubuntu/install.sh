@@ -150,7 +150,7 @@ PINNED_SOURCE_TOOLS=(
   # Reproduce the estate's CI checks locally: these four are exactly what the
   # gitleaks, OSV, actionlint, and hadolint workflows run.
   "gitleaks;8.30.1;tar0;gitleaks;gitleaks;gitleaks;551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb;e4a487ee7ccd7d3a7f7ec08657610aa3606637dab924210b3aee62570fb4b080;https://github.com/gitleaks/gitleaks/releases/download/v8.30.1/gitleaks_8.30.1_linux_x64.tar.gz;https://github.com/gitleaks/gitleaks/releases/download/v8.30.1/gitleaks_8.30.1_linux_arm64.tar.gz"
-  "osv-scanner;2.5.0;raw;osv-scanner;osv-scanner;osv-scanner;edcfc41d257db36148f065055655fe3fcfc434b0b423ea67468a84c207524e0c;fe152e1a546af223e6c557cc3111a8bb3e5dc02fcbf7dbe95d26567c0f0041f2;https://github.com/google/osv-scanner/releases/download/v2.5.0/osv-scanner_linux_amd64;https://github.com/google/osv-scanner/releases/download/v2.5.0/osv-scanner_linux_arm64"
+  "osv-scanner;2.5.1;raw;osv-scanner;osv-scanner;osv-scanner;f9f25499a2c8cc367b3af45df2ea7eeca7fbccceab9c35079968f4b3652194be;3d0f5aa5a6baa8eb32bcef247388e149ef6030a6634ccae6fa0d62681fb27a6d;https://github.com/google/osv-scanner/releases/download/v2.5.1/osv-scanner_linux_amd64;https://github.com/google/osv-scanner/releases/download/v2.5.1/osv-scanner_linux_arm64"
   "actionlint;1.7.12;tar0;actionlint;actionlint;actionlint;8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8;325e971b6ba9bfa504672e29be93c24981eeb1c07576d730e9f7c8805afff0c6;https://github.com/rhysd/actionlint/releases/download/v1.7.12/actionlint_1.7.12_linux_amd64.tar.gz;https://github.com/rhysd/actionlint/releases/download/v1.7.12/actionlint_1.7.12_linux_arm64.tar.gz"
   "hadolint;2.15.1;raw;hadolint;hadolint;hadolint;c7187db94eeeeca956519a6af171adc31453941a1e777961f6e680f697c8c507;f6198ef8090f404dbb771abfee086eb8c48ac177f30da7fd3510aca35b344b5d;https://github.com/hadolint/hadolint/releases/download/v2.15.1/hadolint-linux-x86_64;https://github.com/hadolint/hadolint/releases/download/v2.15.1/hadolint-linux-arm64"
   # Markdown language server. Ubuntu uses markdown-oxide rather than macOS's
@@ -161,11 +161,11 @@ PINNED_SOURCE_TOOLS=(
   # both platforms, but Ubuntu never installed it, so the call silently skipped
   # on every Linux desktop.
   "delta;0.19.2;tar1;delta;delta;delta;8e695c5f586a8c53d6c3b01be0b4a422ed218bfed2a56191caebe373a1c18ab2;0bfce159a5cddd5feb3d6db4a616d883ff51253ce08ac7ec11cb1d208cfaab9e;https://github.com/dandavison/delta/releases/download/0.19.2/delta-0.19.2-x86_64-unknown-linux-gnu.tar.gz;https://github.com/dandavison/delta/releases/download/0.19.2/delta-0.19.2-aarch64-unknown-linux-gnu.tar.gz"
-  "yq;4.53.3;tar0;yq_linux_amd64;yq_linux_arm64;yq;b4077cab0f9ee5ce8381e602d090daa69a0afb7e57eb9a5b20e9cb416d7f6794;42600522e7455282e11c71c9fc62dc8e98b05bcdb830210fe16eb673a871e866;https://github.com/mikefarah/yq/releases/download/v4.53.3/yq_linux_amd64.tar.gz;https://github.com/mikefarah/yq/releases/download/v4.53.3/yq_linux_arm64.tar.gz"
+  "yq;4.53.6;tar0;yq_linux_amd64;yq_linux_arm64;yq;38b907b21b1b04327fb9481c595331d925a67c6ee1aabd0ef419d0b7d12dfb3d;d5e7531273d45c5d4b7abb4a1597c47a0fecb5d6b081dfa755064b38ffcc34f4;https://github.com/mikefarah/yq/releases/download/v4.53.6/yq_linux_amd64.tar.gz;https://github.com/mikefarah/yq/releases/download/v4.53.6/yq_linux_arm64.tar.gz"
   # The archive also ships an `sg` shim. It is not published: upstream prints a
   # deprecation banner and exits non-zero, and on a host that has util-linux it
   # would shadow the setgid `sg`.
-  "ast-grep;0.45.1;zip;ast-grep;ast-grep;ast-grep;76fb6555be6734fb5057dba8d2fb756430f374bb9e1af694cf1ce00e13238d63;9ee7ec49aada3dc05135d21977af089a33fc3154ada25bab102daca90b5098f2;https://github.com/ast-grep/ast-grep/releases/download/0.45.1/app-x86_64-unknown-linux-gnu.zip;https://github.com/ast-grep/ast-grep/releases/download/0.45.1/app-aarch64-unknown-linux-gnu.zip"
+  "ast-grep;0.45.2;zip;ast-grep;ast-grep;ast-grep;67aff72dd2994bf152fcc3a8a09cf93b13193abe59f39393095167c729af2015;e67ee2f5928b4d77a472114edf6e227d90fefe22fa47e7a78db187c55d206564;https://github.com/ast-grep/ast-grep/releases/download/0.45.2/app-x86_64-unknown-linux-gnu.zip;https://github.com/ast-grep/ast-grep/releases/download/0.45.2/app-aarch64-unknown-linux-gnu.zip"
   # Command runner used across the estate's repositories. Ubuntu 26.04 ships
   # 1.45.0 against upstream 1.58.0; a justfile written against a newer feature
   # would fail on the distribution build, so the recipe runner is pinned like
@@ -205,7 +205,7 @@ PINNED_SOURCE_TOOLS=(
 # architecture hashes live in config/rldyour-contract.json and parity tests bind
 # this shell row to them; installation never resolves mutable `latest` state.
 USER_TOOLS=(
-  "herdr;0.8.0;raw;herdr;herdr;herdr;b872ea7e40fa2cb17e857ac9b62b1bf26db7b403c622f5d2f3f5b35f6e9acd28;f647ac66468d9efbc642fe534fb284468f0aea60641606fc008dfc0d82a3ca87;https://github.com/herdrdev/herdr/releases/download/v0.8.0/herdr-linux-x86_64;https://github.com/herdrdev/herdr/releases/download/v0.8.0/herdr-linux-aarch64"
+  "herdr;0.8.2;raw;herdr;herdr;herdr;976150a14d490c94b243ea2e1a7eb2dfb67f12e36b182db90936f6728e6aecf4;f55610658e1c2e0d2aaef730b4b2ab885f7f8ba00285ab372bfb14f2e3d5b40d;https://github.com/herdrdev/herdr/releases/download/v0.8.2/herdr-linux-x86_64;https://github.com/herdrdev/herdr/releases/download/v0.8.2/herdr-linux-aarch64"
   # Telegram Desktop official portable build. Only Telegram/Telegram is
   # published. The binary also has an internal updater, disabled separately by
   # install_telegram_update_policy so it cannot mutate this receipt-bound tree.
@@ -213,10 +213,10 @@ USER_TOOLS=(
   # digest and URL are deliberately empty and the row is skipped there. They
   # used to hold the x86_64 values, which meant an arm64 desktop verified the
   # SHA-256 of an executable it could not run.
-  "telegram;7.0.9;tarx;Telegram/Telegram;Telegram/Telegram;telegram-desktop;d3c05df0259ab116d11d8c1cdc1403019d2a3be303ad3b46d16a84e19df6615f;;https://github.com/telegramdesktop/tdesktop/releases/download/v7.0.9/tsetup.7.0.9.tar.xz;"
+  "telegram;7.1.2;tarx;Telegram/Telegram;Telegram/Telegram;telegram-desktop;0a62f115eeeebd23215461e496a046095c46c9c3d17884f5422148a23f41fe9d;;https://github.com/telegramdesktop/tdesktop/releases/download/v7.1.2/tsetup.7.1.2.tar.xz;"
 )
 
-# Telegram v7.0.9 commit a1e89e1f installs these four files from
+# The reviewed Telegram release installs these four files from
 # InstallLauncher(). Our externalupdater.d policy intentionally makes that
 # function return before it writes anything, so bootstrap must publish the
 # exact upstream assets itself. Rows are source_url;sha256;path under
@@ -448,7 +448,7 @@ rldyour::ubuntu::install_telegram_update_policy() {
 
 # Install the application and symbolic tray icons that Telegram normally
 # publishes from InstallLauncher(). The updater-disabled build deliberately
-# skips that function, so each upstream asset is pinned to the v7.0.9 source
+# skips that function, so each upstream asset is pinned to the reviewed source
 # commit and verified before atomic publication. Divergent local icons are
 # preserved and fail closed instead of being overwritten.
 rldyour::ubuntu::install_telegram_desktop_assets() {
@@ -476,7 +476,7 @@ rldyour::ubuntu::install_telegram_desktop_assets() {
       if [ "$RLDYOUR_DRY_RUN" -eq 0 ]; then
         chmod 0644 "$target" || return 1
       fi
-      rldyour::log "ok" "$(basename "$target") already matches Telegram v7.0.9"
+      rldyour::log "ok" "$(basename "$target") already matches Telegram 7.1.2"
       continue
     fi
 

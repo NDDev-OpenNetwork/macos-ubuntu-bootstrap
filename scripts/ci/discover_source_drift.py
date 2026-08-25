@@ -78,7 +78,12 @@ TIMEOUT_SECONDS = 30
 
 # A pin whose current value is intentionally held rather than stale. Each entry
 # states why, so a held pin reads as a decision instead of an oversight.
-INTENTIONAL_HOLDS: dict[str, str] = {}
+INTENTIONAL_HOLDS: dict[str, str] = {
+    "bun": "1.4 is a major runtime transition pending installer and language-server qualification",
+    "go": "1.27 is a major toolchain transition pending module and cross-architecture qualification",
+    "rust": "1.98 requires a new dated rustup manifest and both architecture hashes",
+    "dart": "3.13.2 requires both official SDK archive hashes",
+}
 
 # How many sources may be unreachable before the run stops being evidence.
 # Two tolerates the transient rate limit this script was already careful about;

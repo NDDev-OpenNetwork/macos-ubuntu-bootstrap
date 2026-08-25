@@ -1038,7 +1038,8 @@ rldyour::ubuntu_server::canonicalize_cidr() {
 import ipaddress
 import sys
 
-print(ipaddress.ip_network(sys.argv[1], strict=False))
+network = ipaddress.ip_network(sys.argv[1], strict=False)
+print(network.network_address if network.prefixlen == network.max_prefixlen else network)
 PY
 }
 
@@ -1397,7 +1398,7 @@ PY
   fi
   rldyour::ubuntu_server::validate_port "$local_port" >&2 || return 1
   use_dns=$(rldyour::ubuntu_server::probe_as_root sshd -T 2>/dev/null |
-    awk '$1 == "usedns" { print $2; exit }') || {
+    awk '$1 == "usedns" && !found { value = $2; found = 1 } END { if (found) print value; else exit 1 }') || {
       rldyour::log "error" "cannot read OpenSSH UseDNS policy for Match validation" >&2
       return 1
     }

@@ -1,0 +1,68 @@
+{
+  "schema_version": 1,
+  "source": {
+    "repository": "NDDev-OpenNetwork/macos-ubuntu-bootstrap",
+    "commit": "2d9a0ca37808b5f9f97ceb5e2604d2e51681736b"
+  },
+  "composition": {
+    "platform": "ubuntu",
+    "release": "26.04",
+    "architecture": "amd64",
+    "profile": "server",
+    "docker_mode": "rootful",
+    "gui": false,
+    "host_class": "disposable_vm"
+  },
+  "result": "success",
+  "observed": [
+    "plan_completed_without_prompt",
+    "strict_apply_completed",
+    "second_apply_completed_idempotently",
+    "initiating_ssh_connection_survived_hardening",
+    "second_key_authenticated_connection_succeeded",
+    "new_root_ssh_login_was_rejected",
+    "external_ssh_port_was_reachable",
+    "docker_tcp_ports_2375_and_2376_were_closed",
+    "ufw_was_active_with_source_restricted_ssh",
+    "reboot_completed",
+    "ssh_docker_containerd_and_fail2ban_recovered_after_reboot",
+    "strict_server_verification_passed_after_reboot",
+    "device_integrity_receipt_was_proven"
+  ],
+  "defects_exposed_and_fixed": [
+    "sshd_effective_config_probe_could_fail_under_pipefail_when_awk_closed_the_pipe_early",
+    "ufw_renders_single_host_cidrs_without_the_32_or_128_suffix"
+  ],
+  "not_proven": [
+    {
+      "capability": "ubuntu_desktop_gui_launch",
+      "status": "NOT_PROVEN",
+      "reason": "server profile is headless"
+    },
+    {
+      "capability": "ubuntu_policykit_gui_authorization",
+      "status": "NOT_PROVEN",
+      "reason": "server profile used the non-interactive sudo path"
+    },
+    {
+      "capability": "ubuntu_arm64_vendor_gui_fail_closed",
+      "status": "NOT_PROVEN",
+      "reason": "host architecture was amd64"
+    },
+    {
+      "capability": "macos_launchd_and_gui_persistence",
+      "status": "NOT_PROVEN",
+      "reason": "no disposable macOS host was available"
+    },
+    {
+      "capability": "docker_published_port_ufw_filtering",
+      "status": "NOT_PROVEN",
+      "reason": "no application port was published; the known Docker and UFW boundary was recorded without claiming filtering"
+    }
+  ],
+  "redaction": {
+    "credentials_included": false,
+    "host_identifiers_included": false,
+    "network_addresses_included": false
+  }
+}

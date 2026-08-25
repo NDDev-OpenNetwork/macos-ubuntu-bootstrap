@@ -1011,26 +1011,17 @@ rldyour::ubuntu_server::ufw_status_has_ssh_rule() {
   local status=$1
   local port=$2
   local allow_cidr=${3:-}
-  local allow_display=
   local line
 
   if [ -n "$allow_cidr" ]; then
     allow_cidr=$(rldyour::ubuntu_server::canonicalize_cidr "$allow_cidr") || return 1
-    allow_display=$(/usr/bin/env -i PATH=/usr/sbin:/usr/bin:/sbin:/bin /usr/bin/python3 -I - "$allow_cidr" <<'PY'
-import ipaddress
-import sys
-
-network = ipaddress.ip_network(sys.argv[1], strict=False)
-print(network.network_address if network.prefixlen == network.max_prefixlen else network)
-PY
-    ) || return 1
   fi
 
   while IFS= read -r line; do
     if grep -Eq "(^|[[:space:]])${port}(/tcp)?([[:space:]]|$)" <<<"$line" &&
       grep -Eq '(^|[[:space:]])ALLOW([[:space:]]|$)' <<<"$line"; then
       if { [ -z "$allow_cidr" ] && grep -Fq 'Anywhere' <<<"$line"; } ||
-        { [ -n "$allow_cidr" ] && grep -Fq "$allow_display" <<<"$line"; }; then
+        { [ -n "$allow_cidr" ] && grep -Fq "$allow_cidr" <<<"$line"; }; then
         return 0
       fi
     fi
@@ -1047,7 +1038,8 @@ rldyour::ubuntu_server::canonicalize_cidr() {
 import ipaddress
 import sys
 
-print(ipaddress.ip_network(sys.argv[1], strict=False))
+network = ipaddress.ip_network(sys.argv[1], strict=False)
+print(network.network_address if network.prefixlen == network.max_prefixlen else network)
 PY
 }
 

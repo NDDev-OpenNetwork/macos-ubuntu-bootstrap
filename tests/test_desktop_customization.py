@@ -206,8 +206,6 @@ CONTRACT = ROOT / "config/rldyour-contract.json"
 
 
 def _chrome_contract() -> dict:
-    import json
-
     apps = json.loads(CONTRACT.read_text(encoding="utf-8"))["ubuntu_apt_packages"][
         "desktop_apps"
     ]

@@ -682,6 +682,7 @@ def run_owned(
     leader_exit_at: float | None = None
     residuals: list[str] = list(spawn_close_errors)
     caught_primary: BaseException | None = None
+    returncode: int | None = None
 
     def close_registered(key: selectors.SelectorKey) -> None:
         nonlocal readiness_fd
@@ -829,6 +830,8 @@ def run_owned(
         _raise_owned_failure(failure, residuals)
     if residuals:
         _raise_owned_failure("owned process cleanup failed", residuals)
+    if returncode is None:
+        raise HarnessError("owned process completed without a wait status")
     try:
         stdout = bytes(buffers["stdout"]).decode("utf-8")
         stderr = bytes(buffers["stderr"]).decode("utf-8")

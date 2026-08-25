@@ -60,6 +60,21 @@ def test_ssh_match_context_contains_full_connection_tuple() -> None:
     )
 
 
+def test_ssh_match_context_consumes_complete_sshd_output() -> None:
+    result = run_server_function(
+        "rldyour::ubuntu_server::probe_as_root() { "
+        "printf 'usedns no\\n'; "
+        "for ((line = 0; line < 10000; line++)); do printf 'unused value\\n'; done; }\n"
+        "rldyour::ubuntu_server::ssh_match_context deploy 2222",
+        env={"SSH_CONNECTION": "198.51.100.8 50123 203.0.113.10 2222"},
+    )
+    assert result.returncode == 0, result.stderr + result.stdout
+    assert result.stdout.strip() == (
+        "user=deploy,host=198.51.100.8,addr=198.51.100.8,"
+        "laddr=203.0.113.10,lport=2222"
+    )
+
+
 def test_ufw_cidr_must_cover_live_operator_or_have_console_confirmation(tmp_path: Path) -> None:
     inside = run_server_function(
         "rldyour::ubuntu_server::validate_ufw_operator_source 198.51.100.0/24",
@@ -85,6 +100,12 @@ def test_ufw_cidr_must_cover_live_operator_or_have_console_confirmation(tmp_path
         "rldyour::ubuntu_server::ufw_status_has_ssh_rule \"$status\" 22 192.168.1.5/24"
     )
     assert canonical_status.returncode == 0, canonical_status.stderr + canonical_status.stdout
+
+    host_status = run_server_function(
+        "status='22/tcp ALLOW 2.72.234.124'\n"
+        "rldyour::ubuntu_server::ufw_status_has_ssh_rule \"$status\" 22 2.72.234.124/32"
+    )
+    assert host_status.returncode == 0, host_status.stderr + host_status.stdout
 
     invalid = run_server_function(
         "rldyour::ubuntu_server::validate_ufw_operator_source not-a-cidr",

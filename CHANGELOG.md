@@ -5,6 +5,10 @@ Versioning; the contract version in `config/rldyour-contract.json` moves with it
 
 ## [Unreleased]
 
+- Refreshed verified official-source pins for Codex, Homebrew.pkg, Herdr,
+  Telegram, OSV Scanner, yq and ast-grep; recorded explicit evidence holds for
+  Bun, Go, Rust and Dart transitions that still lack complete platform hashes.
+
 ## [0.1.2] - 2026-08-25
 
 ### Fixed

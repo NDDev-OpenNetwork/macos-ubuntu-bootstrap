@@ -2,7 +2,7 @@
   "schema_version": 1,
   "source": {
     "repository": "NDDev-OpenNetwork/macos-ubuntu-bootstrap",
-    "commit": "6800fcccdc311b9e6e34745836d45603a67120fd"
+    "commit": "2d9a0ca37808b5f9f97ceb5e2604d2e51681736b"
   },
   "composition": {
     "platform": "ubuntu",

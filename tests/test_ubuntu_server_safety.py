@@ -1,3 +1,4 @@
+import json
 import re
 import os
 import subprocess
@@ -251,6 +252,35 @@ def test_server_contract_contains_rollback_and_context_guards() -> None:
     assert "/usr/bin/sudo" not in installer and "/usr/bin/pkexec" not in installer
     assert "sudo apt-get" not in installer
     assert "sudo install" not in installer
+
+
+def test_real_host_evidence_records_docker_ufw_boundary_without_overclaim() -> None:
+    evidence = json.loads(
+        (ROOT / "evidence/real-host/ubuntu-26.04-amd64-docker-ufw-d33e73d.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    assert evidence["result"] == "proven-exposed-boundary"
+    assert evidence["boundary"]["ordinary_ufw_input_rules_filter_docker_published_ports"] is False
+    assert evidence["boundary"]["external_http_before_explicit_ufw_deny"] == 200
+    assert evidence["boundary"]["external_http_after_explicit_ufw_deny"] == 200
+    assert evidence["teardown"] == {
+        "container_host_deleted": True,
+        "cloud_host_readback": "not-found",
+        "ephemeral_cloud_key_deleted": True,
+        "cloud_key_readback": "not-found",
+        "tagged_disposable_hosts_remaining": 0,
+        "local_private_key_deleted": True,
+        "local_public_key_deleted": True,
+    }
+    assert evidence["redaction"] == {
+        "credentials_included": False,
+        "host_identifiers_included": False,
+        "network_addresses_included": False,
+    }
+
+    verifier = (ROOT / "scripts/ubuntu/verify-server.sh").read_text(encoding="utf-8")
+    assert "UFW status does not prove Docker-published ports are filtered" in verifier
 
 
 def test_ssh_activation_plan_does_not_require_preinstalled_units() -> None:

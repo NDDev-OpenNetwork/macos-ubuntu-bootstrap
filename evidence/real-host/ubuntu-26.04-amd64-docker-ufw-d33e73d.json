@@ -1,0 +1,65 @@
+{
+  "schema_version": 1,
+  "source": {
+    "repository": "NDDev-OpenNetwork/macos-ubuntu-bootstrap",
+    "commit": "d33e73d97b3704357a8722298016c467e9a9ff6d"
+  },
+  "composition": {
+    "platform": "ubuntu",
+    "release": "26.04",
+    "architecture": "amd64",
+    "profile": "server",
+    "docker_mode": "rootful",
+    "docker_version": "29.7.2",
+    "gui": false,
+    "host_class": "disposable_vm"
+  },
+  "result": "proven-exposed-boundary",
+  "observed": [
+    "plan_completed_without_prompt",
+    "strict_apply_completed",
+    "second_apply_completed_idempotently",
+    "second_key_authenticated_connection_succeeded",
+    "new_root_ssh_login_was_rejected",
+    "ufw_default_incoming_policy_was_deny",
+    "ufw_allowed_only_ssh_before_application_test",
+    "scratch_container_served_http_on_a_docker_published_port",
+    "published_port_was_externally_reachable_without_a_ufw_allow_rule",
+    "published_port_remained_externally_reachable_after_an_explicit_ufw_deny_rule",
+    "strict_server_verification_warned_that_ufw_does_not_prove_docker_port_filtering"
+  ],
+  "boundary": {
+    "ordinary_ufw_input_rules_filter_docker_published_ports": false,
+    "external_http_before_explicit_ufw_deny": 200,
+    "external_http_after_explicit_ufw_deny": 200,
+    "container_response_verified": true,
+    "docker_api_tcp_2375_2376_closed": true,
+    "application_exposure_owner": "deployment-specific firewall or reverse-proxy policy"
+  },
+  "teardown": {
+    "container_host_deleted": true,
+    "cloud_host_readback": "not-found",
+    "ephemeral_cloud_key_deleted": true,
+    "cloud_key_readback": "not-found",
+    "tagged_disposable_hosts_remaining": 0,
+    "local_private_key_deleted": true,
+    "local_public_key_deleted": true
+  },
+  "not_proven": [
+    {
+      "capability": "ubuntu_desktop_gui_launch_and_policykit",
+      "status": "NOT_PROVEN",
+      "reason": "server profile is headless"
+    },
+    {
+      "capability": "macos_launchd_gui_and_reboot_persistence",
+      "status": "NOT_PROVEN",
+      "reason": "no disposable reboot-capable macOS connector was available"
+    }
+  ],
+  "redaction": {
+    "credentials_included": false,
+    "host_identifiers_included": false,
+    "network_addresses_included": false
+  }
+}

@@ -276,6 +276,28 @@ rldyour::ubuntu_server::stop_new_rootful_units_after_rootless_ready
     ]
 
 
+def test_rootless_cutover_waits_for_runtime_state_to_converge() -> None:
+    result = run_server_function(
+        """
+RLDYOUR_SERVER_ROOTLESS_PREFLIGHT_STATE=clean
+RLDYOUR_SERVER_ROOTFUL_PREEXISTED=0
+rldyour::ubuntu_server::docker_rootless_daemon_ready() { return 0; }
+rldyour::ubuntu_server::system_unit_owned_by_package() { return 0; }
+rldyour::ubuntu_server::rootful_workloads_absent() { return 0; }
+runtime_checks=0
+rldyour::ubuntu_server::docker_rootful_runtime_active() {
+  runtime_checks=$((runtime_checks + 1))
+  [ "$runtime_checks" -lt 3 ]
+}
+rldyour::ubuntu_server::as_root() { :; }
+sleep() { :; }
+rldyour::ubuntu_server::stop_new_rootful_units_after_rootless_ready
+"""
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert "disabled only rootful units" in result.stdout
+
+
 def test_real_host_evidence_records_docker_ufw_boundary_without_overclaim() -> None:
     evidence = json.loads(
         (ROOT / "evidence/real-host/ubuntu-26.04-amd64-docker-ufw-d33e73d.json").read_text(

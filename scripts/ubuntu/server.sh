@@ -711,6 +711,15 @@ rldyour::ubuntu_server::docker_rootful_runtime_active() {
   return 1
 }
 
+rldyour::ubuntu_server::describe_rootful_runtime_state() {
+  rldyour::log "error" "rootful unit states: docker.service=$(systemctl is-active docker.service 2>/dev/null || true), docker.socket=$(systemctl is-active docker.socket 2>/dev/null || true), containerd.service=$(systemctl is-active containerd.service 2>/dev/null || true)"
+  rldyour::log "error" "rootful sockets: /run/docker.sock=$([ -S /run/docker.sock ] && printf present || printf absent), /var/run/docker.sock=$([ -S /var/run/docker.sock ] && printf present || printf absent)"
+  if command -v ps >/dev/null 2>&1; then
+    ps -eo uid=,pid=,comm=,args= 2>/dev/null |
+      awk '$1 == 0 && ($3 == "dockerd" || $3 == "containerd") { print "rootful process: " $0 }' >&2
+  fi
+}
+
 rldyour::ubuntu_server::docker_rootful_state_present() {
   local package
 
@@ -874,11 +883,23 @@ rldyour::ubuntu_server::stop_new_rootful_units_after_rootless_ready() {
   rldyour::ubuntu_server::as_root systemctl stop docker.socket
   rldyour::ubuntu_server::as_root systemctl stop docker.service containerd.service
   rldyour::ubuntu_server::as_root systemctl disable docker.socket docker.service containerd.service
+  # A successful systemctl stop can precede socket removal and process reap by
+  # a short interval. Wait for the observable runtime state to converge before
+  # deciding that the clean-host cutover failed.
+  local attempt=0
+  while [ "$attempt" -lt 40 ]; do
+    if ! rldyour::ubuntu_server::docker_rootful_runtime_active; then
+      rldyour::log "ok" "disabled only rootful units created by this clean package installation"
+      return 0
+    fi
+    sleep 0.25
+    attempt=$((attempt + 1))
+  done
   if rldyour::ubuntu_server::docker_rootful_runtime_active; then
     rldyour::log "error" "newly installed rootful runtime remains active; rootless daemon was left running"
+    rldyour::ubuntu_server::describe_rootful_runtime_state
     return 1
   fi
-  rldyour::log "ok" "disabled only rootful units created by this clean package installation"
 }
 
 rldyour::ubuntu_server::install_docker_rootless() {

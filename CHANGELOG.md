@@ -5,10 +5,11 @@ Versioning; the contract version in `config/rldyour-contract.json` moves with it
 
 ## [Unreleased]
 
-- Corrected the support-evidence description from thirteen to twenty-two
+- Corrected the support-evidence description from thirteen to twenty-six
   hosted artifacts, separated accepted Ubuntu 26.04 server/reboot/SSH/UFW and
-  Docker evidence from the remaining real-host gaps, added native Ubuntu ARM64
-  rootless Docker evidence, and made every
+  Docker evidence from the remaining real-host gaps, added native Ubuntu 24.04
+  and 26.04 ARM64 rootless Docker evidence, added native Ubuntu 26.04
+  amd64/arm64 no-GUI evidence, and made every
   machine-readable gap name its exact remaining proof.
 - Refreshed verified official-source pins for Codex, Homebrew.pkg, Herdr,
   Telegram, OSV Scanner, yq and ast-grep; recorded explicit evidence holds for

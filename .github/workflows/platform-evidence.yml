@@ -167,12 +167,36 @@ jobs:
         include:
           - runner: ubuntu-24.04
             lane: ubuntu-desktop-no-gui
+            release: "24.04"
+            stability: generally-available
           - runner: ubuntu-24.04-arm
             lane: ubuntu-desktop-no-gui
+            release: "24.04"
+            stability: generally-available
           - runner: ubuntu-24.04-arm
             lane: ubuntu-arm-gui-refusal
+            release: "24.04"
+            stability: generally-available
           - runner: ubuntu-24.04-arm
             lane: ubuntu-arm-rootless-native
+            release: "24.04"
+            stability: generally-available
+          - runner: ubuntu-26.04
+            lane: ubuntu-desktop-no-gui
+            release: "26.04"
+            stability: public-preview
+          - runner: ubuntu-26.04-arm
+            lane: ubuntu-desktop-no-gui
+            release: "26.04"
+            stability: public-preview
+          - runner: ubuntu-26.04-arm
+            lane: ubuntu-arm-gui-refusal
+            release: "26.04"
+            stability: public-preview
+          - runner: ubuntu-26.04-arm
+            lane: ubuntu-arm-rootless-native
+            release: "26.04"
+            stability: public-preview
     steps:
       - name: Checkout exact public commit without credentials
         env:
@@ -186,6 +210,8 @@ jobs:
       - name: Native Ubuntu evidence
         env:
           EVIDENCE_SHA: ${{ github.event.pull_request.head.sha }}
+          RLDYOUR_EVIDENCE_RELEASE: ${{ matrix.release }}
+          RLDYOUR_EVIDENCE_RUNNER_STABILITY: ${{ matrix.stability }}
         run: bash scripts/ci/platform-evidence.sh "${{ matrix.lane }}" "$RUNNER_TEMP/evidence"
       - name: Upload sanitized evidence
         if: always()

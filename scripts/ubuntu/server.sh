@@ -318,7 +318,10 @@ rldyour::ubuntu_server::install_baseline() {
   rldyour::ubuntu_server::configure_unattended_upgrades
 
   if command -v systemctl >/dev/null 2>&1; then
-    rldyour::ubuntu_server::as_root systemctl enable --now apt-daily.timer apt-daily-upgrade.timer
+    # Do not start a missed apt timer inside this bootstrap: it can immediately
+    # acquire dpkg's lock and deadlock the Docker package transaction that
+    # follows. Enabling is sufficient; systemd schedules the timers normally.
+    rldyour::ubuntu_server::as_root systemctl enable apt-daily.timer apt-daily-upgrade.timer
     rldyour::ubuntu_server::ensure_ssh_activation
   fi
 }

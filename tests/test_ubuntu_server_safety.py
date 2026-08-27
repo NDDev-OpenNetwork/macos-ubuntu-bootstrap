@@ -506,6 +506,12 @@ def test_common_path_includes_bun_xdg_global_bin() -> None:
     assert '"${XDG_CACHE_HOME:-$HOME/.cache}/.bun/bin"' in common
 
 
+def test_server_baseline_does_not_start_apt_timer_during_apply() -> None:
+    server = (ROOT / "scripts/ubuntu/server.sh").read_text(encoding="utf-8")
+    assert "systemctl enable --now apt-daily.timer" not in server
+    assert "systemctl enable apt-daily.timer apt-daily-upgrade.timer" in server
+
+
 def test_the_ci_fixture_exemptions_still_exist_and_still_install() -> None:
     """An exemption for a file that no longer installs anything is stale."""
     for relative in sorted(CI_FIXTURE_INSTALLERS):

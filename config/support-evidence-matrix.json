@@ -420,35 +420,35 @@
       "requirement": "OPTIONAL",
       "status": "NOT_PROVEN",
       "required_tier": "HOSTED_NATIVE",
-      "tracking_issue": 57
+      "tracking_issue": 5
     },
     {
       "id": "interactive-privilege-prompts",
       "requirement": "OPTIONAL",
       "status": "NOT_PROVEN",
       "required_tier": "REAL_HOST_REQUIRED",
-      "tracking_issue": 55
+      "tracking_issue": 6
     },
     {
       "id": "reboot-gui-live-ssh-firewall",
       "requirement": "OPTIONAL",
       "status": "NOT_PROVEN",
       "required_tier": "REAL_HOST_REQUIRED",
-      "tracking_issue": 56
+      "tracking_issue": 6
     },
     {
       "id": "ubuntu-amd64-gui-runtime",
       "requirement": "OPTIONAL",
       "status": "NOT_PROVEN",
       "required_tier": "REAL_HOST_REQUIRED",
-      "tracking_issue": 56
+      "tracking_issue": 6
     },
     {
       "id": "ubuntu-arm64-rootless-runtime",
       "requirement": "OPTIONAL",
       "status": "NOT_PROVEN",
       "required_tier": "REAL_HOST_REQUIRED",
-      "tracking_issue": 56
+      "tracking_issue": 6
     }
   ],
   "installation_audit": [

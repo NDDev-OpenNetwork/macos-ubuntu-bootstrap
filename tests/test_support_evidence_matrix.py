@@ -59,7 +59,7 @@ def test_missing_lane_coverage_fails_closed() -> None:
 
 
 def test_known_gaps_are_typed_optional_and_tracked() -> None:
-    assert {gap["tracking_issue"] for gap in MATRIX["known_evidence_gaps"]} == {55, 56, 57}
+    assert {gap["tracking_issue"] for gap in MATRIX["known_evidence_gaps"]} == {5, 6}
     assert all(gap["requirement"] == "OPTIONAL" for gap in MATRIX["known_evidence_gaps"])
     assert all(gap["status"] == "NOT_PROVEN" for gap in MATRIX["known_evidence_gaps"])
     assert {gap["id"] for gap in MATRIX["known_evidence_gaps"]} >= {
@@ -546,7 +546,7 @@ def test_gate_rejects_evidence_from_a_different_commit(tmp_path) -> None:
 
 
 # --------------------------------------------------------------------------
-# Ubuntu 26.04 coverage (#57)
+# Ubuntu 26.04 coverage (#5)
 # --------------------------------------------------------------------------
 
 RUNNER_SCRIPT = (ROOT / "scripts/ci/platform-evidence.sh").read_text(encoding="utf-8")

@@ -187,6 +187,8 @@ run_arm_gui_refusal() {
 run_native_ubuntu_arm_rootless() {
   [ "$(uname -s)" = Linux ]
   { [ "$(uname -m)" = aarch64 ] || [ "$(uname -m)" = arm64 ]; }
+  prepare_clean_hosted_docker_state
+  evidence_step clean_host_precondition
   ensure_native_ubuntu_user
   native_ubuntu_cmd "bash scripts/bootstrap.sh --platform ubuntu --profile server --no-gui --docker-mode rootless --plan --strict"
   evidence_step plan
@@ -198,6 +200,33 @@ run_native_ubuntu_arm_rootless() {
   evidence_step repeat_apply
   native_ubuntu_cmd "RLDYOUR_PROFILE=server RLDYOUR_GUI_ENABLED=0 RLDYOUR_DOCKER_MODE=rootless bash scripts/ubuntu/verify.sh --strict"
   evidence_step repeat_strict_verify
+}
+
+prepare_clean_hosted_docker_state() {
+  [ "${GITHUB_ACTIONS:-}" = true ]
+  [ "${RUNNER_ENVIRONMENT:-}" = github-hosted ]
+  local package
+  local -a installed=()
+  sudo systemctl stop docker.socket docker.service containerd.service 2>/dev/null || true
+  for package in \
+    docker-ce docker-ce-cli docker-ce-rootless-extras docker-buildx-plugin \
+    docker-compose-plugin containerd.io docker.io containerd runc \
+    moby-engine moby-cli moby-containerd; do
+    dpkg-query -W -f='${db:Status-Abbrev}' "$package" 2>/dev/null | grep -q '^ii ' && installed+=("$package")
+  done
+  if [ "${#installed[@]}" -gt 0 ]; then
+    sudo env DEBIAN_FRONTEND=noninteractive apt-get purge -y "${installed[@]}"
+  fi
+  sudo rm -rf -- /var/lib/docker /var/lib/containerd /etc/docker
+  sudo rm -f -- /run/docker.sock /var/run/docker.sock
+  sudo systemctl daemon-reload
+  if systemctl list-unit-files --no-legend docker.service docker.socket containerd.service 2>/dev/null |
+    grep -Eq '^(docker\.service|docker\.socket|containerd\.service)[[:space:]]'; then
+    echo "hosted runner Docker/containerd units remain after clean-host preparation" >&2
+    return 1
+  fi
+  [ ! -e /var/lib/docker ]
+  [ ! -e /var/lib/containerd ]
 }
 
 ensure_native_ubuntu_user() {

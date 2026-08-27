@@ -836,6 +836,7 @@
           "requirement": "REQUIRED",
           "status": "PROVEN",
           "observable_steps": [
+            "clean_host_precondition",
             "plan",
             "apply",
             "strict_verify",
@@ -1085,6 +1086,7 @@
   ],
   "observable_step_vocabulary": [
     "apply",
+    "clean_host_precondition",
     "gui_apply_refused",
     "no_managed_state",
     "plan",

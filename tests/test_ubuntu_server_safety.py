@@ -512,6 +512,11 @@ def test_server_baseline_does_not_start_apt_timer_during_apply() -> None:
     assert "systemctl enable apt-daily.timer apt-daily-upgrade.timer" in server
 
 
+def test_server_baseline_prepares_socket_activated_sshd_runtime() -> None:
+    server = (ROOT / "scripts/ubuntu/server.sh").read_text(encoding="utf-8")
+    assert "install -d -o root -g root -m 0755 /run/sshd" in server
+
+
 def test_the_ci_fixture_exemptions_still_exist_and_still_install() -> None:
     """An exemption for a file that no longer installs anything is stale."""
     for relative in sorted(CI_FIXTURE_INSTALLERS):

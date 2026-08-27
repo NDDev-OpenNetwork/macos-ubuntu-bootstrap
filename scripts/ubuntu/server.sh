@@ -322,6 +322,10 @@ rldyour::ubuntu_server::install_baseline() {
     # acquire dpkg's lock and deadlock the Docker package transaction that
     # follows. Enabling is sufficient; systemd schedules the timers normally.
     rldyour::ubuntu_server::as_root systemctl enable apt-daily.timer apt-daily-upgrade.timer
+    # ssh.socket can be active before ssh.service has ever created its runtime
+    # directory. sshd -t requires the same directory even for config-only
+    # validation, and the daemon expects it when the first socket arrives.
+    rldyour::ubuntu_server::as_root install -d -o root -g root -m 0755 /run/sshd
     rldyour::ubuntu_server::ensure_ssh_activation
   fi
 }

@@ -184,6 +184,56 @@ run_arm_gui_refusal() {
   evidence_step no_managed_state
 }
 
+run_native_ubuntu_arm_rootless() {
+  [ "$(uname -s)" = Linux ]
+  { [ "$(uname -m)" = aarch64 ] || [ "$(uname -m)" = arm64 ]; }
+  prepare_clean_hosted_docker_state
+  evidence_step clean_host_precondition
+  ensure_native_ubuntu_user
+  native_ubuntu_cmd "id; stat -c '%U:%G %a %n' /run/user/${NATIVE_USER_UID}; test -w /run/user/${NATIVE_USER_UID}; systemctl --user show-environment | grep -E '^(HOME|XDG_RUNTIME_DIR)=' || true"
+  native_ubuntu_cmd "bash scripts/bootstrap.sh --platform ubuntu --profile server --no-gui --docker-mode rootless --plan --strict"
+  evidence_step plan
+  if ! native_ubuntu_cmd "bash scripts/bootstrap.sh --platform ubuntu --profile server --no-gui --docker-mode rootless --apply --strict"; then
+    sudo stat -c '%U:%G %a %n' "/run/user/${NATIVE_USER_UID}" || true
+    native_ubuntu_cmd "id; test -w /run/user/${NATIVE_USER_UID} || true; systemctl --user show-environment | grep -E '^(HOME|XDG_RUNTIME_DIR)=' || true; systemctl --user status docker.service --no-pager -l || true; journalctl --user -u docker.service -n 80 --no-pager || true"
+    return 1
+  fi
+  evidence_step apply
+  native_ubuntu_cmd "RLDYOUR_PROFILE=server RLDYOUR_GUI_ENABLED=0 RLDYOUR_DOCKER_MODE=rootless bash scripts/ubuntu/verify.sh --strict"
+  evidence_step strict_verify
+  native_ubuntu_cmd "bash scripts/bootstrap.sh --platform ubuntu --profile server --no-gui --docker-mode rootless --apply --strict"
+  evidence_step repeat_apply
+  native_ubuntu_cmd "RLDYOUR_PROFILE=server RLDYOUR_GUI_ENABLED=0 RLDYOUR_DOCKER_MODE=rootless bash scripts/ubuntu/verify.sh --strict"
+  evidence_step repeat_strict_verify
+}
+
+prepare_clean_hosted_docker_state() {
+  [ "${GITHUB_ACTIONS:-}" = true ]
+  [ "${RUNNER_ENVIRONMENT:-}" = github-hosted ]
+  local package
+  local -a installed=()
+  sudo systemctl stop docker.socket docker.service containerd.service 2>/dev/null || true
+  for package in \
+    docker-ce docker-ce-cli docker-ce-rootless-extras docker-buildx-plugin \
+    docker-compose-plugin containerd.io docker.io containerd runc \
+    moby-engine moby-cli moby-containerd; do
+    dpkg-query -W -f='${db:Status-Abbrev}' "$package" 2>/dev/null | grep -q '^ii ' && installed+=("$package")
+  done
+  if [ "${#installed[@]}" -gt 0 ]; then
+    sudo env DEBIAN_FRONTEND=noninteractive apt-get purge -y "${installed[@]}"
+  fi
+  sudo rm -rf -- /var/lib/docker /var/lib/containerd /etc/docker
+  sudo rm -f -- /run/docker.sock /var/run/docker.sock
+  sudo systemctl daemon-reload
+  if systemctl list-unit-files --no-legend docker.service docker.socket containerd.service 2>/dev/null |
+    grep -Eq '^(docker\.service|docker\.socket|containerd\.service)[[:space:]]'; then
+    echo "hosted runner Docker/containerd units remain after clean-host preparation" >&2
+    return 1
+  fi
+  [ ! -e /var/lib/docker ]
+  [ ! -e /var/lib/containerd ]
+}
+
 ensure_native_ubuntu_user() {
   if ! id rldyourevidence >/dev/null 2>&1; then
     sudo useradd -m -s /bin/bash rldyourevidence
@@ -216,11 +266,38 @@ for path in (
     assert stat.S_ISDIR(value.st_mode) and value.st_uid == 0 and value.st_gid == 0
     assert not stat.S_IMODE(value.st_mode) & 0o022
 PY
+  NATIVE_USER_UID="$(id -u rldyourevidence)"
+  sudo install -d -o rldyourevidence -g rldyourevidence -m 0700 "/run/user/${NATIVE_USER_UID}"
+  sudo loginctl enable-linger rldyourevidence
+  sudo systemctl start "user@${NATIVE_USER_UID}.service"
+  sudo --user rldyourevidence test -w "/run/user/${NATIVE_USER_UID}"
+  sudo test -S "/run/user/${NATIVE_USER_UID}/bus"
+  sudo --user rldyourevidence env \
+    XDG_RUNTIME_DIR="/run/user/${NATIVE_USER_UID}" \
+    DBUS_SESSION_BUS_ADDRESS="unix:path=/run/user/${NATIVE_USER_UID}/bus" \
+    systemctl --user set-environment \
+    HOME=/home/rldyourevidence \
+    XDG_RUNTIME_DIR="/run/user/${NATIVE_USER_UID}" \
+    XDG_CONFIG_HOME=/home/rldyourevidence/.config \
+    XDG_DATA_HOME=/home/rldyourevidence/.local/share \
+    XDG_CACHE_HOME=/home/rldyourevidence/.cache \
+    DOCKER_CONFIG=/home/rldyourevidence/.docker
+  sudo --user rldyourevidence env \
+    XDG_RUNTIME_DIR="/run/user/${NATIVE_USER_UID}" \
+    DBUS_SESSION_BUS_ADDRESS="unix:path=/run/user/${NATIVE_USER_UID}/bus" \
+    systemctl --user show-environment | grep -Fx "XDG_RUNTIME_DIR=/run/user/${NATIVE_USER_UID}"
 }
 
 native_ubuntu_cmd() {
   sudo --user rldyourevidence --set-home env \
     HOME=/home/rldyourevidence USER=rldyourevidence LOGNAME=rldyourevidence \
+    XDG_CONFIG_HOME=/home/rldyourevidence/.config \
+    XDG_DATA_HOME=/home/rldyourevidence/.local/share \
+    XDG_CACHE_HOME=/home/rldyourevidence/.cache \
+    XDG_RUNTIME_DIR="/run/user/${NATIVE_USER_UID}" \
+    DBUS_SESSION_BUS_ADDRESS="unix:path=/run/user/${NATIVE_USER_UID}/bus" \
+    DOCKER_CONFIG=/home/rldyourevidence/.docker \
+    DOCKER_HOST= DOCKER_CONTEXT= \
     bash -c "cd $(printf '%q' "$NATIVE_REPO_ROOT") && $1"
 }
 
@@ -340,6 +417,7 @@ case "$LANE" in
   macos-no-gui) run_native_macos --no-gui ;;
   ubuntu-desktop-no-gui) run_native_ubuntu_desktop ;;
   ubuntu-arm-gui-refusal) run_arm_gui_refusal ;;
+  ubuntu-arm-rootless-native) run_native_ubuntu_arm_rootless ;;
   sandbox-desktop-builds-rootful) run_sandbox_profile desktop-builds rootful ;;
   sandbox-server-none) run_sandbox_profile server none ;;
   sandbox-server-rootful) run_sandbox_profile server rootful ;;

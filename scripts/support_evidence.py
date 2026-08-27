@@ -78,6 +78,8 @@ def validate_matrix(matrix: dict[str, Any], contract: dict[str, Any]) -> None:
             raise MatrixError(f"{identity}: evidence gaps must be OPTIONAL NOT_PROVEN")
         if gap.get("required_tier") not in tiers or not isinstance(gap.get("tracking_issue"), int):
             raise MatrixError(f"{identity}: evidence gap tier and tracking issue are required")
+        if not isinstance(gap.get("remaining_proof"), str) or len(gap["remaining_proof"].strip()) < 40:
+            raise MatrixError(f"{identity}: evidence gap must name the remaining proof precisely")
     audits = matrix.get("installation_audit")
     if not isinstance(audits, list) or not audits:
         raise MatrixError("installation_audit must be a non-empty list")
@@ -162,6 +164,7 @@ def validate_matrix(matrix: dict[str, Any], contract: dict[str, Any]) -> None:
 
     required_lanes = {
         "macos-gui", "macos-no-gui", "ubuntu-desktop-no-gui", "ubuntu-arm-gui-refusal",
+        "ubuntu-arm-rootless-native",
         "sandbox-desktop-builds-rootful", "sandbox-server-none", "sandbox-server-rootful",
         "sandbox-server-rootless", "sandbox-server-hardening",
     }

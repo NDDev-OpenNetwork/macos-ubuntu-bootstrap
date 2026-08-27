@@ -244,7 +244,7 @@ rldyour::ubuntu::as_root() {
 
 apt_install() {
   rldyour::ubuntu::as_root env DEBIAN_FRONTEND=noninteractive \
-    apt-get install -y --no-install-recommends --no-upgrade "$@"
+    apt-get install -o DPkg::Lock::Timeout=120 -y --no-install-recommends --no-upgrade "$@"
 }
 
 is_supported_ubuntu() {

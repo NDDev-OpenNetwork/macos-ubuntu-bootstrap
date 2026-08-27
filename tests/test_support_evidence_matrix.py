@@ -62,21 +62,29 @@ def test_known_gaps_are_typed_optional_and_tracked() -> None:
     assert {gap["tracking_issue"] for gap in MATRIX["known_evidence_gaps"]} == {5, 6}
     assert all(gap["requirement"] == "OPTIONAL" for gap in MATRIX["known_evidence_gaps"])
     assert all(gap["status"] == "NOT_PROVEN" for gap in MATRIX["known_evidence_gaps"])
+    assert all(len(gap["remaining_proof"]) >= 40 for gap in MATRIX["known_evidence_gaps"])
     assert {gap["id"] for gap in MATRIX["known_evidence_gaps"]} >= {
         "ubuntu-26.04-hosted-runtime", "interactive-privilege-prompts",
         "reboot-gui-live-ssh-firewall", "ubuntu-amd64-gui-runtime",
-        "ubuntu-arm64-rootless-runtime",
     }
 
 
+def test_known_gaps_distinguish_accepted_server_evidence_from_external_targets() -> None:
+    gaps = {gap["id"]: gap["remaining_proof"] for gap in MATRIX["known_evidence_gaps"]}
+    assert "already proven" in gaps["reboot-gui-live-ssh-firewall"]
+    assert "public-preview" in gaps["ubuntu-26.04-hosted-runtime"]
+    assert "PolicyKit" in gaps["ubuntu-amd64-gui-runtime"]
+    assert "ubuntu-arm64-rootless-runtime" not in gaps
+
+
 def test_declared_hosted_artifact_count_matches_the_matrix_expansion() -> None:
-    assert MATRIX["expected_hosted_artifact_instances"] == 21
+    assert MATRIX["expected_hosted_artifact_instances"] == 22
     # One artifact per (lane, release, architecture): release is part of the
     # expansion so a 24.04 result cannot stand in for its 26.04 twin.
     assert sum(
         len(lane["architectures"]) * len(lane["releases"])
         for lane in MATRIX["evidence_lanes"]
-    ) == 21
+    ) == 22
 
 
 def test_installation_audit_covers_every_contract_install_domain() -> None:
@@ -128,6 +136,21 @@ def test_workflow_and_runner_script_lane_sets_match_matrix() -> None:
     for lane in MATRIX["evidence_lanes"]:
         assert lane["lane"] in workflow
         assert lane["lane"] in runner
+
+
+def test_native_evidence_user_does_not_inherit_runner_home_paths() -> None:
+    runner = (ROOT / "scripts/ci/platform-evidence.sh").read_text(encoding="utf-8")
+    for assignment in (
+        "HOME=/home/rldyourevidence",
+        "XDG_CONFIG_HOME=/home/rldyourevidence/.config",
+        "XDG_DATA_HOME=/home/rldyourevidence/.local/share",
+        "XDG_CACHE_HOME=/home/rldyourevidence/.cache",
+        "DOCKER_CONFIG=/home/rldyourevidence/.docker",
+        'sudo install -d -o rldyourevidence -g rldyourevidence -m 0700 "/run/user/${NATIVE_USER_UID}"',
+    ):
+        assert assignment in runner
+    assert "systemctl --user set-environment" in runner
+    assert 'grep -Fx "XDG_RUNTIME_DIR=/run/user/${NATIVE_USER_UID}"' in runner
 
 
 # --------------------------------------------------------------------------
@@ -492,7 +515,7 @@ def test_gate_rejects_a_missing_lane(tmp_path) -> None:
     import shutil
 
     shutil.rmtree(tmp_path / "platform-sandbox-server-rootless-24.04-amd64")
-    with pytest.raises(gate.GateError, match="expected 21 evidence payloads, downloaded 20"):
+    with pytest.raises(gate.GateError, match="expected 22 evidence payloads, downloaded 21"):
         gate.verify(tmp_path, sha="a" * 40)
 
 

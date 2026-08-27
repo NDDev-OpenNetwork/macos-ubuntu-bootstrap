@@ -1,8 +1,8 @@
 {
   "schema_version": 1,
   "adapter_version": "0.1.2",
-  "verified_on": "2026-08-13",
-  "expected_hosted_artifact_instances": 21,
+  "verified_on": "2026-08-27",
+  "expected_hosted_artifact_instances": 22,
   "status_vocabulary": [
     "PROVEN",
     "NOT_PROVEN",
@@ -420,35 +420,32 @@
       "requirement": "OPTIONAL",
       "status": "NOT_PROVEN",
       "required_tier": "HOSTED_NATIVE",
-      "tracking_issue": 5
+      "tracking_issue": 5,
+      "remaining_proof": "Re-evaluate a native ubuntu-26.04 hosted lane after GitHub removes the public-preview status; current 24.04/26.04 container pairs and disposable native 26.04 server evidence do not claim hosted-image GA."
     },
     {
       "id": "interactive-privilege-prompts",
       "requirement": "OPTIONAL",
       "status": "NOT_PROVEN",
       "required_tier": "REAL_HOST_REQUIRED",
-      "tracking_issue": 6
+      "tracking_issue": 6,
+      "remaining_proof": "A logged-in Ubuntu 26.04 Desktop session with a real PolicyKit authentication agent and ordinary interactive authorization; hosted passwordless sudo is insufficient."
     },
     {
       "id": "reboot-gui-live-ssh-firewall",
       "requirement": "OPTIONAL",
       "status": "NOT_PROVEN",
       "required_tier": "REAL_HOST_REQUIRED",
-      "tracking_issue": 6
+      "tracking_issue": 6,
+      "remaining_proof": "A reboot-capable disposable macOS host proving launchd and GUI recovery. Ubuntu 26.04 server reboot, live SSH and external firewall evidence is already proven."
     },
     {
       "id": "ubuntu-amd64-gui-runtime",
       "requirement": "OPTIONAL",
       "status": "NOT_PROVEN",
       "required_tier": "REAL_HOST_REQUIRED",
-      "tracking_issue": 6
-    },
-    {
-      "id": "ubuntu-arm64-rootless-runtime",
-      "requirement": "OPTIONAL",
-      "status": "NOT_PROVEN",
-      "required_tier": "REAL_HOST_REQUIRED",
-      "tracking_issue": 6
+      "tracking_issue": 6,
+      "remaining_proof": "A disposable native Ubuntu 26.04 amd64 desktop with a persistent logged-in GNOME session, real GUI application launch and PolicyKit agent."
     }
   ],
   "installation_audit": [
@@ -821,6 +818,44 @@
       ]
     },
     {
+      "lane": "ubuntu-arm-rootless-native",
+      "os": "ubuntu",
+      "architectures": [
+        "arm64"
+      ],
+      "profile": "server",
+      "gui": "disabled",
+      "docker": "rootless",
+      "privilege": "non-root-passwordless-sudo",
+      "interaction": "noninteractive",
+      "environment": "github-hosted-vm",
+      "tier": "HOSTED_NATIVE",
+      "capabilities": [
+        {
+          "id": "plan_apply_strict_verify_repeat_apply",
+          "requirement": "REQUIRED",
+          "status": "PROVEN",
+          "observable_steps": [
+            "clean_host_precondition",
+            "plan",
+            "apply",
+            "strict_verify",
+            "repeat_apply",
+            "repeat_strict_verify"
+          ]
+        },
+        {
+          "id": "reboot_persistence",
+          "requirement": "OPTIONAL",
+          "status": "NOT_PROVEN",
+          "required_tier": "REAL_HOST_REQUIRED"
+        }
+      ],
+      "releases": [
+        "24.04"
+      ]
+    },
+    {
       "lane": "sandbox-desktop-builds-rootful",
       "os": "ubuntu",
       "architectures": [
@@ -1051,6 +1086,7 @@
   ],
   "observable_step_vocabulary": [
     "apply",
+    "clean_host_precondition",
     "gui_apply_refused",
     "no_managed_state",
     "plan",

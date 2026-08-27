@@ -254,6 +254,51 @@ def test_server_contract_contains_rollback_and_context_guards() -> None:
     assert "sudo install" not in installer
 
 
+def test_rootless_cutover_stops_socket_before_rootful_daemons() -> None:
+    result = run_server_function(
+        """
+RLDYOUR_SERVER_ROOTLESS_PREFLIGHT_STATE=clean
+RLDYOUR_SERVER_ROOTFUL_PREEXISTED=0
+rldyour::ubuntu_server::docker_rootless_daemon_ready() { return 0; }
+rldyour::ubuntu_server::system_unit_owned_by_package() { return 0; }
+rldyour::ubuntu_server::rootful_workloads_absent() { return 0; }
+rldyour::ubuntu_server::docker_rootful_runtime_active() { return 1; }
+rldyour::ubuntu_server::as_root() { printf 'CALL:%s\\n' "$*"; }
+rldyour::ubuntu_server::stop_new_rootful_units_after_rootless_ready
+"""
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+    calls = [line for line in result.stdout.splitlines() if line.startswith("CALL:")]
+    assert calls == [
+        "CALL:systemctl stop docker.socket",
+        "CALL:systemctl stop docker.service containerd.service",
+        "CALL:systemctl disable docker.socket docker.service containerd.service",
+        "CALL:rm -f /run/docker.sock /var/run/docker.sock",
+    ]
+
+
+def test_rootless_cutover_waits_for_runtime_state_to_converge() -> None:
+    result = run_server_function(
+        """
+RLDYOUR_SERVER_ROOTLESS_PREFLIGHT_STATE=clean
+RLDYOUR_SERVER_ROOTFUL_PREEXISTED=0
+rldyour::ubuntu_server::docker_rootless_daemon_ready() { return 0; }
+rldyour::ubuntu_server::system_unit_owned_by_package() { return 0; }
+rldyour::ubuntu_server::rootful_workloads_absent() { return 0; }
+runtime_checks=0
+rldyour::ubuntu_server::docker_rootful_runtime_active() {
+  runtime_checks=$((runtime_checks + 1))
+  [ "$runtime_checks" -lt 3 ]
+}
+rldyour::ubuntu_server::as_root() { :; }
+sleep() { :; }
+rldyour::ubuntu_server::stop_new_rootful_units_after_rootless_ready
+"""
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert "disabled only rootful units" in result.stdout
+
+
 def test_real_host_evidence_records_docker_ufw_boundary_without_overclaim() -> None:
     evidence = json.loads(
         (ROOT / "evidence/real-host/ubuntu-26.04-amd64-docker-ufw-d33e73d.json").read_text(
@@ -435,6 +480,41 @@ def test_every_device_apt_install_refuses_to_upgrade() -> None:
         "these install packages onto a device without --no-upgrade, so an "
         f"install could silently upgrade what the operator already had: {missing}"
     )
+
+
+def test_every_device_apt_install_waits_for_package_manager_lock() -> None:
+    missing = []
+    for path in sorted((ROOT / "scripts").rglob("*")):
+        if path.suffix not in {".sh", ".py"} or not path.is_file():
+            continue
+        relative = str(path.relative_to(ROOT))
+        if relative in CI_FIXTURE_INSTALLERS:
+            continue
+        for number, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
+            if line.lstrip().startswith("#") or "apt-get install" not in line:
+                continue
+            if "DPkg::Lock::Timeout=" not in line:
+                missing.append(f"{relative}:{number}: {line.strip()}")
+    assert missing == [], (
+        "these device package installs fail immediately when unattended apt "
+        f"briefly owns the dpkg lock: {missing}"
+    )
+
+
+def test_common_path_includes_bun_xdg_global_bin() -> None:
+    common = (ROOT / "scripts/lib/common.sh").read_text(encoding="utf-8")
+    assert '"${XDG_CACHE_HOME:-$HOME/.cache}/.bun/bin"' in common
+
+
+def test_server_baseline_does_not_start_apt_timer_during_apply() -> None:
+    server = (ROOT / "scripts/ubuntu/server.sh").read_text(encoding="utf-8")
+    assert "systemctl enable --now apt-daily.timer" not in server
+    assert "systemctl enable apt-daily.timer apt-daily-upgrade.timer" in server
+
+
+def test_server_baseline_prepares_socket_activated_sshd_runtime() -> None:
+    server = (ROOT / "scripts/ubuntu/server.sh").read_text(encoding="utf-8")
+    assert "install -d -o root -g root -m 0755 /run/sshd" in server
 
 
 def test_the_ci_fixture_exemptions_still_exist_and_still_install() -> None:

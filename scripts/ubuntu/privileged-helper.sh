@@ -355,7 +355,7 @@ chrome_key_matches() {
 apt_install() {
   apt_arguments_allowed "$@" || { result INTERNAL_ALLOWLIST_REJECTED apt-install; return 2; }
   /usr/bin/env -i PATH="$SAFE_PATH" DEBIAN_FRONTEND=noninteractive \
-    /usr/bin/apt-get install -y --no-install-recommends --no-upgrade "$@"
+    /usr/bin/apt-get install -o DPkg::Lock::Timeout=120 -y --no-install-recommends --no-upgrade "$@"
 }
 
 apt_arguments_allowed() {

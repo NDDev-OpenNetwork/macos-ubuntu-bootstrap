@@ -192,7 +192,7 @@ rldyour::ubuntu_server::apt_update() {
 
 rldyour::ubuntu_server::apt_install() {
   rldyour::ubuntu_server::as_root env DEBIAN_FRONTEND=noninteractive \
-    apt-get install -y --no-install-recommends --no-upgrade "$@"
+    apt-get install -o DPkg::Lock::Timeout=120 -y --no-install-recommends --no-upgrade "$@"
 }
 
 rldyour::ubuntu_server::root_file_equals() {
@@ -318,7 +318,14 @@ rldyour::ubuntu_server::install_baseline() {
   rldyour::ubuntu_server::configure_unattended_upgrades
 
   if command -v systemctl >/dev/null 2>&1; then
-    rldyour::ubuntu_server::as_root systemctl enable --now apt-daily.timer apt-daily-upgrade.timer
+    # Do not start a missed apt timer inside this bootstrap: it can immediately
+    # acquire dpkg's lock and deadlock the Docker package transaction that
+    # follows. Enabling is sufficient; systemd schedules the timers normally.
+    rldyour::ubuntu_server::as_root systemctl enable apt-daily.timer apt-daily-upgrade.timer
+    # ssh.socket can be active before ssh.service has ever created its runtime
+    # directory. sshd -t requires the same directory even for config-only
+    # validation, and the daemon expects it when the first socket arrives.
+    rldyour::ubuntu_server::as_root install -d -o root -g root -m 0755 /run/sshd
     rldyour::ubuntu_server::ensure_ssh_activation
   fi
 }
@@ -711,6 +718,15 @@ rldyour::ubuntu_server::docker_rootful_runtime_active() {
   return 1
 }
 
+rldyour::ubuntu_server::describe_rootful_runtime_state() {
+  rldyour::log "error" "rootful unit states: docker.service=$(systemctl is-active docker.service 2>/dev/null || true), docker.socket=$(systemctl is-active docker.socket 2>/dev/null || true), containerd.service=$(systemctl is-active containerd.service 2>/dev/null || true)"
+  rldyour::log "error" "rootful sockets: /run/docker.sock=$([ -S /run/docker.sock ] && printf present || printf absent), /var/run/docker.sock=$([ -S /var/run/docker.sock ] && printf present || printf absent)"
+  if command -v ps >/dev/null 2>&1; then
+    ps -eo uid=,pid=,comm=,args= 2>/dev/null |
+      awk '$1 == 0 && ($3 == "dockerd" || $3 == "containerd") { print "rootful process: " $0 }' >&2
+  fi
+}
+
 rldyour::ubuntu_server::docker_rootful_state_present() {
   local package
 
@@ -868,12 +884,33 @@ rldyour::ubuntu_server::stop_new_rootful_units_after_rootless_ready() {
     return 1
   fi
 
-  rldyour::ubuntu_server::as_root systemctl disable --now docker.socket docker.service containerd.service
+  # Stop the activation source first. A combined `disable --now` can stop
+  # docker.service before docker.socket; the still-active socket then starts
+  # the daemon again while systemctl is processing the remaining units.
+  rldyour::ubuntu_server::as_root systemctl stop docker.socket
+  rldyour::ubuntu_server::as_root systemctl stop docker.service containerd.service
+  rldyour::ubuntu_server::as_root systemctl disable docker.socket docker.service containerd.service
+  # docker.socket can leave its filesystem node behind after the unit and all
+  # rootful processes are gone. This path is reached only for a preflight-clean
+  # host whose just-installed units and empty runtime were proven above.
+  rldyour::ubuntu_server::as_root rm -f /run/docker.sock /var/run/docker.sock
+  # A successful systemctl stop can precede socket removal and process reap by
+  # a short interval. Wait for the observable runtime state to converge before
+  # deciding that the clean-host cutover failed.
+  local attempt=0
+  while [ "$attempt" -lt 40 ]; do
+    if ! rldyour::ubuntu_server::docker_rootful_runtime_active; then
+      rldyour::log "ok" "disabled only rootful units created by this clean package installation"
+      return 0
+    fi
+    sleep 0.25
+    attempt=$((attempt + 1))
+  done
   if rldyour::ubuntu_server::docker_rootful_runtime_active; then
     rldyour::log "error" "newly installed rootful runtime remains active; rootless daemon was left running"
+    rldyour::ubuntu_server::describe_rootful_runtime_state
     return 1
   fi
-  rldyour::log "ok" "disabled only rootful units created by this clean package installation"
 }
 
 rldyour::ubuntu_server::install_docker_rootless() {

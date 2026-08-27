@@ -184,6 +184,22 @@ run_arm_gui_refusal() {
   evidence_step no_managed_state
 }
 
+run_native_ubuntu_arm_rootless() {
+  [ "$(uname -s)" = Linux ]
+  { [ "$(uname -m)" = aarch64 ] || [ "$(uname -m)" = arm64 ]; }
+  ensure_native_ubuntu_user
+  native_ubuntu_cmd "bash scripts/bootstrap.sh --platform ubuntu --profile server --no-gui --docker-mode rootless --plan --strict"
+  evidence_step plan
+  native_ubuntu_cmd "bash scripts/bootstrap.sh --platform ubuntu --profile server --no-gui --docker-mode rootless --apply --strict"
+  evidence_step apply
+  native_ubuntu_cmd "RLDYOUR_PROFILE=server RLDYOUR_GUI_ENABLED=0 RLDYOUR_DOCKER_MODE=rootless bash scripts/ubuntu/verify.sh --strict"
+  evidence_step strict_verify
+  native_ubuntu_cmd "bash scripts/bootstrap.sh --platform ubuntu --profile server --no-gui --docker-mode rootless --apply --strict"
+  evidence_step repeat_apply
+  native_ubuntu_cmd "RLDYOUR_PROFILE=server RLDYOUR_GUI_ENABLED=0 RLDYOUR_DOCKER_MODE=rootless bash scripts/ubuntu/verify.sh --strict"
+  evidence_step repeat_strict_verify
+}
+
 ensure_native_ubuntu_user() {
   if ! id rldyourevidence >/dev/null 2>&1; then
     sudo useradd -m -s /bin/bash rldyourevidence
@@ -216,11 +232,17 @@ for path in (
     assert stat.S_ISDIR(value.st_mode) and value.st_uid == 0 and value.st_gid == 0
     assert not stat.S_IMODE(value.st_mode) & 0o022
 PY
+  NATIVE_USER_UID="$(id -u rldyourevidence)"
+  sudo loginctl enable-linger rldyourevidence
+  sudo systemctl start "user@${NATIVE_USER_UID}.service"
+  sudo test -S "/run/user/${NATIVE_USER_UID}/bus"
 }
 
 native_ubuntu_cmd() {
   sudo --user rldyourevidence --set-home env \
     HOME=/home/rldyourevidence USER=rldyourevidence LOGNAME=rldyourevidence \
+    XDG_RUNTIME_DIR="/run/user/${NATIVE_USER_UID}" \
+    DBUS_SESSION_BUS_ADDRESS="unix:path=/run/user/${NATIVE_USER_UID}/bus" \
     bash -c "cd $(printf '%q' "$NATIVE_REPO_ROOT") && $1"
 }
 
@@ -340,6 +362,7 @@ case "$LANE" in
   macos-no-gui) run_native_macos --no-gui ;;
   ubuntu-desktop-no-gui) run_native_ubuntu_desktop ;;
   ubuntu-arm-gui-refusal) run_arm_gui_refusal ;;
+  ubuntu-arm-rootless-native) run_native_ubuntu_arm_rootless ;;
   sandbox-desktop-builds-rootful) run_sandbox_profile desktop-builds rootful ;;
   sandbox-server-none) run_sandbox_profile server none ;;
   sandbox-server-rootful) run_sandbox_profile server rootful ;;

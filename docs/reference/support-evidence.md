@@ -28,21 +28,35 @@ Evidence tiers are deliberately non-interchangeable:
 | `EXPECTED_FAIL_CLOSED` | An unsupported combination was rejected before mutation |
 | `REAL_HOST_REQUIRED` | Capability cannot be honestly established by the current hosted lane |
 
-The current workflow produces exactly 13 artifacts. It natively covers macOS
-Apple Silicon GUI/no-GUI installation and Ubuntu 24.04 amd64/arm64 desktop
-no-GUI installation. Docker/server profiles and hardening run in disposable
-systemd containers. Ubuntu ARM64 GUI refusal is a native expected-failure lane.
-Ubuntu 26.04 runtime, Ubuntu amd64 GUI operation, ARM64 rootless Docker, reboot
-persistence, interactive authorization prompts, external firewall reachability,
-and preservation of a live SSH connection remain typed `NOT_PROVEN` follow-ups.
+The current workflow produces exactly 22 artifacts, one for every declared
+`(lane, release, architecture)` expansion. It natively covers macOS Apple
+Silicon GUI/no-GUI installation, Ubuntu 24.04 amd64/arm64 desktop no-GUI
+installation, Ubuntu ARM64 GUI refusal before mutation, and native Ubuntu ARM64
+rootless Docker. Every disposable systemd lane runs separately for Ubuntu 24.04 and 26.04, so one release can
+never stand in for the other.
+
+Separate accepted real-host evidence proves Ubuntu 26.04 amd64 server
+plan/apply/idempotency, Bun and tool baselines, systemd recovery after reboot,
+preserved and second key-authenticated SSH, root rejection, external SSH/UFW,
+Fail2ban, rootful Docker and the Docker-published-port/UFW boundary. Those
+server facts are no longer `NOT_PROVEN` merely because they are outside the
+hosted artifact set.
+
+The remaining typed gaps are narrower: GitHub's native Ubuntu 26.04 labels
+while they remain public preview; a disposable Ubuntu 26.04 Desktop with a
+logged-in GNOME session and real PolicyKit agent; a reboot-capable disposable
+macOS host for launchd/GUI recovery.
+The exact remaining proof and tracking issue for each gap lives in
+`known_evidence_gaps`; prose must not broaden an already accepted boundary.
 
 ## Authoritative platform boundaries
 
-Facts were rechecked on 2026-08-13:
+Facts were rechecked on 2026-08-27:
 
 - [GitHub-hosted runners](https://docs.github.com/en/actions/reference/runners/github-hosted-runners)
   lists standard public `ubuntu-24.04`, `ubuntu-24.04-arm`, and ARM64
-  `macos-15` runners. Hosted Linux and macOS VMs use passwordless sudo, so they
+  `macos-15` runners. `ubuntu-26.04` and `ubuntu-26.04-arm` remain public
+  preview. Hosted Linux and macOS VMs use passwordless sudo, so they
   cannot prove ordinary password or PolicyKit prompt behavior.
 - [Ubuntu supported architectures](https://documentation.ubuntu.com/project/how-ubuntu-is-made/concepts/supported-architectures/)
   includes amd64 and arm64. Vendor application artifacts impose the narrower

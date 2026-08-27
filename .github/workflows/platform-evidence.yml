@@ -171,6 +171,8 @@ jobs:
             lane: ubuntu-desktop-no-gui
           - runner: ubuntu-24.04-arm
             lane: ubuntu-arm-gui-refusal
+          - runner: ubuntu-24.04-arm
+            lane: ubuntu-arm-rootless-native
     steps:
       - name: Checkout exact public commit without credentials
         env:

@@ -1151,17 +1151,24 @@ ensure_go() {
 # every module in the build, so provenance is enforced without a tracked archive
 # hash. GOBIN keeps the binary inside the managed Go tree.
 ensure_gopls() {
-  local goroot="$1" gobin
+  local goroot="$1" gobin attempt
   gobin="$HOME/.local/share/rldyour/go/gopls/${GOPLS_VERSION}"
   if [ ! -x "$gobin/gopls" ]; then
     mkdir -p "$gobin"
     rldyour::log "info" "building gopls ${GOPLS_VERSION} through the module checksum database"
-    env GOROOT="$goroot" GOBIN="$gobin" GOFLAGS=-mod=readonly \
-      GOPROXY=https://proxy.golang.org,direct GOSUMDB=sum.golang.org \
-      "$goroot/bin/go" install "golang.org/x/tools/gopls@${GOPLS_VERSION}" || {
-      rldyour::log "error" "gopls ${GOPLS_VERSION} install failed"
-      return 1
-    }
+    for attempt in 1 2 3; do
+      if env GOROOT="$goroot" GOBIN="$gobin" GOFLAGS=-mod=readonly \
+        GOPROXY=https://proxy.golang.org,direct GOSUMDB=sum.golang.org \
+        "$goroot/bin/go" install "golang.org/x/tools/gopls@${GOPLS_VERSION}"; then
+        break
+      fi
+      if [ "$attempt" -eq 3 ]; then
+        rldyour::log "error" "gopls ${GOPLS_VERSION} install failed after ${attempt} checksum-verified attempts"
+        return 1
+      fi
+      rldyour::log "warn" "gopls transport failed; retrying checksum-verified install (${attempt}/3)"
+      sleep "$attempt"
+    done
   fi
   rldyour::ubuntu::preflight_managed_link gopls "$HOME/.local/share/rldyour/go"
   ensure_managed_tool_link gopls "$gobin/gopls" "$HOME/.local/share/rldyour/go"

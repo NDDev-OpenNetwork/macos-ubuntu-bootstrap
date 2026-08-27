@@ -28,7 +28,7 @@ def test_canonical_matrix_validates_and_is_deterministic() -> None:
 
 @pytest.mark.parametrize("arch,expected", [("x64", "amd64"), ("aarch64", "arm64")])
 def test_architecture_aliases_are_explicit(arch: str, expected: str) -> None:
-    assert support_evidence.resolve_lane(MATRIX, "ubuntu-desktop-no-gui", arch)["architecture"] == expected
+    assert support_evidence.resolve_lane(MATRIX, "ubuntu-desktop-no-gui", arch, "24.04")["architecture"] == expected
 
 
 def test_unknown_lane_and_unsupported_architecture_fail_closed() -> None:
@@ -59,32 +59,32 @@ def test_missing_lane_coverage_fails_closed() -> None:
 
 
 def test_known_gaps_are_typed_optional_and_tracked() -> None:
-    assert {gap["tracking_issue"] for gap in MATRIX["known_evidence_gaps"]} == {5, 6}
+    assert {gap["tracking_issue"] for gap in MATRIX["known_evidence_gaps"]} == {6}
     assert all(gap["requirement"] == "OPTIONAL" for gap in MATRIX["known_evidence_gaps"])
     assert all(gap["status"] == "NOT_PROVEN" for gap in MATRIX["known_evidence_gaps"])
     assert all(len(gap["remaining_proof"]) >= 40 for gap in MATRIX["known_evidence_gaps"])
     assert {gap["id"] for gap in MATRIX["known_evidence_gaps"]} >= {
-        "ubuntu-26.04-hosted-runtime", "interactive-privilege-prompts",
-        "reboot-gui-live-ssh-firewall", "ubuntu-amd64-gui-runtime",
+        "interactive-privilege-prompts", "reboot-gui-live-ssh-firewall",
+        "ubuntu-amd64-gui-runtime",
     }
 
 
 def test_known_gaps_distinguish_accepted_server_evidence_from_external_targets() -> None:
     gaps = {gap["id"]: gap["remaining_proof"] for gap in MATRIX["known_evidence_gaps"]}
     assert "already proven" in gaps["reboot-gui-live-ssh-firewall"]
-    assert "public-preview" in gaps["ubuntu-26.04-hosted-runtime"]
+    assert "ubuntu-26.04-hosted-runtime" not in gaps
     assert "PolicyKit" in gaps["ubuntu-amd64-gui-runtime"]
     assert "ubuntu-arm64-rootless-runtime" not in gaps
 
 
 def test_declared_hosted_artifact_count_matches_the_matrix_expansion() -> None:
-    assert MATRIX["expected_hosted_artifact_instances"] == 22
+    assert MATRIX["expected_hosted_artifact_instances"] == 26
     # One artifact per (lane, release, architecture): release is part of the
     # expansion so a 24.04 result cannot stand in for its 26.04 twin.
     assert sum(
         len(lane["architectures"]) * len(lane["releases"])
         for lane in MATRIX["evidence_lanes"]
-    ) == 22
+    ) == 26
 
 
 def test_installation_audit_covers_every_contract_install_domain() -> None:
@@ -515,7 +515,7 @@ def test_gate_rejects_a_missing_lane(tmp_path) -> None:
     import shutil
 
     shutil.rmtree(tmp_path / "platform-sandbox-server-rootless-24.04-amd64")
-    with pytest.raises(gate.GateError, match="expected 22 evidence payloads, downloaded 21"):
+    with pytest.raises(gate.GateError, match="expected 26 evidence payloads, downloaded 25"):
         gate.verify(tmp_path, sha="a" * 40)
 
 
@@ -575,14 +575,8 @@ def test_gate_rejects_evidence_from_a_different_commit(tmp_path) -> None:
 RUNNER_SCRIPT = (ROOT / "scripts/ci/platform-evidence.sh").read_text(encoding="utf-8")
 
 
-def test_sandbox_release_is_a_lane_property_not_the_runner_s() -> None:
-    """26.04 coverage must not depend on a public-preview runner label.
-
-    The sandbox container's Ubuntu release is independent of the runner's, so a
-    26.04 sandbox runs on a 24.04 runner. `ubuntu-26.04` and `ubuntu-26.04-arm`
-    exist but are public preview, and a job asking for a label no runner
-    advertises queues indefinitely rather than failing.
-    """
+def test_native_preview_and_sandbox_release_axes_remain_explicit() -> None:
+    """Native preview evidence supplements, rather than replaces, sandboxes."""
     assert 'RLDYOUR_EVIDENCE_RELEASE:-24.04' in RUNNER_SCRIPT
     assert "FROM ubuntu:${RELEASE}" in RUNNER_SCRIPT
     assert "FROM ubuntu:24.04" not in RUNNER_SCRIPT, "the sandbox base image is hardcoded again"
@@ -590,14 +584,20 @@ def test_sandbox_release_is_a_lane_property_not_the_runner_s() -> None:
     sandbox = EVIDENCE_WORKFLOW.split("\n  ubuntu-systemd-sandbox:\n", 1)[1]
     assert 'release: ["24.04", "26.04"]' in sandbox
     assert "runs-on: ${{ matrix.runner }}" in sandbox
-    # Comments are stripped: the workflow explains why it does not use the
-    # preview label, and naming it in prose must stay allowed.
-    executable = "\n".join(
-        line for line in EVIDENCE_WORKFLOW.splitlines() if not line.lstrip().startswith("#")
-    )
-    assert "ubuntu-26.04" not in executable, (
-        "a preview runner label entered the workflow; sandbox releases do not need one"
-    )
+    native = EVIDENCE_WORKFLOW.split("\n  ubuntu-native:\n", 1)[1].split(
+        "\n  ubuntu-systemd-sandbox:\n", 1
+    )[0]
+    assert "runner: ubuntu-26.04" in native
+    assert "runner: ubuntu-26.04-arm" in native
+    assert "stability: public-preview" in native
+    assert "RLDYOUR_EVIDENCE_RUNNER_STABILITY: ${{ matrix.stability }}" in native
+
+
+def test_actionlint_knows_the_confirmed_preview_runner_labels() -> None:
+    config = (ROOT / ".github/actionlint.yaml").read_text(encoding="utf-8")
+    assert "ubuntu-26.04" in config
+    assert "ubuntu-26.04-arm" in config
+    assert "does not register or route to a self-hosted runner" in config
 
 
 def test_container_readiness_accepts_a_settled_degraded_system() -> None:

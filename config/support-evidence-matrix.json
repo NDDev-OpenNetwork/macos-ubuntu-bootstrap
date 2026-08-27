@@ -1,8 +1,8 @@
 {
   "schema_version": 1,
   "adapter_version": "0.1.2",
-  "verified_on": "2026-08-27",
-  "expected_hosted_artifact_instances": 22,
+  "verified_on": "2026-08-28",
+  "expected_hosted_artifact_instances": 26,
   "status_vocabulary": [
     "PROVEN",
     "NOT_PROVEN",
@@ -416,14 +416,6 @@
   ],
   "known_evidence_gaps": [
     {
-      "id": "ubuntu-26.04-hosted-runtime",
-      "requirement": "OPTIONAL",
-      "status": "NOT_PROVEN",
-      "required_tier": "HOSTED_NATIVE",
-      "tracking_issue": 5,
-      "remaining_proof": "Re-evaluate a native ubuntu-26.04 hosted lane after GitHub removes the public-preview status; current 24.04/26.04 container pairs and disposable native 26.04 server evidence do not claim hosted-image GA."
-    },
-    {
       "id": "interactive-privilege-prompts",
       "requirement": "OPTIONAL",
       "status": "NOT_PROVEN",
@@ -784,7 +776,8 @@
         }
       ],
       "releases": [
-        "24.04"
+        "24.04",
+        "26.04"
       ]
     },
     {
@@ -814,7 +807,8 @@
         }
       ],
       "releases": [
-        "24.04"
+        "24.04",
+        "26.04"
       ]
     },
     {
@@ -852,7 +846,8 @@
         }
       ],
       "releases": [
-        "24.04"
+        "24.04",
+        "26.04"
       ]
     },
     {

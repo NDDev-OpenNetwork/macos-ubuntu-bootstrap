@@ -294,6 +294,15 @@ def test_gopls_provenance_is_declared_and_not_a_tracked_hash() -> None:
     assert "GOFLAGS=-mod=readonly" in source
 
 
+def test_gopls_checksum_verified_install_retries_transport_failures() -> None:
+    source = INSTALL.read_text(encoding="utf-8")
+    block = source.split("ensure_gopls() {", 1)[1].split("\n}", 1)[0]
+    assert "for attempt in 1 2 3" in block
+    assert "GOSUMDB=sum.golang.org" in block
+    assert "GOPROXY=https://proxy.golang.org,direct" in block
+    assert "sleep \"$attempt\"" in block
+
+
 # ---------- every installed tool is a verified tool ----------
 
 # Registry and Python package names are not command names. This table is the

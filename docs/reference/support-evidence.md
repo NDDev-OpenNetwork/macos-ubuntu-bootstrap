@@ -28,11 +28,12 @@ Evidence tiers are deliberately non-interchangeable:
 | `EXPECTED_FAIL_CLOSED` | An unsupported combination was rejected before mutation |
 | `REAL_HOST_REQUIRED` | Capability cannot be honestly established by the current hosted lane |
 
-The current workflow produces exactly 22 artifacts, one for every declared
+The current workflow produces exactly 26 artifacts, one for every declared
 `(lane, release, architecture)` expansion. It natively covers macOS Apple
-Silicon GUI/no-GUI installation, Ubuntu 24.04 amd64/arm64 desktop no-GUI
-installation, Ubuntu ARM64 GUI refusal before mutation, and native Ubuntu ARM64
-rootless Docker. Every disposable systemd lane runs separately for Ubuntu 24.04 and 26.04, so one release can
+Silicon GUI/no-GUI installation, Ubuntu 24.04 and 26.04 amd64/arm64 desktop
+no-GUI installation, Ubuntu ARM64 GUI refusal before mutation, and native
+Ubuntu ARM64 rootless Docker on both releases. Every disposable systemd lane
+runs separately for Ubuntu 24.04 and 26.04, so one release can
 never stand in for the other.
 
 Separate accepted real-host evidence proves Ubuntu 26.04 amd64 server
@@ -42,8 +43,7 @@ Fail2ban, rootful Docker and the Docker-published-port/UFW boundary. Those
 server facts are no longer `NOT_PROVEN` merely because they are outside the
 hosted artifact set.
 
-The remaining typed gaps are narrower: GitHub's native Ubuntu 26.04 labels
-while they remain public preview; a disposable Ubuntu 26.04 Desktop with a
+The remaining typed gaps are narrower: a disposable Ubuntu 26.04 Desktop with a
 logged-in GNOME session and real PolicyKit agent; a reboot-capable disposable
 macOS host for launchd/GUI recovery.
 The exact remaining proof and tracking issue for each gap lives in
@@ -51,12 +51,14 @@ The exact remaining proof and tracking issue for each gap lives in
 
 ## Authoritative platform boundaries
 
-Facts were rechecked on 2026-08-27:
+Facts were rechecked on 2026-08-28:
 
 - [GitHub-hosted runners](https://docs.github.com/en/actions/reference/runners/github-hosted-runners)
   lists standard public `ubuntu-24.04`, `ubuntu-24.04-arm`, and ARM64
   `macos-15` runners. `ubuntu-26.04` and `ubuntu-26.04-arm` remain public
-  preview. Hosted Linux and macOS VMs use passwordless sudo, so they
+  preview; the workflow runs them as explicitly labelled supplementary native
+  evidence and records `public-preview` in each artifact. Hosted Linux and
+  macOS VMs use passwordless sudo, so they
   cannot prove ordinary password or PolicyKit prompt behavior.
 - [Ubuntu supported architectures](https://documentation.ubuntu.com/project/how-ubuntu-is-made/concepts/supported-architectures/)
   includes amd64 and arm64. Vendor application artifacts impose the narrower

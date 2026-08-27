@@ -265,8 +265,10 @@ for path in (
     assert not stat.S_IMODE(value.st_mode) & 0o022
 PY
   NATIVE_USER_UID="$(id -u rldyourevidence)"
+  sudo install -d -o rldyourevidence -g rldyourevidence -m 0700 "/run/user/${NATIVE_USER_UID}"
   sudo loginctl enable-linger rldyourevidence
   sudo systemctl start "user@${NATIVE_USER_UID}.service"
+  sudo --user rldyourevidence test -w "/run/user/${NATIVE_USER_UID}"
   sudo test -S "/run/user/${NATIVE_USER_UID}/bus"
 }
 

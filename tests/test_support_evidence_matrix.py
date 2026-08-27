@@ -146,6 +146,7 @@ def test_native_evidence_user_does_not_inherit_runner_home_paths() -> None:
         "XDG_DATA_HOME=/home/rldyourevidence/.local/share",
         "XDG_CACHE_HOME=/home/rldyourevidence/.cache",
         "DOCKER_CONFIG=/home/rldyourevidence/.docker",
+        'sudo install -d -o rldyourevidence -g rldyourevidence -m 0700 "/run/user/${NATIVE_USER_UID}"',
     ):
         assert assignment in runner
 

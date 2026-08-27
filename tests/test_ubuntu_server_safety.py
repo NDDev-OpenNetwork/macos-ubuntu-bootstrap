@@ -501,6 +501,11 @@ def test_every_device_apt_install_waits_for_package_manager_lock() -> None:
     )
 
 
+def test_common_path_includes_bun_xdg_global_bin() -> None:
+    common = (ROOT / "scripts/lib/common.sh").read_text(encoding="utf-8")
+    assert '"${XDG_CACHE_HOME:-$HOME/.cache}/.bun/bin"' in common
+
+
 def test_the_ci_fixture_exemptions_still_exist_and_still_install() -> None:
     """An exemption for a file that no longer installs anything is stale."""
     for relative in sorted(CI_FIXTURE_INSTALLERS):

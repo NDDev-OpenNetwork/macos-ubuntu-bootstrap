@@ -244,6 +244,7 @@ rldyour::ensure_path() {
     "$HOME/.local/bin"
     "$HOME/.cargo/bin"
     "$HOME/.bun/bin"
+    "${XDG_CACHE_HOME:-$HOME/.cache}/.bun/bin"
     "$HOME/go/bin"
     "$HOME/.rldyour/bin"
     # The Codex CLI installs into its own target and publishes no link into

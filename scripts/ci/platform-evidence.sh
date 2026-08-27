@@ -270,8 +270,13 @@ PY
 native_ubuntu_cmd() {
   sudo --user rldyourevidence --set-home env \
     HOME=/home/rldyourevidence USER=rldyourevidence LOGNAME=rldyourevidence \
+    XDG_CONFIG_HOME=/home/rldyourevidence/.config \
+    XDG_DATA_HOME=/home/rldyourevidence/.local/share \
+    XDG_CACHE_HOME=/home/rldyourevidence/.cache \
     XDG_RUNTIME_DIR="/run/user/${NATIVE_USER_UID}" \
     DBUS_SESSION_BUS_ADDRESS="unix:path=/run/user/${NATIVE_USER_UID}/bus" \
+    DOCKER_CONFIG=/home/rldyourevidence/.docker \
+    DOCKER_HOST= DOCKER_CONTEXT= \
     bash -c "cd $(printf '%q' "$NATIVE_REPO_ROOT") && $1"
 }
 

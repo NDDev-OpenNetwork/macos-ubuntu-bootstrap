@@ -138,6 +138,18 @@ def test_workflow_and_runner_script_lane_sets_match_matrix() -> None:
         assert lane["lane"] in runner
 
 
+def test_native_evidence_user_does_not_inherit_runner_home_paths() -> None:
+    runner = (ROOT / "scripts/ci/platform-evidence.sh").read_text(encoding="utf-8")
+    for assignment in (
+        "HOME=/home/rldyourevidence",
+        "XDG_CONFIG_HOME=/home/rldyourevidence/.config",
+        "XDG_DATA_HOME=/home/rldyourevidence/.local/share",
+        "XDG_CACHE_HOME=/home/rldyourevidence/.cache",
+        "DOCKER_CONFIG=/home/rldyourevidence/.docker",
+    ):
+        assert assignment in runner
+
+
 # --------------------------------------------------------------------------
 # The gate observes, is required, and cannot silently lose a lane (#65)
 # --------------------------------------------------------------------------

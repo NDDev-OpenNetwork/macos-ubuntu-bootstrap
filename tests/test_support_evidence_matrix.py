@@ -593,6 +593,13 @@ def test_native_preview_and_sandbox_release_axes_remain_explicit() -> None:
     assert "RLDYOUR_EVIDENCE_RUNNER_STABILITY: ${{ matrix.stability }}" in native
 
 
+def test_actionlint_knows_the_confirmed_preview_runner_labels() -> None:
+    config = (ROOT / ".github/actionlint.yaml").read_text(encoding="utf-8")
+    assert "ubuntu-26.04" in config
+    assert "ubuntu-26.04-arm" in config
+    assert "does not register or route to a self-hosted runner" in config
+
+
 def test_container_readiness_accepts_a_settled_degraded_system() -> None:
     """`running` was never the property the lane needs.
 

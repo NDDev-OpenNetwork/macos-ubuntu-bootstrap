@@ -192,7 +192,10 @@ run_native_ubuntu_arm_rootless() {
   ensure_native_ubuntu_user
   native_ubuntu_cmd "bash scripts/bootstrap.sh --platform ubuntu --profile server --no-gui --docker-mode rootless --plan --strict"
   evidence_step plan
-  native_ubuntu_cmd "bash scripts/bootstrap.sh --platform ubuntu --profile server --no-gui --docker-mode rootless --apply --strict"
+  if ! native_ubuntu_cmd "bash scripts/bootstrap.sh --platform ubuntu --profile server --no-gui --docker-mode rootless --apply --strict"; then
+    native_ubuntu_cmd "systemctl --user status docker.service --no-pager -l || true; journalctl --user -u docker.service -n 80 --no-pager || true"
+    return 1
+  fi
   evidence_step apply
   native_ubuntu_cmd "RLDYOUR_PROFILE=server RLDYOUR_GUI_ENABLED=0 RLDYOUR_DOCKER_MODE=rootless bash scripts/ubuntu/verify.sh --strict"
   evidence_step strict_verify

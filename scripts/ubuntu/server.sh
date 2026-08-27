@@ -883,6 +883,10 @@ rldyour::ubuntu_server::stop_new_rootful_units_after_rootless_ready() {
   rldyour::ubuntu_server::as_root systemctl stop docker.socket
   rldyour::ubuntu_server::as_root systemctl stop docker.service containerd.service
   rldyour::ubuntu_server::as_root systemctl disable docker.socket docker.service containerd.service
+  # docker.socket can leave its filesystem node behind after the unit and all
+  # rootful processes are gone. This path is reached only for a preflight-clean
+  # host whose just-installed units and empty runtime were proven above.
+  rldyour::ubuntu_server::as_root rm -f /run/docker.sock /var/run/docker.sock
   # A successful systemctl stop can precede socket removal and process reap by
   # a short interval. Wait for the observable runtime state to converge before
   # deciding that the clean-host cutover failed.

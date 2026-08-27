@@ -273,6 +273,7 @@ rldyour::ubuntu_server::stop_new_rootful_units_after_rootless_ready
         "CALL:systemctl stop docker.socket",
         "CALL:systemctl stop docker.service containerd.service",
         "CALL:systemctl disable docker.socket docker.service containerd.service",
+        "CALL:rm -f /run/docker.sock /var/run/docker.sock",
     ]
 
 

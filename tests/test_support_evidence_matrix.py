@@ -149,6 +149,8 @@ def test_native_evidence_user_does_not_inherit_runner_home_paths() -> None:
         'sudo install -d -o rldyourevidence -g rldyourevidence -m 0700 "/run/user/${NATIVE_USER_UID}"',
     ):
         assert assignment in runner
+    assert "systemctl --user set-environment" in runner
+    assert 'grep -Fx "XDG_RUNTIME_DIR=/run/user/${NATIVE_USER_UID}"' in runner
 
 
 # --------------------------------------------------------------------------

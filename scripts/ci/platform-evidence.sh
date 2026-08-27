@@ -272,6 +272,20 @@ PY
   sudo systemctl start "user@${NATIVE_USER_UID}.service"
   sudo --user rldyourevidence test -w "/run/user/${NATIVE_USER_UID}"
   sudo test -S "/run/user/${NATIVE_USER_UID}/bus"
+  sudo --user rldyourevidence env \
+    XDG_RUNTIME_DIR="/run/user/${NATIVE_USER_UID}" \
+    DBUS_SESSION_BUS_ADDRESS="unix:path=/run/user/${NATIVE_USER_UID}/bus" \
+    systemctl --user set-environment \
+    HOME=/home/rldyourevidence \
+    XDG_RUNTIME_DIR="/run/user/${NATIVE_USER_UID}" \
+    XDG_CONFIG_HOME=/home/rldyourevidence/.config \
+    XDG_DATA_HOME=/home/rldyourevidence/.local/share \
+    XDG_CACHE_HOME=/home/rldyourevidence/.cache \
+    DOCKER_CONFIG=/home/rldyourevidence/.docker
+  sudo --user rldyourevidence env \
+    XDG_RUNTIME_DIR="/run/user/${NATIVE_USER_UID}" \
+    DBUS_SESSION_BUS_ADDRESS="unix:path=/run/user/${NATIVE_USER_UID}/bus" \
+    systemctl --user show-environment | grep -Fx "XDG_RUNTIME_DIR=/run/user/${NATIVE_USER_UID}"
 }
 
 native_ubuntu_cmd() {

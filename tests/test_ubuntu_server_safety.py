@@ -335,7 +335,7 @@ rldyour::ubuntu_server::install_docker_packages rootful
 
 
 def test_authorized_keys_readability_is_not_probed_with_external_test() -> None:
-    """`test -r` and an actual open disagree on Ubuntu 26.04 (#57).
+    """`test -r` and an actual open disagree on Ubuntu 26.04 (#5).
 
     Measured as root, with full capabilities, on a mode 0600 file owned by
     another user -- which is exactly what a correct `authorized_keys` is:

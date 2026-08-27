@@ -67,7 +67,7 @@ requires_container = pytest.mark.skipif(
 requires_systemd_container = pytest.mark.skip(
     reason=(
         "needs systemd as PID 1; `docker run` provides no init. Belongs in the "
-        "systemd sandbox lane rather than this one -- see #55"
+        "systemd sandbox lane rather than this one -- see #6"
     ),
 )
 

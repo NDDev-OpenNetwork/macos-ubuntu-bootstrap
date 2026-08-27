@@ -1449,7 +1449,7 @@ def test_helper_cleanup_aggregates_primary_signal_and_cleanup_results() -> None:
 
 
 def test_absolute_tool_follows_a_root_owned_alternatives_chain() -> None:
-    """Ubuntu 26.04 ships sudo through the alternatives system (#57).
+    """Ubuntu 26.04 ships sudo through the alternatives system (#5).
 
         /usr/bin/sudo -> /etc/alternatives/sudo -> /usr/bin/sudo.ws  (4755 root root)
 

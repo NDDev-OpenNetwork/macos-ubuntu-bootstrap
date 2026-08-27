@@ -190,10 +190,12 @@ run_native_ubuntu_arm_rootless() {
   prepare_clean_hosted_docker_state
   evidence_step clean_host_precondition
   ensure_native_ubuntu_user
+  native_ubuntu_cmd "id; stat -c '%U:%G %a %n' /run/user/${NATIVE_USER_UID}; test -w /run/user/${NATIVE_USER_UID}; systemctl --user show-environment | grep -E '^(HOME|XDG_RUNTIME_DIR)=' || true"
   native_ubuntu_cmd "bash scripts/bootstrap.sh --platform ubuntu --profile server --no-gui --docker-mode rootless --plan --strict"
   evidence_step plan
   if ! native_ubuntu_cmd "bash scripts/bootstrap.sh --platform ubuntu --profile server --no-gui --docker-mode rootless --apply --strict"; then
-    native_ubuntu_cmd "systemctl --user status docker.service --no-pager -l || true; journalctl --user -u docker.service -n 80 --no-pager || true"
+    sudo stat -c '%U:%G %a %n' "/run/user/${NATIVE_USER_UID}" || true
+    native_ubuntu_cmd "id; test -w /run/user/${NATIVE_USER_UID} || true; systemctl --user show-environment | grep -E '^(HOME|XDG_RUNTIME_DIR)=' || true; systemctl --user status docker.service --no-pager -l || true; journalctl --user -u docker.service -n 80 --no-pager || true"
     return 1
   fi
   evidence_step apply

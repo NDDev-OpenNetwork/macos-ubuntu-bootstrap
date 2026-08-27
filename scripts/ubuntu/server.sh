@@ -868,7 +868,12 @@ rldyour::ubuntu_server::stop_new_rootful_units_after_rootless_ready() {
     return 1
   fi
 
-  rldyour::ubuntu_server::as_root systemctl disable --now docker.socket docker.service containerd.service
+  # Stop the activation source first. A combined `disable --now` can stop
+  # docker.service before docker.socket; the still-active socket then starts
+  # the daemon again while systemctl is processing the remaining units.
+  rldyour::ubuntu_server::as_root systemctl stop docker.socket
+  rldyour::ubuntu_server::as_root systemctl stop docker.service containerd.service
+  rldyour::ubuntu_server::as_root systemctl disable docker.socket docker.service containerd.service
   if rldyour::ubuntu_server::docker_rootful_runtime_active; then
     rldyour::log "error" "newly installed rootful runtime remains active; rootless daemon was left running"
     return 1

@@ -254,6 +254,28 @@ def test_server_contract_contains_rollback_and_context_guards() -> None:
     assert "sudo install" not in installer
 
 
+def test_rootless_cutover_stops_socket_before_rootful_daemons() -> None:
+    result = run_server_function(
+        """
+RLDYOUR_SERVER_ROOTLESS_PREFLIGHT_STATE=clean
+RLDYOUR_SERVER_ROOTFUL_PREEXISTED=0
+rldyour::ubuntu_server::docker_rootless_daemon_ready() { return 0; }
+rldyour::ubuntu_server::system_unit_owned_by_package() { return 0; }
+rldyour::ubuntu_server::rootful_workloads_absent() { return 0; }
+rldyour::ubuntu_server::docker_rootful_runtime_active() { return 1; }
+rldyour::ubuntu_server::as_root() { printf 'CALL:%s\\n' "$*"; }
+rldyour::ubuntu_server::stop_new_rootful_units_after_rootless_ready
+"""
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+    calls = [line for line in result.stdout.splitlines() if line.startswith("CALL:")]
+    assert calls == [
+        "CALL:systemctl stop docker.socket",
+        "CALL:systemctl stop docker.service containerd.service",
+        "CALL:systemctl disable docker.socket docker.service containerd.service",
+    ]
+
+
 def test_real_host_evidence_records_docker_ufw_boundary_without_overclaim() -> None:
     evidence = json.loads(
         (ROOT / "evidence/real-host/ubuntu-26.04-amd64-docker-ufw-d33e73d.json").read_text(

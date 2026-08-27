@@ -192,7 +192,7 @@ rldyour::ubuntu_server::apt_update() {
 
 rldyour::ubuntu_server::apt_install() {
   rldyour::ubuntu_server::as_root env DEBIAN_FRONTEND=noninteractive \
-    apt-get install -y --no-install-recommends --no-upgrade "$@"
+    apt-get install -o DPkg::Lock::Timeout=120 -y --no-install-recommends --no-upgrade "$@"
 }
 
 rldyour::ubuntu_server::root_file_equals() {

@@ -481,6 +481,25 @@ def test_every_device_apt_install_refuses_to_upgrade() -> None:
     )
 
 
+def test_every_device_apt_install_waits_for_package_manager_lock() -> None:
+    missing = []
+    for path in sorted((ROOT / "scripts").rglob("*")):
+        if path.suffix not in {".sh", ".py"} or not path.is_file():
+            continue
+        relative = str(path.relative_to(ROOT))
+        if relative in CI_FIXTURE_INSTALLERS:
+            continue
+        for number, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
+            if line.lstrip().startswith("#") or "apt-get install" not in line:
+                continue
+            if "DPkg::Lock::Timeout=" not in line:
+                missing.append(f"{relative}:{number}: {line.strip()}")
+    assert missing == [], (
+        "these device package installs fail immediately when unattended apt "
+        f"briefly owns the dpkg lock: {missing}"
+    )
+
+
 def test_the_ci_fixture_exemptions_still_exist_and_still_install() -> None:
     """An exemption for a file that no longer installs anything is stale."""
     for relative in sorted(CI_FIXTURE_INSTALLERS):

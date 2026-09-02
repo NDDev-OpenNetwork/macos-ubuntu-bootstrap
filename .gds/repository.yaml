@@ -46,7 +46,7 @@ git:
 verification:
   commands:
     lint: ["bash scripts/ci/lint.sh"]
-    test: [".venv/bin/python -m pytest"]
+    test: ["bash scripts/ci/setup-test-env.sh && .venv/bin/python -m pytest"]
     build: ["bash scripts/ci/validate.sh"]
   required: ["lint", "test", "build"]
   required_contexts:

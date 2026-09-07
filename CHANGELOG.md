@@ -5,6 +5,11 @@ Versioning; the contract version in `config/rldyour-contract.json` moves with it
 
 ## [Unreleased]
 
+- Publish unsuccessful completed self-workflow attempts as unassigned,
+  repository-local CI evidence; preserve actual conclusions and exact attempts.
+- Register unreleased workflow dependencies by exact commit identity without
+  claiming a stable release; reject mismatched development metadata.
+
 - Corrected the support-evidence description from thirteen to twenty-six
   hosted artifacts, separated accepted Ubuntu 26.04 server/reboot/SSH/UFW and
   Docker evidence from the remaining real-host gaps, added native Ubuntu 24.04

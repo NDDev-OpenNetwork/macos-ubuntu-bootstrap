@@ -111,7 +111,7 @@
       "install_method": "verified-vendor-script",
       "launcher": "gk",
       "installer_url": "https://x.ai/cli/install.sh",
-      "installer_sha256": "65cf570a44ef216e496dfe45efc1602b20428b4678a38bdad8bbfd21f804fb9b"
+      "installer_sha256": "7fd6fdc75d9418b2e58356726fcbf1ae849416f773925da07d0ccc7a60d3e791"
     },
     "detection": {
       "_doc": "Where each active harness must resolve on an installed device, so the one-owner-per-harness policy is checkable instead of prose. `enforcement: owned-prefix` means this repository installs the harness and a resolution outside `owned_prefix_default` is drift -- normally a second copy from a package-manager global shadowing the managed one. `enforcement: observe-only` means the vendor's own installer chooses the target: the path is recorded so drift is visible, but this repository does not own it and will not fail on it.",

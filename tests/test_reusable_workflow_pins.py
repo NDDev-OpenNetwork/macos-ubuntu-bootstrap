@@ -53,3 +53,27 @@ def test_untagged_or_unregistered_pin_is_rejected() -> None:
     problems = module.validate(root)
     assert any("not registered" in problem for problem in problems)
     assert any("unused" in problem for problem in problems)
+
+
+def test_exact_development_commit_passes_without_a_release_claim() -> None:
+    version = "commit:" + "a" * 40
+    root = fixture(
+        "uses: example-org/workflows/.github/workflows/ci.yml@" + "a" * 40 + " # " + version + "\n"
+    )
+    path = root / "config/reusable-workflow-pins.json"
+    value = json.loads(path.read_text())
+    value["repositories"][0]["version"] = version
+    path.write_text(json.dumps(value))
+    assert module.validate(root) == []
+
+
+def test_development_identity_must_equal_registered_commit() -> None:
+    version = "commit:" + "b" * 40
+    root = fixture(
+        "uses: example-org/workflows/.github/workflows/ci.yml@" + "a" * 40 + " # " + version + "\n"
+    )
+    path = root / "config/reusable-workflow-pins.json"
+    value = json.loads(path.read_text())
+    value["repositories"][0]["version"] = version
+    path.write_text(json.dumps(value))
+    assert any("invalid release" in problem for problem in module.validate(root))

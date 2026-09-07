@@ -26,7 +26,7 @@ def validate(root: pathlib.Path) -> list[str]:
         commit = row.get("commit", "")
         if not re.fullmatch(r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+", repository):
             problems.append(f"{registry_path}: invalid repository {repository!r}")
-        if not re.fullmatch(r"[0-9]+\.[0-9]+\.[0-9]+", version):
+        if not re.fullmatch(r"[0-9]+\.[0-9]+\.[0-9]+", version) and version != "commit:" + commit:
             problems.append(f"{registry_path}: invalid release {version!r} for {repository}")
         if not re.fullmatch(r"[0-9a-f]{40}", commit):
             problems.append(f"{registry_path}: invalid commit for {repository}")
@@ -41,7 +41,7 @@ def validate(root: pathlib.Path) -> list[str]:
                 continue
             match = PIN.search(line)
             if match is None:
-                problems.append(f"{path}:{number}: reusable workflow needs full SHA and release comment")
+                problems.append(f"{path}:{number}: reusable workflow needs full SHA and release or exact commit comment")
                 continue
             repository, _workflow, commit, version = match.groups()
             expected = registry.get(repository)

@@ -91,3 +91,15 @@ tier. A successful evidence lane may contain typed `NOT_PROVEN` observations
 only for optional capabilities; every required capability must be `PROVEN`.
 See the [support/evidence reference](docs/reference/support-evidence.md) for the
 typed tiers, current hosted coverage, and explicit real-host gaps.
+
+
+## CI feedback
+
+The CI feedback workflow reports unsuccessful completed self-workflow attempts
+as unassigned issues in this repository. It uses a pinned publisher and records
+actual job conclusions and attempt identity without executing source-run code.
+Issue publication does not launch a repair agent or authorize deployment.
+
+Unreleased reusable workflows use `commit:<full SHA>` as their registered version
+and inline pin comment. The validator requires that identity to equal the pinned
+commit; it does not label development source as a stable release.

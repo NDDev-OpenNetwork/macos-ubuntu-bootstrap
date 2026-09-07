@@ -5,6 +5,10 @@ Versioning; the contract version in `config/rldyour-contract.json` moves with it
 
 ## [Unreleased]
 
+- Publish unsuccessful completed self-workflow attempts as unassigned,
+  repository-local CI evidence; preserve actual conclusions and exact attempts.
+- Register unreleased workflow dependencies by exact commit identity without
+  claiming a stable release; reject mismatched development metadata.
 - Refresh the Grok installer integrity pin after reviewing the current official
   script. Preserve checksum-before-execution and vendor-owned CLI boundaries;
   document review scope and the distinction from native installation evidence.

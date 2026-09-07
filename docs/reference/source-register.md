@@ -181,3 +181,25 @@ installation never resolves `latest` and uses only the exact tag URLs and hashes
 stored in the contract. Bootstrap also never invokes `herdr update`; version
 changes arrive through reviewed update PRs that refresh the tag, commit, asset
 URLs, hashes, tests, and this register together.
+
+
+## Grok installer review (2026-09-07)
+
+The current [official xAI installer](https://x.ai/cli/install.sh) was downloaded
+without execution and reviewed in full (517 lines). Its SHA-256 is
+`7fd6fdc75d9418b2e58356726fcbf1ae849416f773925da07d0ccc7a60d3e791`, matching
+the payload refused by the old pin in native macOS and Ubuntu CI. The previous
+installer bytes were unavailable for a byte comparison.
+
+The reviewed script validates version/channel and platform selection, downloads
+through xAI or its declared public artifact bucket, and checks the binary's
+version before Unix promotion. It uses the declared `.grok` ownership layout,
+installs shell completions and updates its managed shell-config block. The
+optional deployment-key path restricts its endpoint to HTTPS and uses a temporary
+private header file; this review did not exercise authenticated deployment.
+No credentials were read or created and no installer ran on the review host.
+
+The bootstrap still verifies the complete installer digest before execution.
+Its existing vendor-managed stable-channel contract is unchanged: this is an
+installer integrity pin, not a claim that the vendor's stable binary is frozen.
+Native platform validation supplies installation evidence separately.

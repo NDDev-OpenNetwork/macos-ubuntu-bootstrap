@@ -5,6 +5,10 @@ Versioning; the contract version in `config/rldyour-contract.json` moves with it
 
 ## [Unreleased]
 
+- Refresh the Grok installer integrity pin after reviewing the current official
+  script. Preserve checksum-before-execution and vendor-owned CLI boundaries;
+  document review scope and the distinction from native installation evidence.
+
 - Corrected the support-evidence description from thirteen to twenty-six
   hosted artifacts, separated accepted Ubuntu 26.04 server/reboot/SSH/UFW and
   Docker evidence from the remaining real-host gaps, added native Ubuntu 24.04

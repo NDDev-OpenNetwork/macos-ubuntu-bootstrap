@@ -20,7 +20,7 @@ jobs:
       id-token: write
       contents: read
       actions: read
-    uses: NDDev-OpenNetwork/ci-workflows/.github/workflows/public-scorecard-json.yml@409817cf743e76383c84e30c72edf781d73b71a1 # 0.1.11
+    uses: NDDev-OpenNetwork/ci-workflows/.github/workflows/public-scorecard-json.yml@706233fdc953d4281389c0fd5f8c1a007e19a1f5 # 0.1.15
     with:
       # Public repo: pull_request runs untrusted fork code. Pin the hosted runner
       # explicitly — the reusable's `runner` default belongs to the pinned commit,

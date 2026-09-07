@@ -305,44 +305,32 @@ def _mirror_contexts() -> set[str]:
     }
 
 
-def test_the_ruleset_mirror_does_not_require_a_check_that_cannot_report() -> None:
-    """This assertion used to be its own opposite, and that was the defect.
-
-    The mirror declared `evidence-gate`, the README explained the delta as a
-    pending proposal, and this test pinned it there -- so the one mechanism that
-    could have caught the mistake was instead holding it in place.
-
-    `platform-evidence.yml` has had `pull_request` as its only trigger since #77
-    closed #75. A pull request touching none of its `paths:` never receives the
-    context, and a fork's pull request skips every producer job, which
-    `evidence-gate` turns into a hard failure rather than an absence. Requiring
-    it would have made both classes unmergeable.
-
-    A check earns a place here by being able to report a definite result for
-    every pull request that can reach `main` -- not by being desirable.
-    """
-    contexts = _mirror_contexts()
-    assert "bootstrap-gate" in contexts
-    assert "evidence-gate" not in contexts, (
-        "evidence-gate is back in the ruleset mirror. It may only be required "
-        "once fork pull requests and out-of-path pull requests each receive a "
-        "documented, definite result -- see .github/rulesets/README.md."
-    )
+def test_ordinary_merge_checks_are_advisory_and_structural_protection_remains() -> None:
+    assert _mirror_contexts() == set()
+    assert {rule["type"] for rule in RULESET["rules"]} == {
+        "pull_request", "required_signatures", "deletion", "non_fast_forward"
+    }
+    assert required_contexts.mirror_contexts() == []
 
 
-def test_the_mirror_states_the_contexts_that_protect_main() -> None:
-    """The mirror is the only list a fork's pull request can read.
+@pytest.mark.parametrize("rules", [None, {}, [None], [{}],
+    [{"type": "required_status_checks"}],
+    [{"type": "required_status_checks", "parameters": {"required_status_checks": [None]}}],
+    [{"type": "required_status_checks", "parameters": {"required_status_checks": [{"context": ""}]}}],
+    [{"type": "required_status_checks", "parameters": {"required_status_checks": [{"context": "Gate"}, {"context": "Gate"}]}}],
+])
+def test_empty_policy_does_not_accept_malformed_observations(rules: object) -> None:
+    with pytest.raises(required_contexts.ContextError):
+        required_contexts.contexts_from_rules(rules, "fixture")
 
-    The live ruleset is the authority, and `check_required_contexts.py --live`
-    compares the two on every pull request in this repository. A fork has no
-    token for that API, so what a fork can still check is that the mirror parses
-    and names something — an empty or malformed mirror would make the live
-    comparison vacuous rather than failing.
-    """
-    contexts = required_contexts.mirror_contexts()
-    assert contexts, "the ruleset mirror names no required context"
-    assert contexts == sorted(contexts), "the mirror must be sorted so a diff is readable"
-    assert len(set(contexts)) == len(contexts), "the mirror repeats a context"
+
+def test_advisory_policy_still_rejects_live_required_checks() -> None:
+    live = required_contexts.contexts_from_rules([
+        {"type": "required_status_checks", "parameters": {"required_status_checks": [{"context": "Gate"}]}}
+    ], "fixture")
+    with pytest.raises(required_contexts.ContextError, match="disagree"):
+        required_contexts._report("live", live, "mirror", [])
+
 
 def test_release_requires_both_gates_before_publication() -> None:
     job = RELEASE_WORKFLOW.split("\n  verify-candidate:\n", 1)[1].split("\n  verify-tag:", 1)[0]
@@ -376,20 +364,11 @@ def test_release_requires_both_gates_before_publication() -> None:
     assert not re.search(r"^    if:", job, re.M)
 
 
-def test_the_tree_identity_property_is_backed_by_the_ruleset() -> None:
-    """The proof relies on strict required-status-checks, so assert it is set.
-
-    A merge commit has the same tree as its head only when the branch was up to
-    date. `strict_required_status_checks_policy` is what forces that; without it
-    the tree check would simply start failing, which is the safe direction, but
-    the projection should still say so.
-    """
-    strict = [
-        rule["parameters"]["strict_required_status_checks_policy"]
-        for rule in RULESET["rules"]
-        if rule["type"] == "required_status_checks"
-    ]
-    assert strict == [True], "verify-candidate's tree-identity proof assumes a strict policy"
+def test_release_tree_identity_is_verified_without_merge_status_requirements() -> None:
+    job = RELEASE_WORKFLOW.split("\n  verify-candidate:\n", 1)[1].split("\n  verify-tag:", 1)[0]
+    assert '[ "$candidate_tree" = "$head_tree" ] || {' in job
+    assert "exit 1" in job
+    assert _mirror_contexts() == set()
 
 
 def test_required_capabilities_declare_the_steps_a_lane_must_observe() -> None:

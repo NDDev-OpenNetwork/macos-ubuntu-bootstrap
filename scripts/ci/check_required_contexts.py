@@ -1,20 +1,8 @@
 #!/usr/bin/env python3
-"""Prove the three statements of `main`'s required checks are one list.
+"""Compare the declared and live ordinary-merge status-check policy.
 
-The contexts that protect `main` are written down three times:
-
-* the live ruleset, which is the authority;
-* ``.github/rulesets/branch-main.json``, the checked-in mirror a reviewer reads;
-
-Nothing compared them. The mirror was allowed to run ahead of the live ruleset
-as a "proposal", and the ``.gds`` list was bound by no test at all -- it happened
-to be correct, and nothing would have reported it if it stopped being. A reader,
-human or agent, cannot tell an accurate list from a stale one by looking.
-
-Two of the three are files, so they are compared on every test run. The live
-ruleset needs the API and is compared when ``--live`` is passed; CI passes it.
-
-Exit status is 0 only when every list compared is identical.
+An empty, well-formed context list is a valid advisory policy. API failures and
+malformed responses remain errors. Release publication checks are independent.
 """
 
 from __future__ import annotations
@@ -22,7 +10,6 @@ from __future__ import annotations
 import argparse
 import json
 import os
-import re
 import subprocess
 import sys
 from pathlib import Path
@@ -34,20 +21,35 @@ DEFAULT_REPO = "NDDev-OpenNetwork/macos-ubuntu-bootstrap"
 
 
 class ContextError(RuntimeError):
-    """The three declarations of the required checks do not agree."""
+    """The declared and observed required-check policies do not agree."""
+
+
+def contexts_from_rules(rules: object, source: str) -> list[str]:
+    if not isinstance(rules, list):
+        raise ContextError(f"{source}: rules must be an array")
+    contexts: list[str] = []
+    for rule in rules:
+        if not isinstance(rule, dict) or not isinstance(rule.get("type"), str):
+            raise ContextError(f"{source}: malformed rule")
+        if rule["type"] != "required_status_checks":
+            continue
+        parameters = rule.get("parameters")
+        checks = parameters.get("required_status_checks") if isinstance(parameters, dict) else None
+        if not isinstance(checks, list):
+            raise ContextError(f"{source}: malformed required status checks")
+        for check in checks:
+            context = check.get("context") if isinstance(check, dict) else None
+            if not isinstance(context, str) or not context.strip() or context in contexts:
+                raise ContextError(f"{source}: empty, duplicate or malformed context")
+            contexts.append(context)
+    return sorted(contexts)
 
 
 def mirror_contexts(path: Path = MIRROR) -> list[str]:
     ruleset = json.loads(path.read_text(encoding="utf-8"))
-    contexts = [
-        check["context"]
-        for rule in ruleset.get("rules", [])
-        if rule.get("type") == "required_status_checks"
-        for check in rule.get("parameters", {}).get("required_status_checks", [])
-    ]
-    if not contexts:
-        raise ContextError(f"{path}: declares no required status check")
-    return sorted(contexts)
+    if not isinstance(ruleset, dict) or "rules" not in ruleset:
+        raise ContextError(f"{path}: malformed ruleset mirror")
+    return contexts_from_rules(ruleset["rules"], str(path))
 
 
 def live_contexts(repo: str = DEFAULT_REPO) -> list[str]:
@@ -72,19 +74,11 @@ def live_contexts(repo: str = DEFAULT_REPO) -> list[str]:
             f"--live could not read {endpoint}: {exc.stderr.strip() or exc}"
         ) from exc
 
-    rules = json.loads(completed.stdout)
-    contexts = [
-        check["context"]
-        for rule in rules
-        if rule.get("type") == "required_status_checks"
-        for check in rule.get("parameters", {}).get("required_status_checks", [])
-    ]
-    if not contexts:
-        raise ContextError(
-            f"{endpoint} reports no required status check; either the ruleset was "
-            "emptied or this token cannot see it"
-        )
-    return sorted(contexts)
+    try:
+        rules = json.loads(completed.stdout)
+    except json.JSONDecodeError as exc:
+        raise ContextError(f"{endpoint}: malformed JSON") from exc
+    return contexts_from_rules(rules, endpoint)
 
 
 def _report(name_a: str, a: list[str], name_b: str, b: list[str]) -> None:

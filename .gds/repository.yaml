@@ -33,7 +33,7 @@ product:
       path: "tests"
 
 policy:
-  profiles: ["repository-default", "public-module"]
+  profiles: ["repository-default", "public-module", "continuous-development"]
   rollout_ring: "standard"
 
 git:
@@ -49,12 +49,7 @@ verification:
     test: ["bash scripts/ci/setup-test-env.sh && .venv/bin/python -m pytest"]
     build: ["bash scripts/ci/validate.sh"]
   required: ["lint", "test", "build"]
-  required_contexts:
-    - "Dependency pin checks"
-    - "Gitleaks secret scan / Gitleaks secret scan"
-    - "bootstrap-gate"
-    - "bootstrap-pytests / python (uv, 3.14)"
-    - "dependency-review / Dependency review"
+  required_contexts: []
 
 agent:
   context_profile: "project-default"
@@ -70,3 +65,4 @@ module:
 
 release:
   mode: "bundle"
+  tag_style: "semver"

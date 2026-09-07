@@ -14,3 +14,5 @@ dist/
 
 # uv-created test environment (CI builds it from requirements-test.txt).
 .venv/
+# Pinned uv installer staging created by scripts/ci/setup-test-env.sh.
+.uv/

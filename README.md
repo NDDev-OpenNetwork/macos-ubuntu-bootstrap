@@ -95,6 +95,11 @@ typed tiers, current hosted coverage, and explicit real-host gaps.
 
 ## CI feedback
 
+Ordinary CI reports evidence and failures without blocking merge or deployment.
+Pull requests, signed commits, deletion protection and non-fast-forward
+protection remain required. Release publication separately requires the exact
+candidate checks, matching source tree, and verified platform-evidence verdict.
+
 The CI feedback workflow reports unsuccessful completed self-workflow attempts
 as unassigned issues in this repository. It uses a pinned publisher and records
 actual job conclusions and attempt identity without executing source-run code.

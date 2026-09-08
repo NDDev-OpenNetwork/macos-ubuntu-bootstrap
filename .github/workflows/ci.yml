@@ -42,14 +42,16 @@ jobs:
           - macos-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 1
           persist-credentials: false
 
       - name: Prepare validation tools
+        env:
+          MATRIX_OS: ${{ matrix.os }}
         run: |
-          if [ "${{ matrix.os }}" = "macos-latest" ]; then
+          if [ "$MATRIX_OS" = "macos-latest" ]; then
             brew update
             brew install shellcheck ripgrep
           else
@@ -75,15 +77,17 @@ jobs:
             platform: macos
     steps:
       - name: Checkout
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 1
           persist-credentials: false
 
       - name: Prepare validation tools
         if: github.event_name != 'workflow_dispatch' || inputs.platform == 'both' || inputs.platform == matrix.platform
+        env:
+          MATRIX_OS: ${{ matrix.os }}
         run: |
-          case "${{ matrix.os }}" in
+          case "$MATRIX_OS" in
             macos*) 
               brew update
               brew install shellcheck ripgrep
@@ -99,19 +103,8 @@ jobs:
         run: |
           bash scripts/ci/validate.sh
 
-      # The repository-metadata contract, on both supported operating systems.
-      #
-      # This is what `cross-platform.yml` proved, through two required status
-      # checks and two runner starts on every push, pull request and weekly
-      # schedule: that four files exist and `VERSION` is readable. Both jobs ran
-      # the same block; neither ran a line of this adapter. A platform-specific
-      # regression passed both.
-      #
-      # It is a real invariant -- every consumer resolves the adapter by these
-      # four files -- so it is kept, folded into a job that already runs on both
-      # platforms and already has to be green to merge. Two required contexts
-      # become zero, and the assertion gets stronger: it now runs beside the
-      # lanes that execute the installers.
+      # Check repository metadata in the existing native validation matrix.
+      # This contributes advisory CI evidence and the separate release gate.
       - name: Verify the repository metadata contract
         if: github.event_name != 'workflow_dispatch' || inputs.platform == 'both' || inputs.platform == matrix.platform
         run: |
@@ -125,12 +118,14 @@ jobs:
 
       - name: Verify bootstrap entrypoint for target platform
         if: github.event_name != 'workflow_dispatch' || inputs.platform == 'both' || inputs.platform == matrix.platform
+        env:
+          TARGET_PLATFORM: ${{ matrix.platform }}
         run: |
           args=(--profile desktop)
-          if [ "${{ matrix.platform }}" = "ubuntu" ]; then
+          if [ "$TARGET_PLATFORM" = "ubuntu" ]; then
             args+=(--no-gui)
           fi
-          bash scripts/bootstrap.sh --platform "${{ matrix.platform }}" "${args[@]}" --plan --skip-checks
+          bash scripts/bootstrap.sh --platform "$TARGET_PLATFORM" "${args[@]}" --plan --skip-checks
 
   bootstrap-dryrun-crosscheck:
     needs: bootstrap-validate
@@ -149,38 +144,25 @@ jobs:
             cross_platform: ubuntu
     steps:
       - name: Checkout
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 1
           persist-credentials: false
 
       - name: Crosscheck other platform installer in plan mode
         if: github.event_name != 'workflow_dispatch' || inputs.platform == 'both' || inputs.platform == matrix.platform
+        env:
+          CROSS_PLATFORM: ${{ matrix.cross_platform }}
         run: |
           args=(--profile desktop --no-gui)
-          bash scripts/bootstrap.sh --platform "${{ matrix.cross_platform }}" "${args[@]}" --plan --skip-system --skip-checks
+          bash scripts/bootstrap.sh --platform "$CROSS_PLATFORM" "${args[@]}" --plan --skip-system --skip-checks
 
-  # This lane feeds the required `bootstrap-gate`, and it used to acquire its
-  # linter mutably: `raven-actions/actionlint` was pinned to a commit, but that
-  # action's `version` input defaults to `latest` and it verifies no checksum.
-  # Pinning the wrapper and letting it resolve whatever bytes are newest is not
-  # a content-addressed supply chain -- the same repository commit could lint
-  # with a different program tomorrow, in the one check that must be green to
-  # merge.
-  #
-  # The checksum-bound implementation already existed in `ci-workflows` and was
-  # already what `actionlint.yml` called -- but that workflow was not a required
-  # context, so the repository ran the strong lane advisorily and the weak lane
-  # as its gate. `actionlint.yml` is deleted with this change; keeping two
-  # implementations of one check is how they drift.
-  #
-  # Version and digest come from `config/rldyour-contract.json`, the same values
-  # a device installs, and `scripts/ci/check_ci_tool_parity.py` fails if they
-  # drift apart.
+  # The checksum-bound linter contributes to bootstrap-gate. Version and digest
+  # match config/rldyour-contract.json through check_ci_tool_parity.py.
   workflow-lint:
     permissions:
       contents: read
-    uses: NDDev-OpenNetwork/ci-workflows/.github/workflows/actionlint.yml@409817cf743e76383c84e30c72edf781d73b71a1 # 0.1.11
+    uses: NDDev-OpenNetwork/ci-workflows/.github/workflows/actionlint.yml@bc9c7919de1c39d947a8709a92856925051bae05 # commit:bc9c7919de1c39d947a8709a92856925051bae05
     with:
       # Public repo: pull_request runs untrusted fork code. Pin the hosted runner
       # explicitly. The estate runner platform forbids public/fork code on a
@@ -192,11 +174,8 @@ jobs:
       actionlint_version: '1.7.12'
       actionlint_sha256: '8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8'
 
-  # Proves the three statements of what protects `main` are one list: the live
-  # ruleset, the checked-in mirror, and `.gds/repository.yaml`. It reaches the
-  # API, so it is its own job rather than a step inside a matrix that would run
-  # it twice, and it joins `bootstrap-gate` rather than becoming an eighth
-  # required context -- the gate is the aggregation point that already exists.
+  # Compare the live branch rules with the checked-in mirror once per run.
+  # Explicitly empty required checks are valid; API failures are not success.
   required-contexts:
     runs-on: ubuntu-latest
     name: required-contexts
@@ -204,19 +183,15 @@ jobs:
       contents: read
     steps:
       - name: Checkout
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 1
           persist-credentials: false
 
-      - name: Live ruleset, mirror and anchor must agree
+      - name: Live ruleset and mirror must agree
         env:
           GH_TOKEN: ${{ github.token }}
-        run: # --live compares the mirror with the branch's own rules API. Restore the
-          # flag once this repository has a branch ruleset: until one exists the
-          # comparison has nothing to read, and a check that cannot fail is worse
-          # than an absent one. Without it the mirror is still checked for shape.
-          python3 scripts/ci/check_required_contexts.py
+        run: python3 scripts/ci/check_required_contexts.py --live
 
   bootstrap-gate:
     needs: [bootstrap-script-lint, bootstrap-validate, bootstrap-dryrun-crosscheck, workflow-lint, required-contexts]
@@ -224,32 +199,38 @@ jobs:
     if: always()
     steps:
       - name: Bootstrap CI gate
+        env:
+          SCRIPT_LINT_RESULT: ${{ needs.bootstrap-script-lint.result }}
+          VALIDATE_RESULT: ${{ needs.bootstrap-validate.result }}
+          WORKFLOW_LINT_RESULT: ${{ needs.workflow-lint.result }}
+          CONTEXTS_RESULT: ${{ needs.required-contexts.result }}
+          CROSSCHECK_RESULT: ${{ needs.bootstrap-dryrun-crosscheck.result }}
         run: |
           echo "Checking required bootstrap workflow jobs"
           echo "mode=plan"
 
-          if [[ "${{ needs.bootstrap-script-lint.result }}" != "success" ]]; then
-            echo "bootstrap-script-lint: ${{ needs.bootstrap-script-lint.result }}" >&2
+          if [[ "$SCRIPT_LINT_RESULT" != "success" ]]; then
+            echo "bootstrap-script-lint: $SCRIPT_LINT_RESULT" >&2
             exit 1
           fi
 
-          if [[ "${{ needs.bootstrap-validate.result }}" != "success" ]]; then
-            echo "bootstrap-validate: ${{ needs.bootstrap-validate.result }}" >&2
+          if [[ "$VALIDATE_RESULT" != "success" ]]; then
+            echo "bootstrap-validate: $VALIDATE_RESULT" >&2
             exit 1
           fi
 
-          if [[ "${{ needs.workflow-lint.result }}" != "success" ]]; then
-            echo "workflow-lint: ${{ needs.workflow-lint.result }}" >&2
+          if [[ "$WORKFLOW_LINT_RESULT" != "success" ]]; then
+            echo "workflow-lint: $WORKFLOW_LINT_RESULT" >&2
             exit 1
           fi
 
-          if [[ "${{ needs.required-contexts.result }}" != "success" ]]; then
-            echo "required-contexts: ${{ needs.required-contexts.result }}" >&2
+          if [[ "$CONTEXTS_RESULT" != "success" ]]; then
+            echo "required-contexts: $CONTEXTS_RESULT" >&2
             exit 1
           fi
 
-          if [[ "${{ needs.bootstrap-dryrun-crosscheck.result }}" != "success" ]]; then
-            echo "bootstrap-dryrun-crosscheck: ${{ needs.bootstrap-dryrun-crosscheck.result }}" >&2
+          if [[ "$CROSSCHECK_RESULT" != "success" ]]; then
+            echo "bootstrap-dryrun-crosscheck: $CROSSCHECK_RESULT" >&2
             exit 1
           fi
 

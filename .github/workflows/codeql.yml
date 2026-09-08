@@ -24,10 +24,7 @@ on:
   schedule:
     - cron: '0 5 * * 1'
 
-permissions:
-  contents: read
-  actions: read
-  security-events: write
+permissions: {}
 
 concurrency:
   group: codeql-${{ github.workflow }}-${{ github.ref }}
@@ -37,10 +34,10 @@ jobs:
   analyze:
     name: codeql-analysis
     permissions:
-      actions: read
+      actions: read # Read workflow metadata for CodeQL analysis.
       contents: read
-      security-events: write
-    uses: NDDev-OpenNetwork/ci-workflows/.github/workflows/public-codeql.yml@409817cf743e76383c84e30c72edf781d73b71a1 # 0.1.11
+      security-events: write # Upload CodeQL SARIF to this repository.
+    uses: NDDev-OpenNetwork/ci-workflows/.github/workflows/public-codeql.yml@bc9c7919de1c39d947a8709a92856925051bae05 # commit:bc9c7919de1c39d947a8709a92856925051bae05
     with:
       # Public repo: pull_request runs untrusted fork code. Pin the hosted runner
       # explicitly — the reusable's `runner` default belongs to the pinned commit,

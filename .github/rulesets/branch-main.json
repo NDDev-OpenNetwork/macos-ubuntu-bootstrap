@@ -38,30 +38,6 @@
           "merge"
         ]
       }
-    },
-    {
-      "type": "required_status_checks",
-      "parameters": {
-        "strict_required_status_checks_policy": true,
-        "do_not_enforce_on_create": false,
-        "required_status_checks": [
-          {
-            "context": "bootstrap-gate"
-          },
-          {
-            "context": "bootstrap-pytests / python (uv, 3.14)"
-          },
-          {
-            "context": "Gitleaks secret scan / Gitleaks secret scan"
-          },
-          {
-            "context": "dependency-review / Dependency review"
-          },
-          {
-            "context": "Dependency pin checks"
-          }
-        ]
-      }
     }
   ]
 }

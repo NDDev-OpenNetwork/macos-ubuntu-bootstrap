@@ -5,6 +5,12 @@ Versioning; the contract version in `config/rldyour-contract.json` moves with it
 
 ## [Unreleased]
 
+- Make ordinary merge CI advisory while preserving structural branch protections
+  and independent release evidence gates; accept an explicit empty required-check
+  policy without accepting malformed live observations.
+- Consume verified current reusable-workflow commits and declare the numeric
+  release tag style used by this module.
+
 - Publish unsuccessful completed self-workflow attempts as unassigned,
   repository-local CI evidence; preserve actual conclusions and exact attempts.
 - Register unreleased workflow dependencies by exact commit identity without

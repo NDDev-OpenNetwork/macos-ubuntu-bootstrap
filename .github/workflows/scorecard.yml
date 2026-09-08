@@ -17,10 +17,10 @@ jobs:
   analysis:
     name: OSSF Scorecard
     permissions:
-      id-token: write
+      id-token: write # Authenticate the optional Scorecard result publication.
       contents: read
-      actions: read
-    uses: NDDev-OpenNetwork/ci-workflows/.github/workflows/public-scorecard-json.yml@409817cf743e76383c84e30c72edf781d73b71a1 # 0.1.11
+      actions: read # Read workflow metadata for Scorecard analysis.
+    uses: NDDev-OpenNetwork/ci-workflows/.github/workflows/public-scorecard-json.yml@bc9c7919de1c39d947a8709a92856925051bae05 # commit:bc9c7919de1c39d947a8709a92856925051bae05
     with:
       # Public repo: pull_request runs untrusted fork code. Pin the hosted runner
       # explicitly — the reusable's `runner` default belongs to the pinned commit,

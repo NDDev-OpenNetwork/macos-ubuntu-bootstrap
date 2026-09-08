@@ -166,13 +166,13 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:
-      checks: read
+      checks: read # Verify the exact candidate check results before publication.
       contents: read
       # Reads the evidence verdict the pull request's run published. Listing and
       # downloading another run's artifacts needs this; `checks: read` alone
       # only answers what a check concluded, which is exactly what stopped
       # being proof.
-      actions: read
+      actions: read # Read and download the exact PR evidence verdict artifact.
     steps:
       - name: Checkout the candidate with full history
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -204,11 +204,9 @@ jobs:
       # hand it write access to the default-branch cache scope -- this proves the
       # candidate is the same tree the evidence was produced from.
       #
-      # `main`'s ruleset sets strict_required_status_checks_policy, so a branch
-      # must be up to date before it merges, and the merge commit of an
-      # up-to-date branch has the same tree as its head. That is the property
-      # relied on, and it is verified rather than assumed: a candidate whose tree
-      # differs from the head that carries the evidence fails here.
+      # Ordinary merge checks are advisory. Publication independently verifies
+      # exact tree equality below and refuses any candidate whose merge changed
+      # the tree that produced the evidence, regardless of merge policy.
       - name: Require verified evidence for the tree this candidate carries
         env:
           GH_TOKEN: ${{ github.token }}
@@ -293,7 +291,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:
-      checks: read
+      checks: read # Verify the exact candidate check results before publication.
       contents: read
     steps:
       - name: Checkout exact dispatch commit
@@ -342,11 +340,11 @@ jobs:
     needs: [resolve, verify-candidate, verify-tag]
     if: ${{ always() && needs.resolve.result == 'success' && needs.verify-candidate.result == 'success' && (needs.verify-tag.result == 'success' || needs.verify-tag.result == 'skipped') }}
     permissions:
-      contents: write
-      id-token: write
-      attestations: write
+      contents: write # Publish the verified immutable release and assets.
+      id-token: write # Request OIDC identity for release provenance.
+      attestations: write # Publish the release provenance and SBOM attestations.
       artifact-metadata: write   # actions/attest artifact storage record (required at v4.1.1)
-    uses: NDDev-OpenNetwork/ci-workflows/.github/workflows/release-supply-chain.yml@409817cf743e76383c84e30c72edf781d73b71a1 # 0.1.11
+    uses: NDDev-OpenNetwork/ci-workflows/.github/workflows/release-supply-chain.yml@bc9c7919de1c39d947a8709a92856925051bae05 # commit:bc9c7919de1c39d947a8709a92856925051bae05
     with:
       # Public repo: pull_request runs untrusted fork code. Pin the hosted runner
       # explicitly. The estate runner platform forbids public/fork code on a

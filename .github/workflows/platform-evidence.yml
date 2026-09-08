@@ -39,8 +39,8 @@ on:
   #   through re-run-jobs on the original pull request's run.
   # - `push: [main]` was tried, to give release candidates their own evidence,
   #   and reverted for the same reason. `release.yml` proves instead that the
-  #   candidate's tree is identical to a head whose `evidence-gate` is green,
-  #   which `main`'s strict required-status-checks policy already guarantees.
+  #   candidate's tree is identical to the head with verified evidence. This
+  #   explicit equality check remains required when ordinary merge CI is advisory.
 
 permissions: {}
 
@@ -147,7 +147,8 @@ jobs:
       - name: Native Apple Silicon apply and strict verification
         env:
           EVIDENCE_SHA: ${{ github.event.pull_request.head.sha }}
-        run: bash scripts/ci/platform-evidence.sh "${{ matrix.lane }}" "$RUNNER_TEMP/evidence"
+          EVIDENCE_LANE: ${{ matrix.lane }}
+        run: bash scripts/ci/platform-evidence.sh "$EVIDENCE_LANE" "$RUNNER_TEMP/evidence"
       - name: Upload sanitized evidence
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
@@ -212,7 +213,8 @@ jobs:
           EVIDENCE_SHA: ${{ github.event.pull_request.head.sha }}
           RLDYOUR_EVIDENCE_RELEASE: ${{ matrix.release }}
           RLDYOUR_EVIDENCE_RUNNER_STABILITY: ${{ matrix.stability }}
-        run: bash scripts/ci/platform-evidence.sh "${{ matrix.lane }}" "$RUNNER_TEMP/evidence"
+          EVIDENCE_LANE: ${{ matrix.lane }}
+        run: bash scripts/ci/platform-evidence.sh "$EVIDENCE_LANE" "$RUNNER_TEMP/evidence"
       - name: Upload sanitized evidence
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
@@ -264,7 +266,8 @@ jobs:
         env:
           EVIDENCE_SHA: ${{ github.event.pull_request.head.sha }}
           RLDYOUR_EVIDENCE_RELEASE: ${{ matrix.release }}
-        run: bash scripts/ci/platform-evidence.sh "${{ matrix.lane }}" "$RUNNER_TEMP/evidence"
+          EVIDENCE_LANE: ${{ matrix.lane }}
+        run: bash scripts/ci/platform-evidence.sh "$EVIDENCE_LANE" "$RUNNER_TEMP/evidence"
       - name: Upload sanitized evidence
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
@@ -358,7 +361,7 @@ jobs:
     runs-on: ubuntu-24.04
     needs: [scope, macos-native, ubuntu-native, ubuntu-systemd-sandbox, ubuntu-safeguards, privileged-container]
     permissions:
-      actions: read
+      actions: read # Download the exact producer artifacts for the evidence verdict.
     steps:
       # Out of scope: nothing this change touched can alter what a device gets,
       # so there is no evidence to require. Stated in the summary rather than

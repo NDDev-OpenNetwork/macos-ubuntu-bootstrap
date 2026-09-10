@@ -23,7 +23,9 @@ permission prompts. Authentication is performed afterward with
 Herdr is a required terminal tool on macOS and every Ubuntu profile. Both
 platforms install the pinned architecture-specific binary from the official
 `herdrdev/herdr` GitHub release and verify its checksum, managed launcher,
-runtime receipt, and exact version. Bootstrap does not depend on a lagging
+runtime receipt, and exact version. Ubuntu also installs a user-systemd oom
+guard that moves MCP and language-server processes into a killable cgroup so
+systemd-oomd cannot take the multiplexer down with them. Bootstrap does not depend on a lagging
 or subsequently updated Homebrew formula for the managed macOS runtime. The pinned upstream identity,
 independently verified asset hashes, and update policy are recorded in the
 [dependency source register](reference/source-register.md).

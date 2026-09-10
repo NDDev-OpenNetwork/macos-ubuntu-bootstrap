@@ -1,0 +1,22 @@
+# Managed by macos-ubuntu-bootstrap: herdr-oom-guard-unit-v1
+[Unit]
+Description=Herdr systemd-oomd isolation guard
+Documentation=man:systemd-oomd.service(8)
+Wants=herdr-reclaim.service
+After=herdr-reclaim.service
+# Wants, not Requires: if oomd kills the reclaim unit the guard must keep
+# running so it can recreate it and re-attach new MCP/LSP processes.
+
+[Service]
+Type=exec
+ExecStart=%h/.local/lib/rldyour/herdr-oom-guard.sh
+Restart=always
+RestartSec=2
+Nice=10
+MemoryAccounting=yes
+ManagedOOMPreference=omit
+OOMPolicy=continue
+KillMode=mixed
+
+[Install]
+WantedBy=default.target

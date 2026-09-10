@@ -1,0 +1,23 @@
+# Managed by macos-ubuntu-bootstrap: herdr-oom-guard-unit-v1
+[Unit]
+Description=Herdr reclaimable MCP/LSP cgroup
+Documentation=man:systemd-oomd.service(8)
+
+[Service]
+Type=exec
+ExecStart=/bin/sleep infinity
+Restart=always
+RestartSec=1
+# Placeholder only. The oom-guard attaches MCP/LSP PIDs here so systemd-oomd
+# can kill this leaf cgroup without taking Herdr or agent CLIs with it.
+OOMScoreAdjust=1000
+OOMPolicy=continue
+MemoryAccounting=yes
+ManagedOOMPreference=none
+KillMode=control-group
+# AttachProcessesToUnit refuses non-delegated destinations:
+# "Process migration not available on non-delegated units."
+Delegate=cpu memory pids
+
+[Install]
+WantedBy=default.target

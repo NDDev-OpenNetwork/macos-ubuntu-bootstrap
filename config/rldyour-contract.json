@@ -249,17 +249,17 @@
         }
       },
       "age": {
-        "version": "1.3.1",
+        "version": "1.3.2",
         "sha256": {
-          "x64": "bdc69c09cbdd6cf8b1f333d372a1f58247b3a33146406333e30c0f26e8f51377",
-          "arm64": "c6878a324421b69e3e20b00ba17c04bc5c6dab0030cfe55bf8f68fa8d9e9093a"
+          "x64": "cbe24006683f8eb669266162894b9a522a1af52f2665fbc63a4bb032ed26ac10",
+          "arm64": "6b8dc4333c53a5a57c9e5834e3a48f92605d7154014cd07269ff3327db5d37f4"
         }
       },
       "ast-grep": {
-        "version": "0.45.2",
+        "version": "0.45.3",
         "sha256": {
-          "x64": "67aff72dd2994bf152fcc3a8a09cf93b13193abe59f39393095167c729af2015",
-          "arm64": "e67ee2f5928b4d77a472114edf6e227d90fefe22fa47e7a78db187c55d206564"
+          "x64": "f8ac830881339d1edee6b2652f54798c0f4da5a827f2db38a08ee31117783ce8",
+          "arm64": "b39cfbc58da4b869a88b8a4bc57bd5deb0d24541e704cf7c257da7b53ec81c8f"
         }
       },
       "eza": {
@@ -270,10 +270,10 @@
         }
       },
       "lazygit": {
-        "version": "0.64.1",
+        "version": "0.65.0",
         "sha256": {
-          "x64": "f8ea237c41f194cd799b48505518bfdaae4edf5a2ad6bd3d898e939785ee4532",
-          "arm64": "8b7ca3b344e60340ad1f89f29b9868ee39bcaba5bb92ee818bbe65476bb8b6e7"
+          "x64": "44d8e7dd1484b4a66e191bd4ab25a71e8b4b3a65ab122f838e65677ef58c5506",
+          "arm64": "d954a09c128bd37b2bd0d254308474e87de3729cfe0e37f5b46a49357a4fe257"
         }
       },
       "difft": {
@@ -315,7 +315,7 @@
   },
   "user_tools": {
     "herdr": {
-      "version": "0.8.2",
+      "version": "0.9.0",
       "summary": "Terminal workspace manager for AI coding agents (tmux-style multiplexer with agent session support).",
       "install_method": {
         "linux": "verified-github-release-binary",
@@ -323,25 +323,25 @@
       },
       "source": {
         "repository": "https://github.com/herdrdev/herdr",
-        "tag": "v0.8.2",
-        "tag_object": "34ba52cc6ff3b723e6fc0130485ec24582dbe205",
-        "commit": "9eb521456ac0d19d3ab3d9d7cea3cca10baa8a4c",
-        "release": "https://github.com/herdrdev/herdr/releases/tag/v0.8.2",
+        "tag": "v0.9.0",
+        "tag_object": "cca4af8dfad160bc5fb5ae133b70882b5fe28f61",
+        "commit": "b99002ac99b09e00b4ca692436cb15a6b0d676f1",
+        "release": "https://github.com/herdrdev/herdr/releases/tag/v0.9.0",
         "release_feed": "https://github.com/herdrdev/herdr/releases.atom",
         "upstream_manifest": "https://herdr.dev/latest.json",
-        "verified_at": "2026-08-13",
+        "verified_at": "2026-09-10",
         "assets": {
           "macos-aarch64": {
-            "url": "https://github.com/herdrdev/herdr/releases/download/v0.8.2/herdr-macos-aarch64",
-            "sha256": "a5d4f4d504d8b309c91f811050559300faba31258425f53c50852fc96f6ae574"
+            "url": "https://github.com/herdrdev/herdr/releases/download/v0.9.0/herdr-macos-aarch64",
+            "sha256": "32b53df09872628059c789a69f02a6b8e29e14ddf26711421f3463f70c1aef17"
           },
           "linux-x86_64": {
-            "url": "https://github.com/herdrdev/herdr/releases/download/v0.8.2/herdr-linux-x86_64",
-            "sha256": "976150a14d490c94b243ea2e1a7eb2dfb67f12e36b182db90936f6728e6aecf4"
+            "url": "https://github.com/herdrdev/herdr/releases/download/v0.9.0/herdr-linux-x86_64",
+            "sha256": "4fa1a01158dd8043da92d31b270780b0dcc10603038d9b61cac4d81ab63fb71f"
           },
           "linux-aarch64": {
-            "url": "https://github.com/herdrdev/herdr/releases/download/v0.8.2/herdr-linux-aarch64",
-            "sha256": "f55610658e1c2e0d2aaef730b4b2ab885f7f8ba00285ab372bfb14f2e3d5b40d"
+            "url": "https://github.com/herdrdev/herdr/releases/download/v0.9.0/herdr-linux-aarch64",
+            "sha256": "9c8db20fb7e7427b138d5367113f1621ffd319f2f65d6f009e2594029115f0d2"
           }
         }
       },
@@ -367,12 +367,12 @@
       ]
     },
     "telegram": {
-      "version": "7.1.2",
+      "version": "7.2.8",
       "summary": "Telegram Desktop messenger from the official telegramdesktop/tdesktop GitHub release.",
       "install_method": "verified-github-release-tarball",
       "repo": "telegramdesktop/tdesktop",
-      "url": "https://github.com/telegramdesktop/tdesktop/releases/download/v7.1.2/tsetup.7.1.2.tar.xz",
-      "archive_sha256": "0a62f115eeeebd23215461e496a046095c46c9c3d17884f5422148a23f41fe9d",
+      "url": "https://github.com/telegramdesktop/tdesktop/releases/download/v7.2.8/td-setup-linux-x64-7.2.8.tar.xz",
+      "archive_sha256": "60313dfd5441d7013b2af351574bdf0a3688110d5bce00b837d54d14608cebd8",
       "architectures": [
         "x86_64"
       ],
@@ -416,7 +416,7 @@
       "target": "${HOME}/.local/share/applications/org.telegram.desktop.desktop",
       "icon": "org.telegram.desktop",
       "upstream_source_commit": "a1e89e1f64f08cb058caf1c61ff43f319f98a6ec",
-      "upstream_desktop_entry": "https://github.com/telegramdesktop/tdesktop/blob/v7.1.2/lib/xdg/org.telegram.desktop.desktop",
+      "upstream_desktop_entry": "https://github.com/telegramdesktop/tdesktop/blob/v7.2.8/lib/xdg/org.telegram.desktop.desktop",
       "icon_assets": [
         {
           "source_url": "https://raw.githubusercontent.com/telegramdesktop/tdesktop/a1e89e1f64f08cb058caf1c61ff43f319f98a6ec/Telegram/Resources/art/logo_256.png",

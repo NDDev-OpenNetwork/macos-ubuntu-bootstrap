@@ -165,7 +165,7 @@ PINNED_SOURCE_TOOLS=(
   # The archive also ships an `sg` shim. It is not published: upstream prints a
   # deprecation banner and exits non-zero, and on a host that has util-linux it
   # would shadow the setgid `sg`.
-  "ast-grep;0.45.2;zip;ast-grep;ast-grep;ast-grep;67aff72dd2994bf152fcc3a8a09cf93b13193abe59f39393095167c729af2015;e67ee2f5928b4d77a472114edf6e227d90fefe22fa47e7a78db187c55d206564;https://github.com/ast-grep/ast-grep/releases/download/0.45.2/app-x86_64-unknown-linux-gnu.zip;https://github.com/ast-grep/ast-grep/releases/download/0.45.2/app-aarch64-unknown-linux-gnu.zip"
+  "ast-grep;0.45.3;zip;ast-grep;ast-grep;ast-grep;f8ac830881339d1edee6b2652f54798c0f4da5a827f2db38a08ee31117783ce8;b39cfbc58da4b869a88b8a4bc57bd5deb0d24541e704cf7c257da7b53ec81c8f;https://github.com/ast-grep/ast-grep/releases/download/0.45.3/app-x86_64-unknown-linux-gnu.zip;https://github.com/ast-grep/ast-grep/releases/download/0.45.3/app-aarch64-unknown-linux-gnu.zip"
   # Command runner used across the estate's repositories. Ubuntu 26.04 ships
   # 1.45.0 against upstream 1.58.0; a justfile written against a newer feature
   # would fail on the distribution build, so the recipe runner is pinned like
@@ -177,7 +177,7 @@ PINNED_SOURCE_TOOLS=(
   # carry. The archive also contains age-inspect and age-plugin-batchpass, which
   # are deliberately not published: only the two commands the estate uses are
   # linked, so the managed PATH stays exactly what the contract declares.
-  "age;1.3.1;tar1;age,age-keygen;age,age-keygen;age,age-keygen;bdc69c09cbdd6cf8b1f333d372a1f58247b3a33146406333e30c0f26e8f51377;c6878a324421b69e3e20b00ba17c04bc5c6dab0030cfe55bf8f68fa8d9e9093a;https://github.com/FiloSottile/age/releases/download/v1.3.1/age-v1.3.1-linux-amd64.tar.gz;https://github.com/FiloSottile/age/releases/download/v1.3.1/age-v1.3.1-linux-arm64.tar.gz"
+  "age;1.3.2;tar1;age,age-keygen;age,age-keygen;age,age-keygen;cbe24006683f8eb669266162894b9a522a1af52f2665fbc63a4bb032ed26ac10;6b8dc4333c53a5a57c9e5834e3a48f92605d7154014cd07269ff3327db5d37f4;https://github.com/FiloSottile/age/releases/download/v1.3.2/age-v1.3.2-linux-amd64.tar.gz;https://github.com/FiloSottile/age/releases/download/v1.3.2/age-v1.3.2-linux-arm64.tar.gz"
   # Interactive terminal tools that templates/terminal/zshrc binds an alias or
   # abbreviation to. Every one of these guards was dead on Ubuntu: the tool was
   # in the macOS brew set and in no Ubuntu manifest, so `command -v` was false
@@ -186,7 +186,7 @@ PINNED_SOURCE_TOOLS=(
   # 24.04, lazygit and difftastic are in no Ubuntu archive at all, and jaq
   # arrived only in 24.10 -- so each is pinned rather than left to apt.
   "eza;0.23.5;tar0;eza;eza;eza;35c70c5c43c29108075e58b893234c67ef585f0b53a7eaf8e9e7d4eec9f339b4;40b87ae8628aa2ff0f0d2dc24ab52f689631366385c3da630bae745671fd71ec;https://github.com/eza-community/eza/releases/download/v0.23.5/eza_x86_64-unknown-linux-gnu.tar.gz;https://github.com/eza-community/eza/releases/download/v0.23.5/eza_aarch64-unknown-linux-gnu.tar.gz"
-  "lazygit;0.64.1;tar0;lazygit;lazygit;lazygit;f8ea237c41f194cd799b48505518bfdaae4edf5a2ad6bd3d898e939785ee4532;8b7ca3b344e60340ad1f89f29b9868ee39bcaba5bb92ee818bbe65476bb8b6e7;https://github.com/jesseduffield/lazygit/releases/download/v0.64.1/lazygit_0.64.1_linux_x86_64.tar.gz;https://github.com/jesseduffield/lazygit/releases/download/v0.64.1/lazygit_0.64.1_linux_arm64.tar.gz"
+  "lazygit;0.65.0;tar0;lazygit;lazygit;lazygit;44d8e7dd1484b4a66e191bd4ab25a71e8b4b3a65ab122f838e65677ef58c5506;d954a09c128bd37b2bd0d254308474e87de3729cfe0e37f5b46a49357a4fe257;https://github.com/jesseduffield/lazygit/releases/download/v0.65.0/lazygit_0.65.0_linux_x86_64.tar.gz;https://github.com/jesseduffield/lazygit/releases/download/v0.65.0/lazygit_0.65.0_linux_arm64.tar.gz"
   # difftastic publishes its binary as `difft`; the row is named for the command
   # it publishes, like every other row here.
   "difft;0.70.0;tar0;difft;difft;difft;2997d2bbe620534edbd79b0049f00ce84eef3fedb15c7822456d58e38d8b05c9;e729684907d67d1a1727a08f443877e19e40eeb2efebcd95c1b8f7fee4284e8e;https://github.com/Wilfred/difftastic/releases/download/0.70.0/difft-x86_64-unknown-linux-gnu.tar.gz;https://github.com/Wilfred/difftastic/releases/download/0.70.0/difft-aarch64-unknown-linux-gnu.tar.gz"
@@ -205,7 +205,7 @@ PINNED_SOURCE_TOOLS=(
 # architecture hashes live in config/rldyour-contract.json and parity tests bind
 # this shell row to them; installation never resolves mutable `latest` state.
 USER_TOOLS=(
-  "herdr;0.8.2;raw;herdr;herdr;herdr;976150a14d490c94b243ea2e1a7eb2dfb67f12e36b182db90936f6728e6aecf4;f55610658e1c2e0d2aaef730b4b2ab885f7f8ba00285ab372bfb14f2e3d5b40d;https://github.com/herdrdev/herdr/releases/download/v0.8.2/herdr-linux-x86_64;https://github.com/herdrdev/herdr/releases/download/v0.8.2/herdr-linux-aarch64"
+  "herdr;0.9.0;raw;herdr;herdr;herdr;4fa1a01158dd8043da92d31b270780b0dcc10603038d9b61cac4d81ab63fb71f;9c8db20fb7e7427b138d5367113f1621ffd319f2f65d6f009e2594029115f0d2;https://github.com/herdrdev/herdr/releases/download/v0.9.0/herdr-linux-x86_64;https://github.com/herdrdev/herdr/releases/download/v0.9.0/herdr-linux-aarch64"
   # Telegram Desktop official portable build. Only Telegram/Telegram is
   # published. The binary also has an internal updater, disabled separately by
   # install_telegram_update_policy so it cannot mutate this receipt-bound tree.
@@ -213,7 +213,7 @@ USER_TOOLS=(
   # digest and URL are deliberately empty and the row is skipped there. They
   # used to hold the x86_64 values, which meant an arm64 desktop verified the
   # SHA-256 of an executable it could not run.
-  "telegram;7.1.2;tarx;Telegram/Telegram;Telegram/Telegram;telegram-desktop;0a62f115eeeebd23215461e496a046095c46c9c3d17884f5422148a23f41fe9d;;https://github.com/telegramdesktop/tdesktop/releases/download/v7.1.2/tsetup.7.1.2.tar.xz;"
+  "telegram;7.2.8;tarx;Telegram/Telegram;Telegram/Telegram;telegram-desktop;60313dfd5441d7013b2af351574bdf0a3688110d5bce00b837d54d14608cebd8;;https://github.com/telegramdesktop/tdesktop/releases/download/v7.2.8/td-setup-linux-x64-7.2.8.tar.xz;"
 )
 
 # The reviewed Telegram release installs these four files from
@@ -476,7 +476,7 @@ rldyour::ubuntu::install_telegram_desktop_assets() {
       if [ "$RLDYOUR_DRY_RUN" -eq 0 ]; then
         chmod 0644 "$target" || return 1
       fi
-      rldyour::log "ok" "$(basename "$target") already matches Telegram 7.1.2"
+      rldyour::log "ok" "$(basename "$target") already matches Telegram 7.2.8"
       continue
     fi
 

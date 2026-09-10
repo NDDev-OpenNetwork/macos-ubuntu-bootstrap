@@ -284,7 +284,7 @@ def test_telegram_presence_probe_never_executes_the_gui(
     def fake_run_version(binary: Path, flag: str) -> str:
         calls.append(binary.name)
         assert flag == "--version"
-        return "herdr 0.8.2"
+        return "herdr 0.9.0"
 
     monkeypatch.setattr(di.shutil, "which", lambda name: str(bin_dir / name))
     monkeypatch.setattr(di, "_applies_to_current_os", lambda spec: True)
@@ -293,7 +293,7 @@ def test_telegram_presence_probe_never_executes_the_gui(
 
     assert calls == ["herdr"]
     assert state["telegram"]["raw"] == "presence-only"
-    assert state["telegram"]["installed_version"] == "7.1.2"
+    assert state["telegram"]["installed_version"] == "7.2.8"
 
 
 # ----------------------------- profile awareness -----------------------------
@@ -404,13 +404,13 @@ def test_herdr_declared_in_contract_and_install_sh() -> None:
     contract = di.load_contract()
     assert "herdr" in contract["user_tools"], "herdr not in contract user_tools"
     assert (
-        contract["user_tools"]["herdr"]["version"] == "0.8.2"
+        contract["user_tools"]["herdr"]["version"] == "0.9.0"
     ), "herdr version mismatch in contract"
 
     installer = (ROOT / "scripts/ubuntu/install.sh").read_text(encoding="utf-8")
     assert "USER_TOOLS=(" in installer, "USER_TOOLS array missing from install.sh"
     assert (
-        "herdr;0.8.2;raw" in installer
+        "herdr;0.9.0;raw" in installer
     ), "herdr row missing from USER_TOOLS array in install.sh"
 
 

@@ -70,10 +70,10 @@ rldyour::ubuntu_verify::herdr_oom_guard() {
   local unit_dir="$HOME/.config/systemd/user"
   local unit login_home
 
-  [ -f "$script" ] && [ ! -L "$script" ] && [ -x "$script" ] || {
+  if [ ! -f "$script" ] || [ -L "$script" ] || [ ! -x "$script" ]; then
     rldyour::log "missing" "Herdr oom-guard script"
     return 1
-  }
+  fi
   grep -Fxq '# Managed by macos-ubuntu-bootstrap: herdr-oom-guard-v1' "$script" || {
     rldyour::log "missing" "Herdr oom-guard script managed marker"
     return 1
@@ -83,10 +83,10 @@ rldyour::ubuntu_verify::herdr_oom_guard() {
     return 1
   }
   for unit in herdr-reclaim.service herdr-oom-guard.service; do
-    [ -f "$unit_dir/$unit" ] && [ ! -L "$unit_dir/$unit" ] || {
+    if [ ! -f "$unit_dir/$unit" ] || [ -L "$unit_dir/$unit" ]; then
       rldyour::log "missing" "Herdr oom-guard unit ${unit}"
       return 1
-    }
+    fi
     grep -Fxq '# Managed by macos-ubuntu-bootstrap: herdr-oom-guard-unit-v1' "$unit_dir/$unit" || {
       rldyour::log "missing" "Herdr oom-guard unit ${unit} managed marker"
       return 1

@@ -234,7 +234,8 @@ rldyour::herdr_oom::tick() {
 
   unit="$(rldyour::herdr_oom::unit_of_pid "$server_pid")"
   cg="$(rldyour::herdr_oom::cgroup_dir "$server_pid")"
-  [ -n "$unit" ] && [ -n "$cg" ] || return 0
+  [ -n "$unit" ] || return 0
+  [ -n "$cg" ] || return 0
 
   if [ "$unit" = "$HERDR_RECLAIM_UNIT" ]; then
     rldyour::herdr_oom::log "herdr server is in ${HERDR_RECLAIM_UNIT}; refusing to reclaim that unit"

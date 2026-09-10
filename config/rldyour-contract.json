@@ -94,10 +94,10 @@
       "grok-build"
     ],
     "codex": {
-      "version": "0.149.1",
+      "version": "0.154.0",
       "install_method": "verified-npm-tarball",
       "launcher": "cx",
-      "sha512": "eaae696dca456c96ea3a992e6d20c1c179a4b50e79683f1e5331b3045d73012a1bd838f084128348d1ad75929a95facd2547530d33c3326cc25c45ece6d30160"
+      "sha512": "155ff1d4e1d762ffe27e37f79978fd4e14d301671464de9c18845046147190a34e3ee226bb5596d1cf1ebf5bd4904f57187f747449d81b5b418c8931462920d3"
     },
     "claude-code": {
       "channel": "stable",
@@ -142,15 +142,15 @@
     }
   },
   "runtime_support": {
-    "ubuntu_node_lts": "24.19.0",
+    "ubuntu_node_lts": "24.21.0",
     "ubuntu_node_sha256": {
-      "x64": "14b342e71204f811bde6153be8e04b62aef63c236fef92b55f9c83154b409647",
-      "arm64": "01443c1e1a29e531ccad5a46fefa6df490d2189c49f7955904aecdbb0fe86fdc"
+      "x64": "fd8e59d5a511510f6a298afb548f18c7d2b1be404d8b4a27d94fbe49f56cb2d6",
+      "arm64": "6ad1325edbdb5649c379b75a237147a666c95d4f9ae8d340fef2d1575d289ad2"
     },
-    "ubuntu_uv": "0.12.5",
+    "ubuntu_uv": "0.12.13",
     "ubuntu_uv_sha256": {
-      "x64": "68a509da24b06b4223a1c0175fb5eb5bc79342b76cbeff0cfe51ac3f5b17b6b2",
-      "arm64": "9bf43b4d1a07665bf64d4c4e710930b382321a785e0eb10aac07f46471f86a31"
+      "x64": "745765a3b6e360ad76743599ae5c42e9278c7edf8bbff9fc76d05bf2623a04dd",
+      "arm64": "2eaa5d94f5db7b3a1a092156b9420459e42ab0217d917fe74a876309cef9b5e9"
     },
     "ubuntu_bun": "1.3.14",
     "ubuntu_bun_sha256": {
@@ -309,8 +309,8 @@
     ]
   },
   "supply_chain": {
-    "homebrew_pkg_version": "6.0.19",
-    "homebrew_pkg_sha256": "000d19fda55e946e79aa80919028d4cc2c434361297ff6f4810274bbad390da3",
+    "homebrew_pkg_version": "6.0.22",
+    "homebrew_pkg_sha256": "9d15f67a9478019754efd9c62ef206a6b802caad8be321db553baabd3394454d",
     "homebrew_installer_team": "927JGANW46"
   },
   "user_tools": {

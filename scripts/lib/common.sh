@@ -338,9 +338,9 @@ RLDYOUR_CLAUDE_INSTALLER_URL="https://claude.ai/install.sh"
 RLDYOUR_CLAUDE_INSTALLER_SHA256="3a68d3406cf674e17bed1733a4dcf37805e2e47d87417700007d7e1aa766a944"
 RLDYOUR_GROK_INSTALLER_URL="https://x.ai/cli/install.sh"
 RLDYOUR_GROK_INSTALLER_SHA256="7fd6fdc75d9418b2e58356726fcbf1ae849416f773925da07d0ccc7a60d3e791"
-RLDYOUR_CODEX_VERSION="0.149.1"
-RLDYOUR_CODEX_TARBALL="https://registry.npmjs.org/@openai/codex/-/codex-0.149.1.tgz"
-RLDYOUR_CODEX_SHA512="eaae696dca456c96ea3a992e6d20c1c179a4b50e79683f1e5331b3045d73012a1bd838f084128348d1ad75929a95facd2547530d33c3326cc25c45ece6d30160"
+RLDYOUR_CODEX_VERSION="0.154.0"
+RLDYOUR_CODEX_TARBALL="https://registry.npmjs.org/@openai/codex/-/codex-0.154.0.tgz"
+RLDYOUR_CODEX_SHA512="155ff1d4e1d762ffe27e37f79978fd4e14d301671464de9c18845046147190a34e3ee226bb5596d1cf1ebf5bd4904f57187f747449d81b5b418c8931462920d3"
 
 rldyour::install_vendor_ai_clis() {
   rldyour::section "Install official AI CLIs (Codex, Claude Code, Grok Build)"
@@ -356,8 +356,8 @@ rldyour::install_vendor_ai_clis() {
     grok_script="$stage/grok-install.sh"
     rldyour::download_verified_sha512_file "$RLDYOUR_CODEX_TARBALL" "$RLDYOUR_CODEX_SHA512" "$codex_tgz" || return 1
     npm_bin="$(command -v npm 2>/dev/null || true)"
-    if [ -z "$npm_bin" ] && [ -x "$HOME/.local/share/rldyour/node/v24.19.0/bin/npm" ]; then
-      npm_bin="$HOME/.local/share/rldyour/node/v24.19.0/bin/npm"
+    if [ -z "$npm_bin" ] && [ -x "$HOME/.local/share/rldyour/node/v24.21.0/bin/npm" ]; then
+      npm_bin="$HOME/.local/share/rldyour/node/v24.21.0/bin/npm"
     fi
     [ -n "$npm_bin" ] || {
       rldyour::log "error" "npm is unavailable for the verified Codex package installation"

@@ -419,7 +419,7 @@ def test_desktop_template_exists() -> None:
     assert template.is_file(), f"desktop template missing: {template}"
     text = template.read_text(encoding="utf-8")
     assert "Exec=ptyxis" in text, "desktop template missing Ptyxis Exec line"
-    assert "desktop-entry-herdr-v1" in text, "desktop template missing managed marker"
+    assert "desktop-entry-herdr-v2" in text, "desktop template missing managed marker"
 
 
 def test_telegram_runtime_and_launcher_policies_are_explicit() -> None:

@@ -5,6 +5,13 @@ Versioning; the contract version in `config/rldyour-contract.json` moves with it
 
 ## [Unreleased]
 
+- Keep the Herdr multiplexer alive when systemd-oomd sheds a cgroup. Ptyxis
+  launches Herdr inside one transient scope, so oomd killing that leaf takes
+  every agent, MCP server and language server with it. Install a sibling
+  `herdr-reclaim.service`, move MCP and LSP processes into it, and mark the
+  Herdr unit `ManagedOOMPreference=omit`; shed at 25% pressure so pressure
+  falls before oomd picks an unrelated leaf.
+
 - Make ordinary merge CI advisory while preserving structural branch protections
   and independent release evidence gates; accept an explicit empty required-check
   policy without accepting malformed live observations.

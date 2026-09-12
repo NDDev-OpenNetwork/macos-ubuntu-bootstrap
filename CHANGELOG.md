@@ -5,6 +5,8 @@ Versioning; the contract version in `config/rldyour-contract.json` moves with it
 
 ## [Unreleased]
 
+## [0.1.3] - 2026-09-13
+
 - Keep the Herdr multiplexer alive when systemd-oomd sheds a cgroup. Ptyxis
   launches Herdr inside one transient scope, so oomd killing that leaf takes
   every agent, MCP server and language server with it. Install a sibling

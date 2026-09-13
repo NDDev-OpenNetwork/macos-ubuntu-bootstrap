@@ -18,17 +18,21 @@ and what the receipt does and does not assert. `harnesses.detection` in the
 contract is what makes one-owner-per-harness checkable — do not describe an
 enforcement this repository cannot observe.
 
-## Contract 0.1.3
+## Contract 0.2.0
 
 - macOS supports `desktop`, with optional GUI, no Docker, and source-analysis
   plus local-check tooling.
-- Ubuntu requires explicit `desktop`, `desktop-builds`, or `server` selection.
+- Ubuntu requires explicit `desktop`, `desktop-builds`, `desktop-server`, or
+  `server` selection.
 - Ubuntu GUI is supported on `amd64`; `arm64` supports the same profiles with
   GUI disabled because Chrome and Telegram publish no compatible Linux builds.
 - Ubuntu `desktop` has no Docker; `desktop-builds` adds rootful Docker for local
   builds/tests without the server baseline.
 - Ubuntu `server` is headless, defaults to rootful Docker, and supports explicit
   `rootless` or `none` alternatives.
+- Ubuntu `desktop-server` is Ubuntu 24.04 amd64 only, requires GUI, defaults to
+  no Docker, composes the full server baseline, and exposes XRDP only on
+  loopback through an owner-managed SSH tunnel. It never owns credentials.
 - All profiles receive Codex CLI, Claude Code, Grok Build, zsh configuration,
   modern terminal tools, source-quality tools, and applicable language servers.
 - `terminal_tools` in the contract owns the interactive tool boundary. Every

@@ -19,7 +19,7 @@ WITH_FAIL2BAN=0
 
 usage() {
   cat <<'EOF'
-Usage: scripts/bootstrap.sh [--platform macos|ubuntu] [--profile desktop|desktop-builds|server]
+Usage: scripts/bootstrap.sh [--platform macos|ubuntu] [--profile desktop|desktop-builds|desktop-server|server]
                            [--gui|--no-gui] [--docker-mode none|rootful|rootless]
                            [--apply|--plan] [--skip-system] [--skip-ai]
                            [--skip-lsps] [--skip-checks] [--strict]
@@ -31,8 +31,9 @@ Default:
   - mode: plan (dry-run)
   - platform: auto-detect (darwin -> macos, linux -> ubuntu)
   - profile: macOS resolves to desktop; Ubuntu requires an explicit profile
-  - GUI: enabled for desktop/desktop-builds, disabled for server
-  - Docker: rootful on Ubuntu server/desktop-builds, none on desktop; rootless is explicit
+  - GUI: enabled for desktop/desktop-builds/desktop-server, disabled for server
+  - Docker: rootful on Ubuntu server/desktop-builds, none on desktop/desktop-server;
+            desktop-server and server accept an explicit rootful or rootless alternative
 
 Profiles:
   - desktop:        source editing, LSP/quality tools, three vendor AI CLIs, and
@@ -40,6 +41,9 @@ Profiles:
   - desktop-builds: Ubuntu-only — everything desktop has, PLUS Docker rootful for
                     local builds/tests. Receives the server Docker layer without the
                     server baseline (no openssh-server, unattended-upgrades, or chrony).
+  - desktop-server: Ubuntu 24.04 amd64 remote workstation — desktop, source/LSP and
+                    AI tooling plus the server baseline and loopback-only RDP over an
+                    owner-managed SSH tunnel. Docker is optional and defaults to none.
   - server:         Ubuntu-only headless build/runtime host with Docker, AI CLIs,
                     LSPs, terminal tooling, and safe server verification.
 
@@ -152,13 +156,13 @@ if [ "$PROFILE" = "auto" ]; then
   if [ "$PLATFORM" = "macos" ]; then
     PROFILE="desktop"
   else
-    echo "Ubuntu requires --profile desktop|desktop-builds|server; the bootstrap never infers Docker/server state" >&2
+    echo "Ubuntu requires --profile desktop|desktop-builds|desktop-server|server; the bootstrap never infers Docker/server state" >&2
     exit 2
   fi
 fi
 
-if [ "$PROFILE" != "server" ] && [ "$PROFILE" != "desktop" ] && [ "$PROFILE" != "desktop-builds" ]; then
-  echo "Unsupported profile: $PROFILE (expected desktop|desktop-builds|server)" >&2
+if [ "$PROFILE" != "server" ] && [ "$PROFILE" != "desktop" ] && [ "$PROFILE" != "desktop-builds" ] && [ "$PROFILE" != "desktop-server" ]; then
+  echo "Unsupported profile: $PROFILE (expected desktop|desktop-builds|desktop-server|server)" >&2
   exit 2
 fi
 
@@ -208,8 +212,8 @@ if [ "$PLATFORM" = "macos" ] && [ "$DOCKER_MODE" != "none" ]; then
   echo "This bootstrap never installs local Docker on macOS" >&2
   exit 2
 fi
-if [ "$PROFILE" != "server" ] && { [ "$HARDEN_SSH" -eq 1 ] || [ "$ENABLE_UFW" -eq 1 ] || [ "$WITH_FAIL2BAN" -eq 1 ]; }; then
-  echo "Server hardening flags require --profile server" >&2
+if [ "$PROFILE" != "server" ] && [ "$PROFILE" != "desktop-server" ] && { [ "$HARDEN_SSH" -eq 1 ] || [ "$ENABLE_UFW" -eq 1 ] || [ "$WITH_FAIL2BAN" -eq 1 ]; }; then
+  echo "Server hardening flags require --profile server or --profile desktop-server" >&2
   exit 2
 fi
 
@@ -239,6 +243,8 @@ if [ "$PROFILE" = "desktop" ]; then
   export RLDYOUR_LOCAL_EXECUTION_POLICY="source-lsp-only"
 elif [ "$PROFILE" = "desktop-builds" ]; then
   export RLDYOUR_LOCAL_EXECUTION_POLICY="local-dev-with-builds"
+elif [ "$PROFILE" = "desktop-server" ]; then
+  export RLDYOUR_LOCAL_EXECUTION_POLICY="interactive-desktop-server"
 else
   export RLDYOUR_LOCAL_EXECUTION_POLICY="container-execution-only"
 fi

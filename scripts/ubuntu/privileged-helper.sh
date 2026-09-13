@@ -236,7 +236,7 @@ with open(sys.argv[1], encoding="utf-8") as stream:
 p = data["privilege"]
 assert p["schema_version"] == 1
 assert p["system_python_minimum"] == "3.12"
-assert len(p["system_python_surfaces"]) == 14
+assert len(p["system_python_surfaces"]) == 15
 assert p["runtime"]["helper"] == "/usr/local/libexec/rldyour-bootstrap-privileged"
 assert p["runtime"]["contract"] == "/usr/local/share/rldyour-bootstrap/rldyour-contract.json"
 assert set(p["operations"]) == {

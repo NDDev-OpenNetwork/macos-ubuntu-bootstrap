@@ -2,7 +2,7 @@
   "schema_version": 2,
   "adapter": {
     "id": "macos-ubuntu-bootstrap",
-    "version": "0.1.3"
+    "version": "0.2.0"
   },
   "support_evidence": {
     "path": "config/support-evidence-matrix.json",
@@ -59,6 +59,25 @@
           "default_docker_mode": "rootful",
           "execution_policy": "local-dev-with-builds"
         },
+        "desktop-server": {
+          "releases": [
+            "24.04"
+          ],
+          "architectures": [
+            "amd64"
+          ],
+          "gui_modes": [
+            "enabled"
+          ],
+          "docker_modes": [
+            "none",
+            "rootful",
+            "rootless"
+          ],
+          "default_docker_mode": "none",
+          "execution_policy": "interactive-desktop-server",
+          "remote_desktop": "xrdp-over-owner-managed-openssh-tunnel"
+        },
         "server": {
           "gui_modes": [
             "disabled"
@@ -73,6 +92,34 @@
         }
       }
     }
+  },
+  "remote_desktop": {
+    "profile": "desktop-server",
+    "server_platform": {
+      "os": "ubuntu",
+      "release": "24.04",
+      "architecture": "amd64"
+    },
+    "server_entrypoint": "scripts/ubuntu/remote-desktop.sh",
+    "client_renderer": "scripts/remote-desktop-client.py",
+    "session": "ubuntu-gnome-on-xorg",
+    "rdp_service": "xrdp",
+    "rdp_bind": "127.0.0.1",
+    "rdp_port": 3389,
+    "transport": "owner-managed-openssh-local-forward",
+    "default_client_port": 13389,
+    "default_ssh_ports": [
+      22,
+      443
+    ],
+    "server_credentials": "pre-existing-owner-account",
+    "ssh_credentials": "owner-managed-public-key",
+    "client_bundle_secrets": "forbidden",
+    "ssh_host_identity": "deployment-supplied-ed25519-public-host-key",
+    "public_rdp_listener": "forbidden",
+    "docker_default": "none",
+    "fresh_install_package_policy": "ubuntu-signed-archive-candidate-when-absent-no-upgrade",
+    "preinstalled_xrdp_policy": "preserve-compatible-installed-version"
   },
   "remote_execution": {
     "client_profiles": [
@@ -270,10 +317,10 @@
         }
       },
       "lazygit": {
-        "version": "0.65.0",
+        "version": "0.65.1",
         "sha256": {
-          "x64": "44d8e7dd1484b4a66e191bd4ab25a71e8b4b3a65ab122f838e65677ef58c5506",
-          "arm64": "d954a09c128bd37b2bd0d254308474e87de3729cfe0e37f5b46a49357a4fe257"
+          "x64": "02beacbcda0fa342e50ae3480ba8147307353af3fb28e1d5f790e02329c201a6",
+          "arm64": "49abecdf6adf4f2dfdb11bf7b9bfada267ea523612ed809d1c6d87f6c04000a7"
         }
       },
       "difft": {
@@ -309,8 +356,8 @@
     ]
   },
   "supply_chain": {
-    "homebrew_pkg_version": "6.0.22",
-    "homebrew_pkg_sha256": "9d15f67a9478019754efd9c62ef206a6b802caad8be321db553baabd3394454d",
+    "homebrew_pkg_version": "7.0.1",
+    "homebrew_pkg_sha256": "c71d94541adad139c16e92c7774e2635e157c6ed60174787398ecd84bbcd82a9",
     "homebrew_installer_team": "927JGANW46"
   },
   "user_tools": {
@@ -363,6 +410,7 @@
       "profiles": [
         "desktop",
         "desktop-builds",
+        "desktop-server",
         "server"
       ]
     },
@@ -391,7 +439,8 @@
       ],
       "profiles": [
         "desktop",
-        "desktop-builds"
+        "desktop-builds",
+        "desktop-server"
       ],
       "gui_required": true
     }
@@ -405,7 +454,8 @@
       "wm_class": "Ptyxis",
       "profiles": [
         "desktop",
-        "desktop-builds"
+        "desktop-builds",
+        "desktop-server"
       ],
       "os": [
         "ubuntu"
@@ -447,7 +497,8 @@
       "dbus_activatable": false,
       "profiles": [
         "desktop",
-        "desktop-builds"
+        "desktop-builds",
+        "desktop-server"
       ],
       "os": [
         "ubuntu"
@@ -496,6 +547,17 @@
     ],
     "desktop_gui_fonts": [
       "fonts-jetbrains-mono"
+    ],
+    "remote_desktop": [
+      "ubuntu-desktop-minimal",
+      "xrdp",
+      "xorgxrdp",
+      "dbus-x11",
+      "dbus-user-session",
+      "gnome-terminal",
+      "mesa-utils",
+      "language-pack-ru",
+      "openssh-server"
     ],
     "desktop_apps": [
       {
@@ -550,6 +612,12 @@
         "baseline",
         "desktop_build",
         "desktop_apps"
+      ],
+      "desktop-server": [
+        "baseline",
+        "desktop_build",
+        "desktop_apps",
+        "remote_desktop"
       ],
       "server": [
         "baseline"
@@ -825,10 +893,13 @@
             "rldyour::privilege::operation",
             "rldyour::privilege::preflight"
           ],
-          "scripts/ubuntu/desktop.sh": [
-            "rldyour::privilege::refresh"
-          ],
-          "scripts/ubuntu/server.sh": [
+        "scripts/ubuntu/desktop.sh": [
+          "rldyour::privilege::refresh"
+        ],
+        "scripts/ubuntu/remote-desktop.sh": [
+          "rldyour::privilege::root_exec"
+        ],
+        "scripts/ubuntu/server.sh": [
             "rldyour::privilege::as_root"
           ]
         },
@@ -924,6 +995,11 @@
         "id": "server-ssh-address",
         "path": "scripts/ubuntu/server.sh",
         "kind": "heredoc"
+      },
+      {
+        "id": "remote-desktop-ini",
+        "path": "scripts/ubuntu/remote-desktop.sh",
+        "kind": "heredoc"
       }
     ],
     "runtime": {
@@ -978,6 +1054,18 @@
         ]
       },
       "desktop-builds:gui-1": {
+        "operations": [
+          "ubuntu-desktop-gui-system",
+          "ubuntu-server-system"
+        ],
+        "mechanisms": [
+          "plan",
+          "root",
+          "sudo-noninteractive",
+          "sudo-tty"
+        ]
+      },
+      "desktop-server:gui-1": {
         "operations": [
           "ubuntu-desktop-gui-system",
           "ubuntu-server-system"

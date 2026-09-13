@@ -45,7 +45,10 @@ hosted artifact set.
 
 The remaining typed gaps are narrower: a disposable Ubuntu 26.04 Desktop with a
 logged-in GNOME session and real PolicyKit agent; a reboot-capable disposable
-macOS host for launchd/GUI recovery.
+macOS host for launchd/GUI recovery; and a disposable Ubuntu 24.04 amd64 host
+for clean and repeated desktop-server apply, reboot recovery, and end-to-end
+macOS and Windows tunnel clients. The working Amsterdam predecessor is useful
+runtime evidence, but it is not clean-system bootstrap evidence.
 The exact remaining proof and tracking issue for each gap lives in
 `known_evidence_gaps`; prose must not broaden an already accepted boundary.
 

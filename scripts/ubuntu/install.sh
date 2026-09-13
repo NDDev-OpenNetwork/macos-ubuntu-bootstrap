@@ -26,6 +26,7 @@ LOCAL_EXECUTION_POLICY="${RLDYOUR_LOCAL_EXECUTION_POLICY:-container-execution-on
 HARDEN_SSH="${RLDYOUR_HARDEN_SSH:-0}"
 ENABLE_UFW="${RLDYOUR_ENABLE_UFW:-0}"
 WITH_FAIL2BAN="${RLDYOUR_WITH_FAIL2BAN:-0}"
+REMOTE_DESKTOP_USER="${RLDYOUR_REMOTE_DESKTOP_USER:-$(id -un)}"
 # Login shell change is explicit opt-in only; never mutated silently.
 SET_LOGIN_SHELL="${RLDYOUR_SET_LOGIN_SHELL:-0}"
 
@@ -186,7 +187,7 @@ PINNED_SOURCE_TOOLS=(
   # 24.04, lazygit and difftastic are in no Ubuntu archive at all, and jaq
   # arrived only in 24.10 -- so each is pinned rather than left to apt.
   "eza;0.23.5;tar0;eza;eza;eza;35c70c5c43c29108075e58b893234c67ef585f0b53a7eaf8e9e7d4eec9f339b4;40b87ae8628aa2ff0f0d2dc24ab52f689631366385c3da630bae745671fd71ec;https://github.com/eza-community/eza/releases/download/v0.23.5/eza_x86_64-unknown-linux-gnu.tar.gz;https://github.com/eza-community/eza/releases/download/v0.23.5/eza_aarch64-unknown-linux-gnu.tar.gz"
-  "lazygit;0.65.0;tar0;lazygit;lazygit;lazygit;44d8e7dd1484b4a66e191bd4ab25a71e8b4b3a65ab122f838e65677ef58c5506;d954a09c128bd37b2bd0d254308474e87de3729cfe0e37f5b46a49357a4fe257;https://github.com/jesseduffield/lazygit/releases/download/v0.65.0/lazygit_0.65.0_linux_x86_64.tar.gz;https://github.com/jesseduffield/lazygit/releases/download/v0.65.0/lazygit_0.65.0_linux_arm64.tar.gz"
+  "lazygit;0.65.1;tar0;lazygit;lazygit;lazygit;02beacbcda0fa342e50ae3480ba8147307353af3fb28e1d5f790e02329c201a6;49abecdf6adf4f2dfdb11bf7b9bfada267ea523612ed809d1c6d87f6c04000a7;https://github.com/jesseduffield/lazygit/releases/download/v0.65.1/lazygit_0.65.1_linux_x86_64.tar.gz;https://github.com/jesseduffield/lazygit/releases/download/v0.65.1/lazygit_0.65.1_linux_arm64.tar.gz"
   # difftastic publishes its binary as `difft`; the row is named for the command
   # it publishes, like every other row here.
   "difft;0.70.0;tar0;difft;difft;difft;2997d2bbe620534edbd79b0049f00ce84eef3fedb15c7822456d58e38d8b05c9;e729684907d67d1a1727a08f443877e19e40eeb2efebcd95c1b8f7fee4284e8e;https://github.com/Wilfred/difftastic/releases/download/0.70.0/difft-x86_64-unknown-linux-gnu.tar.gz;https://github.com/Wilfred/difftastic/releases/download/0.70.0/difft-aarch64-unknown-linux-gnu.tar.gz"
@@ -260,6 +261,7 @@ validate_target() {
   case "$PROFILE:$LOCAL_EXECUTION_POLICY:$DOCKER_MODE:$GUI_ENABLED" in
     desktop:source-lsp-only:none:0|desktop:source-lsp-only:none:1) ;;
     desktop-builds:local-dev-with-builds:rootful:0|desktop-builds:local-dev-with-builds:rootful:1) ;;
+    desktop-server:interactive-desktop-server:none:1|desktop-server:interactive-desktop-server:rootful:1|desktop-server:interactive-desktop-server:rootless:1) ;;
     server:container-execution-only:none:0|server:container-execution-only:rootful:0|server:container-execution-only:rootless:0) ;;
     *)
       rldyour::log "error" "invalid Ubuntu composition: profile=$PROFILE policy=$LOCAL_EXECUTION_POLICY docker=$DOCKER_MODE gui=$GUI_ENABLED"
@@ -672,6 +674,10 @@ rldyour::ubuntu::retire_telegram_generated_integrations() {
   # the corresponding apply has not created yet. If a candidate does exist,
   # its provenance remains bound to the exact managed launcher below.
   if [ ! -L "$launcher" ] || [ ! -x "$launcher" ]; then
+    if [ "$RLDYOUR_DRY_RUN" -eq 1 ]; then
+      rldyour::log "info" "[DRY-RUN] inspect and retire only Telegram-generated integrations after installing the managed launcher"
+      return 0
+    fi
     rldyour::log "error" "managed Telegram launcher is unavailable during integration migration"
     return 1
   fi
@@ -775,6 +781,10 @@ rldyour::ubuntu::retire_telegram_userapp_entries() {
   [ "${#candidates[@]}" -gt 0 ] || return 0
 
   if [ ! -L "$launcher" ] || [ ! -x "$launcher" ]; then
+    if [ "$RLDYOUR_DRY_RUN" -eq 1 ]; then
+      rldyour::log "info" "[DRY-RUN] inspect and retire only Telegram userapp launchers after installing the managed launcher"
+      return 0
+    fi
     rldyour::log "error" "managed Telegram launcher is unavailable during userapp migration"
     return 1
   fi
@@ -1647,8 +1657,9 @@ install_gui_apps() {
 
 run_server_layer() {
   local resolved_user=""
-  # No Docker work for the plain desktop profile. Server and desktop-builds
-  # both reach this function; desktop-builds installs Docker-only via --skip-baseline.
+  # No Docker or server-baseline work for the plain desktop profile. Server,
+  # desktop-server and desktop-builds reach this function; desktop-builds
+  # installs Docker-only via --skip-baseline.
   if [ "$PROFILE" = "desktop" ]; then
     return 0
   fi
@@ -1680,6 +1691,13 @@ run_server_layer() {
   fi
   [ "$WITH_FAIL2BAN" -eq 1 ] && args+=(--enable-fail2ban)
   rldyour::ubuntu_server::main "${args[@]}"
+}
+
+run_remote_desktop_layer() {
+  [ "$PROFILE" = "desktop-server" ] || return 0
+  local -a args=(--user "$REMOTE_DESKTOP_USER")
+  if [ "$RLDYOUR_DRY_RUN" -eq 1 ]; then args+=(--plan); else args+=(--apply); fi
+  bash "$SCRIPT_DIR/remote-desktop.sh" "${args[@]}"
 }
 
 # Record the proven device state as a canonical receipt. This runs only after
@@ -1775,6 +1793,7 @@ main() {
   fi
   install_gui_apps
   run_server_layer
+  run_remote_desktop_layer
 
   # The harness layer runs LAST of the installing layers, and deliberately so.
   # It delegates to a separate module whose own fail-closed guards depend on local

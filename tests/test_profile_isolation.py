@@ -180,6 +180,30 @@ def test_desktop_builds_gets_compiled_hosts_and_user_tools() -> None:
     assert "managed telegram" in output or "upstream publishes no arm64 build" in output
 
 
+def test_desktop_server_composes_gui_and_server_baseline_without_default_docker() -> None:
+    """desktop-server is the explicit remote-workstation composition."""
+    output = run_plan("--platform", "ubuntu", "--profile", "desktop-server")
+    assert "Install verified Ubuntu GUI applications" in output
+    assert "Configure Ubuntu desktop" in output
+    assert "Ubuntu server module" in output
+    assert "Docker mode none: no Docker state is managed" in output
+    assert "server baseline skipped" not in output
+
+
+def test_desktop_server_accepts_server_hardening_flags() -> None:
+    result = run_invalid(
+        "--platform", "ubuntu", "--profile", "desktop-server",
+        "--harden-ssh", "--enable-ufw", "--with-fail2ban", "--skip-system",
+    )
+    assert result.returncode == 0, result.stderr
+
+
+def test_desktop_server_rejects_no_gui() -> None:
+    result = run_invalid("--platform", "ubuntu", "--profile", "desktop-server", "--no-gui")
+    assert result.returncode == 2
+    assert "invalid Ubuntu composition" in result.stdout + result.stderr
+
+
 
 # ----------------------------- B3: validate_target unit tests -----------------------------
 
@@ -191,6 +215,9 @@ VALID_TUPLES: list[tuple[str, str, str, str]] = [
     ("desktop", "source-lsp-only", "none", "1"),
     ("desktop-builds", "local-dev-with-builds", "rootful", "0"),
     ("desktop-builds", "local-dev-with-builds", "rootful", "1"),
+    ("desktop-server", "interactive-desktop-server", "none", "1"),
+    ("desktop-server", "interactive-desktop-server", "rootful", "1"),
+    ("desktop-server", "interactive-desktop-server", "rootless", "1"),
     ("server", "container-execution-only", "none", "0"),
     ("server", "container-execution-only", "rootful", "0"),
     ("server", "container-execution-only", "rootless", "0"),
@@ -208,6 +235,9 @@ INVALID_TUPLES: list[tuple[str, str, str, str]] = [
     # Server cannot have GUI
     ("server", "container-execution-only", "none", "1"),
     ("server", "container-execution-only", "rootful", "1"),
+    # desktop-server is a remote graphical workstation, never headless.
+    ("desktop-server", "interactive-desktop-server", "none", "0"),
+    ("desktop-server", "source-lsp-only", "none", "1"),
     # Execution policy must match profile
     ("desktop", "container-execution-only", "none", "0"),
     ("desktop", "local-dev-with-builds", "none", "0"),

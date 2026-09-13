@@ -153,7 +153,7 @@ assert {item["id"] for item in p["system_python_surfaces"]} == {
     "helper-trusted-path", "helper-contract-values", "helper-pkexec-parent",
     "verifier-runtime-contract", "verifier-herdr-contract", "verifier-chrome-trust",
     "server-cidr", "server-operator-source",
-    "server-ssh-address",
+    "server-ssh-address", "remote-desktop-ini",
 }
 assert p["runtime"]["helper"] == "/usr/local/libexec/rldyour-bootstrap-privileged"
 assert p["runtime"]["contract"] == "/usr/local/share/rldyour-bootstrap/rldyour-contract.json"
@@ -167,7 +167,7 @@ assert p["operation_owners"] == {
     "ubuntu-desktop-gui-system": "scripts/ubuntu/privileged-helper.sh",
     "ubuntu-server-system": "scripts/ubuntu/server.sh",
 }
-assert set(p["profiles"]) == {"desktop:gui-0", "desktop:gui-1", "desktop-builds:gui-0", "desktop-builds:gui-1", "server:gui-0"}
+assert set(p["profiles"]) == {"desktop:gui-0", "desktop:gui-1", "desktop-builds:gui-0", "desktop-builds:gui-1", "desktop-server:gui-1", "server:gui-0"}
 allowed = {"plan", "root", "sudo-noninteractive", "sudo-tty", "policykit"}
 for key, entry in p["profiles"].items():
     assert set(entry) == {"operations", "mechanisms"}

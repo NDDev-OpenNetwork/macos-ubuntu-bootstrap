@@ -163,7 +163,7 @@ def test_privilege_profile_contract_is_closed_and_complete() -> None:
     }
     assert set(privilege["profiles"]) == {
         "desktop:gui-0", "desktop:gui-1", "desktop-builds:gui-0",
-        "desktop-builds:gui-1", "server:gui-0",
+        "desktop-builds:gui-1", "desktop-server:gui-1", "server:gui-0",
     }
     assert "policykit" in privilege["profiles"]["desktop:gui-1"]["mechanisms"]
     assert all(

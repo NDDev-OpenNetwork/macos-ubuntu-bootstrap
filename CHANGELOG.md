@@ -5,6 +5,22 @@ Versioning; the contract version in `config/rldyour-contract.json` moves with it
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-09-13
+
+- Add the Ubuntu 24.04 amd64 `desktop-server` profile: the GUI workstation and
+  server baseline, with Docker disabled by default and XRDP restricted to
+  `127.0.0.1:3389` behind an owner-managed OpenSSH tunnel.
+- Add a credential-free deployment-time client renderer for macOS and Windows.
+  Generated clients pin the Ed25519 SSH host key, fail over between ports 22
+  and 443, verify local tunnel readiness, and include normal and constrained
+  network RDP profiles.
+- Preserve the proven Amsterdam XRDP 0.10 installation while fresh hosts use
+  the signed Ubuntu package candidate without implicitly upgrading an existing
+  healthy package. Record clean apply, repeat, reboot and cross-platform client
+  proof as explicit real-host evidence still required.
+- Refresh Homebrew.pkg to 7.0.1 and lazygit to 0.65.1 with reviewed upstream
+  artifacts and per-architecture hashes.
+
 ## [0.1.3] - 2026-09-13
 
 - Keep the Herdr multiplexer alive when systemd-oomd sheds a cgroup. Ptyxis

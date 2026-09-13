@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "adapter_version": "0.1.3",
+  "adapter_version": "0.2.0",
   "verified_on": "2026-08-28",
   "expected_hosted_artifact_instances": 26,
   "status_vocabulary": [
@@ -99,6 +99,35 @@
       ],
       "docker_modes": [
         "rootful"
+      ],
+      "apply_privilege": [
+        "non-root-sudo"
+      ],
+      "interaction": [
+        "interactive-terminal",
+        "noninteractive-passwordless-sudo"
+      ],
+      "support": "SUPPORTED"
+    },
+    {
+      "id": "ubuntu-24.04-amd64-desktop-server",
+      "os": "ubuntu",
+      "releases": [
+        "24.04"
+      ],
+      "architectures": [
+        "amd64"
+      ],
+      "profiles": [
+        "desktop-server"
+      ],
+      "gui_modes": [
+        "enabled"
+      ],
+      "docker_modes": [
+        "none",
+        "rootful",
+        "rootless"
       ],
       "apply_privilege": [
         "non-root-sudo"
@@ -270,6 +299,7 @@
       "profiles": [
         "desktop",
         "desktop-builds",
+        "desktop-server",
         "server"
       ],
       "gui_modes": [
@@ -376,7 +406,7 @@
         "noninteractive-passwordless-sudo"
       ],
       "support": "UNSUPPORTED_FAIL_CLOSED",
-      "reason": "contract 0.1.3 supports Apple Silicon only"
+      "reason": "contract 0.2.0 supports Apple Silicon only"
     },
     {
       "id": "full-apply-as-root",
@@ -392,6 +422,7 @@
       "profiles": [
         "desktop",
         "desktop-builds",
+        "desktop-server",
         "server"
       ],
       "gui_modes": [
@@ -415,6 +446,14 @@
     }
   ],
   "known_evidence_gaps": [
+    {
+      "id": "desktop-server-clean-apply-reboot-client",
+      "requirement": "OPTIONAL",
+      "status": "NOT_PROVEN",
+      "required_tier": "REAL_HOST_REQUIRED",
+      "tracking_issue": 6,
+      "remaining_proof": "A disposable native Ubuntu 24.04 amd64 host proving clean desktop-server apply, repeat apply, reboot recovery, and end-to-end macOS and Windows client connections through the pinned SSH tunnel."
+    },
     {
       "id": "interactive-privilege-prompts",
       "requirement": "OPTIONAL",

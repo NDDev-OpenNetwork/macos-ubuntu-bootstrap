@@ -269,6 +269,10 @@ done
 
 rldyour::ensure_path
 rldyour::section "Verify Ubuntu $PROFILE profile"
+if [ "$PROFILE" = "desktop-server" ]; then
+  bash "$SCRIPT_DIR/remote-desktop.sh" --verify \
+    --user "${RLDYOUR_REMOTE_DESKTOP_USER:-$(id -un)}"
+fi
 rldyour::ubuntu_verify::tool_host_provenance
 rldyour::ubuntu_verify::herdr_provenance
 rldyour::ubuntu_verify::herdr_oom_guard

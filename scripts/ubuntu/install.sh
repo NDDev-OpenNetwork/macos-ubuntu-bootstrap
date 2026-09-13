@@ -84,7 +84,7 @@ CARAPACE_SHA256_X64="35ab52bfe7bdd8296d90c3687660bde80497599badde840ab615d2f421f
 CARAPACE_SHA256_ARM64="b2456cb09d77004db87de2567d6d7588a61ceb4724522c463e2b1c1f87b4d4b9"
 
 APT_SOURCE_PACKAGES=(
-  ca-certificates curl gpg gnupg git jq python3 python3-venv
+  ca-certificates curl gpg gnupg git jq python3 python3-venv python3-yaml
   shellcheck shfmt clangd zsh unzip xz-utils wget zip lsb-release yamllint
   fd-find bat fzf zoxide tmux btop duf hexyl gh ripgrep httpie miller
   software-properties-common wl-clipboard libsecret-tools

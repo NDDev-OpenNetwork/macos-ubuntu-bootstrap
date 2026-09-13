@@ -5,6 +5,9 @@ Versioning; the contract version in `config/rldyour-contract.json` moves with it
 
 ## [Unreleased]
 
+- Add Ubuntu's distribution-owned PyYAML binding to the baseline so estate
+  diagnostics and plan-state readers work with system Python on a clean host.
+
 ## [0.2.0] - 2026-09-13
 
 - Add the Ubuntu 24.04 amd64 `desktop-server` profile: the GUI workstation and

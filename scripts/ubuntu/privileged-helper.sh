@@ -13,7 +13,7 @@ unset BASH_ENV CDPATH ENV GLOBIGNORE IFS LD_LIBRARY_PATH LD_PRELOAD PYTHONHOME P
 umask 022
 tmp_dir=
 DESKTOP_APT_PACKAGES=(
-  ca-certificates curl gpg gnupg git jq python3 python3-venv
+  ca-certificates curl gpg gnupg git jq python3 python3-venv python3-yaml
   shellcheck shfmt clangd zsh unzip xz-utils wget zip lsb-release yamllint fd-find bat
   fzf zoxide tmux btop duf hexyl gh ripgrep httpie miller software-properties-common
   wl-clipboard libsecret-tools

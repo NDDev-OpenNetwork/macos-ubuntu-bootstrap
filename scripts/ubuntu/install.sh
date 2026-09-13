@@ -36,18 +36,18 @@ NODE_SHA256_ARM64="6ad1325edbdb5649c379b75a237147a666c95d4f9ae8d340fef2d1575d289
 UV_VERSION="0.12.13"
 UV_SHA256_X64="745765a3b6e360ad76743599ae5c42e9278c7edf8bbff9fc76d05bf2623a04dd"
 UV_SHA256_ARM64="2eaa5d94f5db7b3a1a092156b9420459e42ab0217d917fe74a876309cef9b5e9"
-BUN_VERSION="1.3.14"
-BUN_SHA256_X64="951ee2aee855f08595aeec6225226a298d3fea83a3dcd6465c09cbccdf7e848f"
-BUN_SHA256_X64_BASELINE="a063908ae08b7852ca10939bbdc6ceed3ddabce8fb9402dce83d65d73b36e6c7"
-BUN_SHA256_ARM64="a27ffb63a8310375836e0d6f668ae17fa8d8d18b88c37c821c65331973a19a3b"
+BUN_VERSION="1.4.2"
+BUN_SHA256_X64="36368faef7527875d5ffa52e53cd48021741f2a83eb6208a8dd64068d422a913"
+BUN_SHA256_X64_BASELINE="c678040f14fe0440eb839d37cbd0ce4c051a32da72806ac97de6a6aab6bf728f"
+BUN_SHA256_ARM64="54328bbc2d9c8e0c9f892c544d66c57a83b84139e34909e5ee81758f1ac8fda7"
 # Go and Rust are desktop language-server hosts, exactly like Node and uv: they
 # back gopls and rust-analyzer over the estate's Go and Rust sources. Installing
 # them does not authorize local project builds; the desktop execution policy
 # stays `source-lsp-only` and the server profile never receives them (project
 # builds belong in Docker under `container-execution-only`).
-GO_VERSION="1.26.6"
-GO_SHA256_AMD64="708effb774be8237570d0add163225abbdfaf4fca28b2611df167beba4feef89"
-GO_SHA256_ARM64="d0507e9e9d7fe012aae570108cbd76c15de879e17130ab8cb90d4d7445cb1f2e"
+GO_VERSION="1.27.1"
+GO_SHA256_AMD64="b477e877a104211f3010911c61b501c0c015533d80290ddfa9f3dd43c5b4120e"
+GO_SHA256_ARM64="01d80e8ca1b7abddafaac6f0864a407aa35ab120483381df73d6070b9faec60b"
 # gopls publishes no prebuilt archive. It is pinned to an exact version and its
 # provenance comes from the Go module checksum database (sum.golang.org), which
 # is a transparency log rather than a hash this repository tracks. GOFLAGS and
@@ -55,10 +55,10 @@ GO_SHA256_ARM64="d0507e9e9d7fe012aae570108cbd76c15de879e17130ab8cb90d4d7445cb1f2
 GOPLS_VERSION="v0.23.0"
 # One combined archive per architecture carries rustc, cargo, rust-std, clippy,
 # rustfmt and rust-analyzer, so a single tracked hash covers the whole host.
-RUST_VERSION="1.97.1"
-RUST_CHANNEL_DATE="2026-07-16"
-RUST_SHA256_X86_64="88f28fa9af20594179f85d6df67078dfd6fa93e2f6da5e1e9b0ac4997988ca4f"
-RUST_SHA256_AARCH64="9a7a2c336b4787f1b72f6bab7c35d5b7af2fd03cbd39b4fc721466a70d402a7d"
+RUST_VERSION="1.98.1"
+RUST_CHANNEL_DATE="2026-09-03"
+RUST_SHA256_X86_64="5326b36c53de11d148c8f8dab6553a3d1006c2cfd32123683073fad3c302605b"
+RUST_SHA256_AARCH64="0b514a8cc1cbcd939bff0f151661fe58b6ea5c7a7f645a5098c69e32e8c1e0a2"
 # Dart is the third desktop language-server host (ADR 0005), on the same footing
 # as Go and Rust. One self-contained SDK archive carries `dart language-server`
 # (the analysis server) and `dart mcp-server` (the Dart/Flutter MCP transport the
@@ -66,9 +66,9 @@ RUST_SHA256_AARCH64="9a7a2c336b4787f1b72f6bab7c35d5b7af2fd03cbd39b4fc721466a70d4
 # SDK never mutates its own install tree, which is what keeps it compatible with
 # the runtime-receipt contract; the Flutter SDK is deliberately not installed
 # here because its bin/cache self-populates at runtime and would break that.
-DART_VERSION="3.13.0"
-DART_SHA256_X64="87902573facd8acacac7ee1fe73fa8d0668e06065016068e2ed6c5c99c6b1ee0"
-DART_SHA256_ARM64="20141a0653327939bb20c4b87b231226beba1128d8a9aedbb30cb5af1a2790d4"
+DART_VERSION="3.13.3"
+DART_SHA256_X64="549c182cffbdc6864df7509c16fec646c73fe6cb8a18c2cb572db1292f300cd7"
+DART_SHA256_ARM64="c59c535623f3ab9717e8755237df695f153fb3af3bfb0f6c281b2eb4fefe669e"
 # Prompt/history/completion pillars — parity with the macOS brew baseline
 # (starship, atuin, carapace). Installed as pinned standalone artifacts, never
 # via apt (stale) or a piped install script. Linux x64 + arm64 tarball SHA-256
@@ -109,6 +109,8 @@ BUN_LSP_PACKAGES=(
   "markdownlint-cli2@0.23.1"
   "prettier@3.9.6"
   "@ansible/ansible-language-server@26.6.0"
+  "svelte-language-server@0.18.4"
+  "sql-language-server@1.7.1"
 )
 
 # Isolated Python source-analysis tools, pinned to exact versions so a device
@@ -192,6 +194,10 @@ PINNED_SOURCE_TOOLS=(
   # it publishes, like every other row here.
   "difft;0.70.0;tar0;difft;difft;difft;2997d2bbe620534edbd79b0049f00ce84eef3fedb15c7822456d58e38d8b05c9;e729684907d67d1a1727a08f443877e19e40eeb2efebcd95c1b8f7fee4284e8e;https://github.com/Wilfred/difftastic/releases/download/0.70.0/difft-x86_64-unknown-linux-gnu.tar.gz;https://github.com/Wilfred/difftastic/releases/download/0.70.0/difft-aarch64-unknown-linux-gnu.tar.gz"
   "jaq;3.1.1;raw;jaq;jaq;jaq;5922c7b67d9bd6841d6676d1f954410c6bf04b47203dcb661c4f052dfef7f454;bdda42d5a8c060a2c7916b287a227e7750d5fccbd4c37aacf0ab863010921829;https://github.com/01mf02/jaq/releases/download/v3.1.1/jaq-x86_64-unknown-linux-gnu;https://github.com/01mf02/jaq/releases/download/v3.1.1/jaq-aarch64-unknown-linux-gnu"
+  # Official JetBrains Kotlin LSP. The standalone archive includes its own JBR,
+  # so no mutable system Java dependency is introduced. Upstream marks it alpha;
+  # the exact release and both CDN checksums keep that boundary explicit.
+  "kotlin-lsp;262.9593.0;tar1;kotlin-lsp.sh;kotlin-lsp.sh;kotlin-lsp;2d99d8e198fbe4aa8f4481e37799724ce94803b4ea12a60b416040e3fcd7cc5e;2317831c6e5607d05b7ebc1da655330125ce0e3d66fbf24517dfce442debc14e;https://download-cdn.jetbrains.com/language-server/kotlin-server/262.9593.0/kotlin-server-262.9593.0.tar.gz;https://download-cdn.jetbrains.com/language-server/kotlin-server/262.9593.0/kotlin-server-262.9593.0-aarch64.tar.gz"
 )
 
 # User-selected CLI tools that are not language hosts, LSPs, or scanners but
@@ -1036,7 +1042,7 @@ rldyour::ubuntu::validate_runtime_receipt() {
 
 ensure_node() {
   rldyour::section "Ensure Node.js LTS ${NODE_VERSION}"
-  local arch sha filename url archive stage destination parent
+  local arch sha module_version url archive stage destination parent
   case "$(uname -m)" in
     x86_64|amd64) arch="x64"; sha="$NODE_SHA256_X64" ;;
     aarch64|arm64) arch="arm64"; sha="$NODE_SHA256_ARM64" ;;
@@ -1149,8 +1155,12 @@ ensure_go() {
     aarch64|arm64) arch="arm64"; sha="$GO_SHA256_ARM64" ;;
     *) rldyour::log "error" "Go ${GO_VERSION} has no tracked artifact for $(uname -m)"; return 1 ;;
   esac
-  filename="go${GO_VERSION}.linux-${arch}.tar.gz"
-  url="https://go.dev/dl/${filename}"
+  # The official dl.google.com binary endpoint is not reachable from every
+  # supported server network. The Go module proxy is also an official Go
+  # distribution channel and publishes the same toolchain as a transparent,
+  # immutable module artifact.
+  module_version="v0.0.1-go${GO_VERSION}.linux-${arch}"
+  url="https://proxy.golang.org/golang.org/toolchain/@v/${module_version}.zip"
   destination="$HOME/.local/share/rldyour/go/${GO_VERSION}"
   parent="$(dirname "$destination")"
   if [ "$RLDYOUR_DRY_RUN" -eq 1 ]; then
@@ -1169,7 +1179,9 @@ ensure_go() {
     archive="$(mktemp)"; stage="$(mktemp -d "$parent/.go-${GO_VERSION}.tmp.XXXXXX")"
     trap 'rm -rf "$archive"; [ -z "${stage:-}" ] || rm -rf "$stage"' RETURN
     rldyour::download_verified_file "$url" "$sha" "$archive" || return 1
-    tar -xzf "$archive" --strip-components=1 -C "$stage"
+    unzip -q "$archive" -d "$stage.unpacked"
+    mv "$stage.unpacked/golang.org/toolchain@${module_version}"/* "$stage"/
+    rmdir "$stage.unpacked/golang.org/toolchain@${module_version}" "$stage.unpacked/golang.org" "$stage.unpacked"
     [ "$("$stage/bin/go" version 2>/dev/null | awk '{ print $3 }')" = "go${GO_VERSION}" ] || {
       rldyour::log "error" "staged Go artifact did not report go${GO_VERSION}"
       return 1

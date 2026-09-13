@@ -199,24 +199,24 @@
       "x64": "745765a3b6e360ad76743599ae5c42e9278c7edf8bbff9fc76d05bf2623a04dd",
       "arm64": "2eaa5d94f5db7b3a1a092156b9420459e42ab0217d917fe74a876309cef9b5e9"
     },
-    "ubuntu_bun": "1.3.14",
+    "ubuntu_bun": "1.4.2",
     "ubuntu_bun_sha256": {
-      "x64": "951ee2aee855f08595aeec6225226a298d3fea83a3dcd6465c09cbccdf7e848f",
-      "x64-baseline": "a063908ae08b7852ca10939bbdc6ceed3ddabce8fb9402dce83d65d73b36e6c7",
-      "arm64": "a27ffb63a8310375836e0d6f668ae17fa8d8d18b88c37c821c65331973a19a3b"
+      "x64": "36368faef7527875d5ffa52e53cd48021741f2a83eb6208a8dd64068d422a913",
+      "x64-baseline": "c678040f14fe0440eb839d37cbd0ce4c051a32da72806ac97de6a6aab6bf728f",
+      "arm64": "54328bbc2d9c8e0c9f892c544d66c57a83b84139e34909e5ee81758f1ac8fda7"
     },
-    "ubuntu_go": "1.26.6",
+    "ubuntu_go": "1.27.1",
     "ubuntu_go_sha256": {
-      "amd64": "708effb774be8237570d0add163225abbdfaf4fca28b2611df167beba4feef89",
-      "arm64": "d0507e9e9d7fe012aae570108cbd76c15de879e17130ab8cb90d4d7445cb1f2e"
+      "amd64": "b477e877a104211f3010911c61b501c0c015533d80290ddfa9f3dd43c5b4120e",
+      "arm64": "01d80e8ca1b7abddafaac6f0864a407aa35ab120483381df73d6070b9faec60b"
     },
     "ubuntu_gopls": "v0.23.0",
     "ubuntu_gopls_provenance": "go-module-checksum-database",
-    "ubuntu_rust": "1.97.1",
-    "ubuntu_rust_channel_date": "2026-07-16",
+    "ubuntu_rust": "1.98.1",
+    "ubuntu_rust_channel_date": "2026-09-03",
     "ubuntu_rust_sha256": {
-      "x86_64": "88f28fa9af20594179f85d6df67078dfd6fa93e2f6da5e1e9b0ac4997988ca4f",
-      "aarch64": "9a7a2c336b4787f1b72f6bab7c35d5b7af2fd03cbd39b4fc721466a70d402a7d"
+      "x86_64": "5326b36c53de11d148c8f8dab6553a3d1006c2cfd32123683073fad3c302605b",
+      "aarch64": "0b514a8cc1cbcd939bff0f151661fe58b6ea5c7a7f645a5098c69e32e8c1e0a2"
     },
     "ubuntu_rust_components": [
       "rustc",
@@ -226,10 +226,10 @@
       "rustfmt-preview",
       "rust-analyzer-preview"
     ],
-    "ubuntu_dart": "3.13.0",
+    "ubuntu_dart": "3.13.3",
     "ubuntu_dart_sha256": {
-      "x64": "87902573facd8acacac7ee1fe73fa8d0668e06065016068e2ed6c5c99c6b1ee0",
-      "arm64": "20141a0653327939bb20c4b87b231226beba1128d8a9aedbb30cb5af1a2790d4"
+      "x64": "549c182cffbdc6864df7509c16fec646c73fe6cb8a18c2cb572db1292f300cd7",
+      "arm64": "c59c535623f3ab9717e8755237df695f153fb3af3bfb0f6c281b2eb4fefe669e"
     },
     "ubuntu_dart_provides": [
       "dart",
@@ -335,6 +335,15 @@
         "sha256": {
           "x64": "5922c7b67d9bd6841d6676d1f954410c6bf04b47203dcb661c4f052dfef7f454",
           "arm64": "bdda42d5a8c060a2c7916b287a227e7750d5fccbd4c37aacf0ab863010921829"
+        }
+      },
+      "kotlin-lsp": {
+        "version": "262.9593.0",
+        "maturity": "upstream-alpha",
+        "source": "official-jetbrains-standalone-archive",
+        "sha256": {
+          "x64": "2d99d8e198fbe4aa8f4481e37799724ce94803b4ea12a60b416040e3fcd7cc5e",
+          "arm64": "2317831c6e5607d05b7ebc1da655330125ce0e3d66fbf24517dfce442debc14e"
         }
       }
     }
@@ -745,6 +754,8 @@
       "bash-language-server@5.6.0",
       "dockerfile-language-server-nodejs@0.15.0",
       "gh-actions-language-server@0.0.3",
+      "svelte-language-server@0.18.4",
+      "sql-language-server@1.7.1",
       "typescript@7.0.2",
       "yaml-language-server@1.24.0",
       "@openai/codex"

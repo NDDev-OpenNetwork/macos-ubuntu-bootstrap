@@ -74,6 +74,8 @@ def test_server_module_has_no_public_rdp_listener_literal() -> None:
     assert "[::]:3389" not in source
     assert "AllowRootLogin=false" in source
     assert "--global mask gnome-remote-desktop.service" in source
+    assert "trap \"rm -rf -- '$tmp'; trap - RETURN\" RETURN" in source
+    assert "trap 'rm -rf -- \"$tmp\"' RETURN" not in source
 
 
 def test_rdp_profiles_preserve_the_proven_amsterdam_client_shape() -> None:

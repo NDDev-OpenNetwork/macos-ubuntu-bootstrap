@@ -16,6 +16,13 @@ local static checks without Docker. `desktop-builds` adds rootful Docker for
 local builds/tests. `server` configures a headless Docker server and keeps risky
 network hardening behind explicit flags.
 
+The source-analysis baseline covers the estate's active Python, JavaScript and
+TypeScript, Svelte, SQL, Go, Rust, Dart, Kotlin, C/C++, shell, YAML, JSON,
+HTML/CSS, TOML, Markdown, Terraform, CMake, Dockerfile, GitHub Actions, and
+Ansible sources. Ubuntu receives JetBrains' official standalone Kotlin LSP;
+Swift and SwiftUI remain a macOS responsibility because useful SourceKit
+analysis depends on Apple's SDK toolchain.
+
 `desktop-server` targets Ubuntu 24.04 amd64 and combines the complete GUI and
 server baselines. It defaults to no Docker and configures XRDP exclusively on
 `127.0.0.1:3389`; do not add a public firewall rule for that port. Generate

@@ -32,10 +32,12 @@ Ubuntu GUI is supported on amd64; ARM64 remains supported with `--no-gui`
 because Google and Telegram publish no compatible Linux ARM64 applications.
 
 Desktop source hosts include Node, Python, LLVM/clangd, Go/gopls, Rust with
-rust-analyzer, Dart with its analysis server, TypeScript, YAML, Bash, Dockerfile,
-HTML/CSS/JSON, TOML, Markdown, Terraform, CMake, GitHub Actions, and Ansible
-analysis tooling. The `desktop` profile does not authorize project execution or
-deployment. Use `desktop-builds` for local Docker builds/tests.
+rust-analyzer, Dart with its analysis server, Kotlin, TypeScript, Svelte, SQL,
+YAML, Bash, Dockerfile, HTML/CSS/JSON, TOML, Markdown, Terraform, CMake, GitHub
+Actions, and Ansible analysis tooling. Swift/SwiftUI analysis remains on the
+macOS source hosts where the Apple SDK and SourceKit toolchain exist. The
+`desktop` profile does not authorize project execution or deployment. Use
+`desktop-builds` for local Docker builds/tests.
 
 The Ubuntu server profile installs and verifies a server baseline, Docker,
 unattended security updates, and time synchronization. UFW, key-only SSH, and

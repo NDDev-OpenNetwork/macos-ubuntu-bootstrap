@@ -20,6 +20,19 @@ Versioning; the contract version in `config/rldyour-contract.json` moves with it
   proof as explicit real-host evidence still required.
 - Refresh Homebrew.pkg to 7.0.1 and lazygit to 0.65.1 with reviewed upstream
   artifacts and per-architecture hashes.
+- Refresh Bun to 1.4.2, Go to 1.27.1, Rust to 1.98.1, and Dart to 3.13.3 after
+  independently verifying every supported architecture against official
+  checksums. Add pinned Svelte and SQL language servers on both desktops and
+  JetBrains' official standalone Kotlin LSP on Ubuntu.
+- Consume Go through its immutable official toolchain module on
+  `proxy.golang.org`, retaining per-architecture artifact hashes while avoiding
+  the `dl.google.com` binary endpoint that is unavailable on some server
+  networks.
+- Migrate Ubuntu's exact vendor-generated Chrome Deb822 source into a root-only
+  recovery backup before publishing the managed source, eliminating duplicate
+  repository identities without accepting edited or redirected files.
+- Extend the device-integrity receipt schema and policy resolver to record and
+  verify the `desktop-server` profile.
 
 ## [0.1.3] - 2026-09-13
 

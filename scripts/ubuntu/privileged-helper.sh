@@ -419,6 +419,25 @@ install_rustdesk() {
 
 install_chrome() {
   local key_url=$1 fingerprint=$2 repo_uri=$3 keyring=$4 source=$5
+  local legacy=/etc/apt/sources.list.d/google-chrome.sources
+  local backup=/var/lib/rldyour-bootstrap/backups/google-chrome.sources.pre-managed
+  # Chrome's own package may have created this alternate Deb822 source before
+  # bootstrap took ownership. Accept only its exact vendor shape, retain a
+  # recoverable copy, and remove the duplicate identity before publishing the
+  # managed source. Any edited or redirected file still fails closed.
+  if [ -e "$legacy" ] || [ -L "$legacy" ]; then
+    [ ! -L "$legacy" ] && [ -f "$legacy" ] || return 1
+    /usr/bin/grep -Fxq '### THIS FILE IS AUTOMATICALLY CONFIGURED ###' "$legacy" || return 1
+    /usr/bin/grep -Fxq 'URIs: https://dl.google.com/linux/chrome-stable/deb/' "$legacy" || return 1
+    /usr/bin/grep -Fxq 'Signed-By: /usr/share/keyrings/google-chrome.gpg' "$legacy" || return 1
+    /usr/bin/install -d -o root -g root -m 0700 /var/lib/rldyour-bootstrap/backups
+    if [ -e "$backup" ]; then
+      [ ! -L "$backup" ] && [ -f "$backup" ] && /usr/bin/cmp -s "$legacy" "$backup" || return 1
+    else
+      /usr/bin/install -o root -g root -m 0600 "$legacy" "$backup"
+    fi
+    /bin/rm -f -- "$legacy"
+  fi
   clean_env /usr/bin/curl --proto '=https' --tlsv1.2 --fail --silent --show-error --location "$key_url" --output "$tmp_dir/chrome-key"
   chrome_key_matches "$tmp_dir/chrome-key" "$fingerprint" || return 1
   /usr/bin/install -d -o root -g root -m 0755 /etc/apt/keyrings /etc/apt/sources.list.d /etc/default
@@ -433,13 +452,26 @@ install_chrome() {
   apt_install google-chrome-stable
 }
 
+configure_x11_keymap() {
+  # Ubuntu deliberately does not implement localectl set-x11-keymap. Its
+  # keyboard-configuration package reads this Debian-family contract instead.
+  # GNOME's per-user input sources are configured separately by desktop.sh.
+  /usr/bin/printf '%s\n' \
+    'XKBMODEL="pc105"' \
+    'XKBLAYOUT="us,ru"' \
+    'XKBVARIANT=""' \
+    'XKBOPTIONS="grp:alt_shift_toggle"' \
+    'BACKSPACE="guess"' >"$tmp_dir/keyboard"
+  /usr/bin/install -o root -g root -m 0644 "$tmp_dir/keyboard" /etc/default/keyboard
+}
+
 desktop_gui() {
   local key_url=$1 fingerprint=$2 repo_uri=$3 keyring=$4 source=$5 rustdesk_url=$6 rustdesk_sha=$7
   [ "$(/usr/bin/dpkg --print-architecture)" = amd64 ] || return 1
   apt_install fonts-jetbrains-mono
   /usr/bin/sed -i 's/^# *ru_RU\.UTF-8 UTF-8/ru_RU.UTF-8 UTF-8/' /etc/locale.gen
   /usr/sbin/locale-gen >/dev/null
-  /usr/bin/localectl --no-convert set-x11-keymap us,ru pc105 '' grp:alt_shift_toggle
+  configure_x11_keymap
   install_rustdesk "$rustdesk_url" "$rustdesk_sha"
   install_chrome "$key_url" "$fingerprint" "$repo_uri" "$keyring" "$source"
   if /usr/bin/snap list firefox >/dev/null 2>&1; then /usr/bin/snap remove --purge firefox; fi

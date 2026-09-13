@@ -185,7 +185,12 @@ rldyour::remote_desktop::root_apply() {
     "IdleTimeLimit=0" "Policy=Default"
 
   tmp="$(mktemp -d)"
-  trap 'rm -rf -- "$tmp"' RETURN
+  # Expand the trusted mktemp path while the local exists, and remove this
+  # RETURN trap after its first invocation. A deferred `$tmp` lookup runs after
+  # the local scope is gone under `set -u` and turns a successful apply into a
+  # cleanup failure.
+  # shellcheck disable=SC2064
+  trap "rm -rf -- '$tmp'; trap - RETURN" RETURN
   cat >"$tmp/xsessionrc" <<'EOF'
 # Managed by macos-ubuntu-bootstrap: desktop-server-xsession-v1
 export DESKTOP_SESSION=ubuntu

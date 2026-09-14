@@ -198,26 +198,52 @@ def _parse_user_tool_rows(path: Path) -> dict[str, list[str]]:
     return rows
 
 
+def _user_tool_install_method(spec: dict) -> str:
+    method = spec.get("install_method")
+    if isinstance(method, dict):
+        method = method.get("linux") or next(iter(method.values()), "")
+    return str(method or "")
+
+
 def test_user_tools_match_the_contract() -> None:
-    """USER_TOOLS bash array must match contract user_tools: name, version, SHA-256."""
+    """USER_TOOLS / NPM_USER_TOOLS must match contract user_tools."""
     declared = CONTRACT_DATA.get("user_tools", {})
     rows = _parse_user_tool_rows(UBUNTU_INSTALL_PATH)
-    assert set(declared) == set(rows), (
-        f"contract and installer disagree on user_tools set:\n"
-        f"  contract only: {set(declared) - set(rows)}\n"
-        f"  installer only: {set(rows) - set(declared)}"
+    artifact = {
+        name: spec
+        for name, spec in declared.items()
+        if not _user_tool_install_method(spec).startswith("npm-")
+    }
+    registry = {
+        name: spec
+        for name, spec in declared.items()
+        if _user_tool_install_method(spec).startswith("npm-")
+    }
+    assert set(artifact) == set(rows), (
+        f"contract and installer disagree on hashed user_tools set:\n"
+        f"  contract only: {set(artifact) - set(rows)}\n"
+        f"  installer only: {set(rows) - set(artifact)}"
+    )
+    npm_entries = set(_parse_bash_array(UBUNTU_INSTALL_PATH, "NPM_USER_TOOLS"))
+    expected_npm = {
+        f"{spec['source']['package']}@{spec['version']}" for spec in registry.values()
+    }
+    assert npm_entries == expected_npm, (
+        f"contract and installer disagree on npm user_tools:\n"
+        f"  contract only: {expected_npm - npm_entries}\n"
+        f"  installer only: {npm_entries - expected_npm}"
     )
     for name, row in rows.items():
-        spec = declared[name]
+        spec = artifact[name]
         assert row[1] == spec["version"], f"{name}: version drift ({row[1]} vs {spec['version']})"
-        # Herdr uses the canonical per-platform source asset table; Telegram
-        # uses a single archive_sha256.
-        if name == "herdr":
-            assets = spec["source"]["assets"]
+        source = spec.get("source", {})
+        assets = source.get("assets") if isinstance(source, dict) else None
+        if isinstance(assets, dict) and "linux-x86_64" in assets:
             assert row[6] == assets["linux-x86_64"]["sha256"], f"{name}: x64 SHA-256 drift"
-            assert row[7] == assets["linux-aarch64"]["sha256"], f"{name}: arm64 SHA-256 drift"
             assert row[8] == assets["linux-x86_64"]["url"], f"{name}: x64 URL drift"
-            assert row[9] == assets["linux-aarch64"]["url"], f"{name}: arm64 URL drift"
+            if row[7]:
+                assert row[7] == assets["linux-aarch64"]["sha256"], f"{name}: arm64 SHA-256 drift"
+                assert row[9] == assets["linux-aarch64"]["url"], f"{name}: arm64 URL drift"
         elif "archive_sha256" in spec:
             assert row[6] == spec["archive_sha256"], f"{name}: archive SHA-256 drift"
             assert row[7] in {"", spec["archive_sha256"]}, f"{name}: archive SHA-256 (arm64 slot) drift"

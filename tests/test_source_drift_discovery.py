@@ -225,7 +225,8 @@ def test_every_pinned_source_tool_has_a_probe() -> None:
 def test_every_runtime_host_and_user_tool_has_a_probe() -> None:
     probed = {name for name, *_ in drift._pins(CONTRACT)}
     for expected in ("node", "uv", "bun", "go", "rust", "dart", "gopls",
-                     "herdr", "telegram", "codex", "homebrew-pkg"):
+                     "herdr", "telegram", "doctl", "stripe", "resend", "wrangler",
+                     "codex", "homebrew-pkg"):
         assert expected in probed, f"{expected} has no discovery probe"
 
 

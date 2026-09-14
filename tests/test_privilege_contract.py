@@ -668,6 +668,7 @@ def test_package_and_tool_arrays_have_one_owner_and_a_consumer() -> None:
         ("scripts/ubuntu/install.sh", "PYTHON_SOURCE_TOOLS"),
         ("scripts/ubuntu/install.sh", "PINNED_SOURCE_TOOLS"),
         ("scripts/ubuntu/install.sh", "USER_TOOLS"),
+        ("scripts/ubuntu/install.sh", "NPM_USER_TOOLS"),
         ("scripts/ubuntu/install.sh", "TELEGRAM_DESKTOP_ASSETS"),
         ("scripts/ubuntu/privileged-helper.sh", "DESKTOP_APT_PACKAGES"),
         ("scripts/ubuntu/privileged-helper.sh", "GUI_APT_PACKAGES"),

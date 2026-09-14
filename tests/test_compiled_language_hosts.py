@@ -338,13 +338,20 @@ PACKAGE_COMMANDS: dict[str, tuple[str, ...]] = {
     "cmake-language-server": ("cmake-language-server",),
     "basedpyright": ("basedpyright",),
     "semgrep": ("semgrep",),
+    # NPM_USER_TOOLS
+    "resend-cli": ("resend",),
+    "wrangler": ("wrangler",),
 }
 
 
 def _declared_packages() -> list[str]:
     source = INSTALL.read_text(encoding="utf-8")
     names: list[str] = []
-    for array, separator in (("BUN_LSP_PACKAGES", "@"), ("PYTHON_SOURCE_TOOLS", "==")):
+    for array, separator in (
+        ("BUN_LSP_PACKAGES", "@"),
+        ("PYTHON_SOURCE_TOOLS", "=="),
+        ("NPM_USER_TOOLS", "@"),
+    ):
         block = re.search(rf"^{array}=\((.*?)^\)", source, re.M | re.S)
         assert block, f"{array} is missing"
         for line in block.group(1).splitlines():

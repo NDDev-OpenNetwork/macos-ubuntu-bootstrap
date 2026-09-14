@@ -5,6 +5,12 @@ Versioning; the contract version in `config/rldyour-contract.json` moves with it
 
 ## [Unreleased]
 
+## [0.2.1] - 2026-09-14
+
+- Republish the 0.2.0 contract: tag `0.2.0` landed on the merge commit, which
+  GitHub does not attach to a pull request, so release evidence lookup refused
+  publication. This tag is the PR-head commit after merge.
+
 ## [0.2.0] - 2026-09-14
 
 - Add Ubuntu's distribution-owned PyYAML binding to the baseline so estate

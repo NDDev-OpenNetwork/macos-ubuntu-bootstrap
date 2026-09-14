@@ -203,7 +203,11 @@ rldyour::privilege::root_exec() {
 }
 
 rldyour::privilege::file_sha256() {
-  /usr/bin/sha256sum "$1" | /usr/bin/awk '{print $1}'
+  if [ -r "$1" ]; then
+    /usr/bin/sha256sum "$1" | /usr/bin/awk '{print $1}'
+  else
+    rldyour::privilege::root_exec /usr/bin/sha256sum "$1" | /usr/bin/awk '{print $1}'
+  fi
 }
 
 rldyour::privilege::receipt_value() {
@@ -341,14 +345,11 @@ rldyour::privilege::upgrade_contract() {
       return 1
     fi
     installed_contract=$(rldyour::privilege::file_sha256 "$RLDYOUR_PRIVILEGE_CONTRACT") || return 1
-    if [ "$installed_contract" = "$prior_contract" ]; then
+    if [ "$installed_contract" != "$contract_sha" ]; then
       rldyour::privilege::retire "$RLDYOUR_PRIVILEGE_CONTRACT" \
-        "rldyour-contract.json.aside-${prior_contract}" "$prior_contract" 0644 || return 1
+        "rldyour-contract.json.aside-${installed_contract}" "$installed_contract" 0644 || return 1
       rldyour::privilege::secure_publish "$RLDYOUR_PRIVILEGE_SOURCE_CONTRACT" \
         "$RLDYOUR_PRIVILEGE_CONTRACT" 0644 || return 1
-    elif [ "$installed_contract" != "$contract_sha" ]; then
-      rldyour::log "error" "managed privilege target differs from this source; no-replace policy preserves it"
-      return 1
     fi
   else
     rldyour::privilege::secure_publish "$RLDYOUR_PRIVILEGE_SOURCE_CONTRACT" \
@@ -408,22 +409,21 @@ rldyour::privilege::provision_bundle() {
   fi
 
   # Completed helper+policy that already match this source may take a new
-  # contract. The publisher never replaces, so upgrade asides the prior JSON
-  # and records. A crash after aside and before publish leaves the canonical
-  # contract missing; the same receipt still authorizes publishing the source.
+  # contract. The publisher never replaces helper or policy. The versioned
+  # adapter JSON may aside whatever regular file currently occupies that
+  # path, including an interrupted upgrade that published a different
+  # adapter JSON before records were rewritten. Privilege records are 0600
+  # root-owned; hashing them uses root_exec when the applying user cannot
+  # read them.
   if [ -e "$RLDYOUR_PRIVILEGE_RECEIPT" ] || [ -L "$RLDYOUR_PRIVILEGE_RECEIPT" ]; then
     prior_contract=$(rldyour::privilege::receipt_value "$RLDYOUR_PRIVILEGE_RECEIPT" contract_sha256) || return 1
     if [ "${installed_helper:-}" = "$helper_sha" ] && [ "${installed_policy:-}" = "$policy_sha" ] &&
       [ "$(rldyour::privilege::receipt_value "$RLDYOUR_PRIVILEGE_RECEIPT" helper_sha256)" = "$helper_sha" ] &&
       [ "$(rldyour::privilege::receipt_value "$RLDYOUR_PRIVILEGE_RECEIPT" policy_sha256)" = "$policy_sha" ] &&
       [ "$prior_contract" != "$contract_sha" ]; then
-      case "${installed_contract:-}" in
-        ""|"$prior_contract"|"$contract_sha")
-          rldyour::privilege::upgrade_contract "$helper_sha" "$contract_sha" "$policy_sha" "$prior_contract" || return 1
-          rldyour::privilege::bundle_current
-          return 0
-          ;;
-      esac
+      rldyour::privilege::upgrade_contract "$helper_sha" "$contract_sha" "$policy_sha" "$prior_contract" || return 1
+      rldyour::privilege::bundle_current
+      return 0
     fi
   fi
 

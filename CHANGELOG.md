@@ -5,6 +5,13 @@ Versioning; the contract version in `config/rldyour-contract.json` moves with it
 
 ## [Unreleased]
 
+## [0.2.4] - 2026-09-15
+
+- Hash root-owned 0600 privilege records through `root_exec` when the applying
+  user cannot read them. An interrupted contract upgrade that already published
+  a different adapter JSON is asided and replaced; helper and policy still
+  never replace.
+
 ## [0.2.3] - 2026-09-15
 
 - Ubuntu privilege can take a new contract JSON when helper and policy already

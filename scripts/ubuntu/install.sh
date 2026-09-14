@@ -367,7 +367,7 @@ rldyour::ubuntu::adopt_unmanaged_launcher() {
   if [ -L "$destination" ]; then
     current=$(readlink "$destination")
     case "$current" in
-      "$namespace"/*|"$HOME/.bun/bin/$name") return 0 ;;
+      "$namespace"/*|"$HOME/.bun/bin/$name"|"${XDG_CACHE_HOME:-$HOME/.cache}/.bun/bin/$name") return 0 ;;
     esac
   fi
   if [ -e "$backup" ] || [ -L "$backup" ]; then
@@ -448,7 +448,10 @@ rldyour::ubuntu::npm_user_tool_command() {
 
 install_npm_user_tools() {
   local entry name version cmd failed=0 bun_bin
-  bun_bin="$HOME/.bun/bin"
+  bun_bin="$(bun pm bin -g 2>/dev/null || true)"
+  if [ -z "$bun_bin" ]; then
+    bun_bin="${XDG_CACHE_HOME:-$HOME/.cache}/.bun/bin"
+  fi
   for entry in "${NPM_USER_TOOLS[@]}"; do
     name="${entry%@*}"
     version="${entry##*@}"

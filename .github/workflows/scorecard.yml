@@ -20,7 +20,7 @@ jobs:
       id-token: write # Authenticate the optional Scorecard result publication.
       contents: read
       actions: read # Read workflow metadata for Scorecard analysis.
-    uses: NDDev-OpenNetwork/ci-workflows/.github/workflows/public-scorecard-json.yml@bc9c7919de1c39d947a8709a92856925051bae05 # commit:bc9c7919de1c39d947a8709a92856925051bae05
+    uses: NDDev-OpenNetwork/ci-workflows/.github/workflows/public-scorecard-json.yml@9eb9e070ae87b0fc3bdbd2cbed5afe3b92f7e2c7 # commit:9eb9e070ae87b0fc3bdbd2cbed5afe3b92f7e2c7
     with:
       # Public repo: pull_request runs untrusted fork code. Pin the hosted runner
       # explicitly — the reusable's `runner` default belongs to the pinned commit,

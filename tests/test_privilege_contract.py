@@ -1536,6 +1536,8 @@ def test_receipt_and_partial_transaction_are_immutable_fail_closed() -> None:
     assert "rldyour::privilege::upgrade_contract" in text
     assert "rldyour::privilege::rewrite_records" in text
     assert "rldyour-contract.json.aside-" in text
+    assert 'rldyour-contract.json.aside-${installed_contract}' in text
+    assert "rldyour::privilege::root_exec /usr/bin/sha256sum" in text
 
 
 def test_helper_rejects_hostile_pkexec_subject_and_non_gui_operation() -> None:

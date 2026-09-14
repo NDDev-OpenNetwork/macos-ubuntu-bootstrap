@@ -452,6 +452,147 @@
         "desktop-server"
       ],
       "gui_required": true
+    },
+    "doctl": {
+      "version": "1.168.0",
+      "summary": "DigitalOcean command-line interface from the official digitalocean/doctl GitHub release.",
+      "install_method": "verified-github-release-tarball",
+      "version_flag": "version",
+      "source": {
+        "repository": "https://github.com/digitalocean/doctl",
+        "tag": "v1.168.0",
+        "release": "https://github.com/digitalocean/doctl/releases/tag/v1.168.0",
+        "verified_at": "2026-09-14",
+        "assets": {
+          "linux-x86_64": {
+            "url": "https://github.com/digitalocean/doctl/releases/download/v1.168.0/doctl-1.168.0-linux-amd64.tar.gz",
+            "sha256": "ad817330e1a12fd60729f105d8c39af31ca845f221a60886a1b2215f74d9b35d"
+          },
+          "linux-aarch64": {
+            "url": "https://github.com/digitalocean/doctl/releases/download/v1.168.0/doctl-1.168.0-linux-arm64.tar.gz",
+            "sha256": "cb5bc103b00e83021f348e555df703f9b5a40d50be5ddbd549e867f4039ae3cb"
+          }
+        }
+      },
+      "update_policy": "pinned-bootstrap-managed; never invoke doctl's self-update",
+      "bin_target": "${HOME}/.local/bin/doctl",
+      "managed_receipt": "ubuntu-runtime-v1",
+      "os": [
+        "linux"
+      ],
+      "profiles": [
+        "desktop",
+        "desktop-builds",
+        "desktop-server",
+        "server"
+      ]
+    },
+    "stripe": {
+      "version": "1.50.11",
+      "summary": "Stripe CLI from the official stripe/stripe-cli GitHub release.",
+      "install_method": "verified-github-release-tarball",
+      "source": {
+        "repository": "https://github.com/stripe/stripe-cli",
+        "tag": "v1.50.11",
+        "release": "https://github.com/stripe/stripe-cli/releases/tag/v1.50.11",
+        "verified_at": "2026-09-14",
+        "assets": {
+          "linux-x86_64": {
+            "url": "https://github.com/stripe/stripe-cli/releases/download/v1.50.11/stripe_1.50.11_linux_x86_64.tar.gz",
+            "sha256": "a99c81b67ca7c322958fc19b46b5f906b15d22e9934a644b09038c29f53cd8b2"
+          },
+          "linux-aarch64": {
+            "url": "https://github.com/stripe/stripe-cli/releases/download/v1.50.11/stripe_1.50.11_linux_arm64.tar.gz",
+            "sha256": "816023515eead49134c165e949d21d56fd61050f689a53f0fd77d07ca41ec1c6"
+          }
+        }
+      },
+      "update_policy": "pinned-bootstrap-managed",
+      "bin_target": "${HOME}/.local/bin/stripe",
+      "managed_receipt": "ubuntu-runtime-v1",
+      "os": [
+        "linux"
+      ],
+      "profiles": [
+        "desktop",
+        "desktop-builds",
+        "desktop-server",
+        "server"
+      ]
+    },
+    "gcloud": {
+      "version": "579.0.0",
+      "summary": "Google Cloud SDK CLI (gcloud, gsutil, bq) from the versioned cloud-sdk-release archive.",
+      "install_method": "verified-google-cloud-sdk-tarball",
+      "source": {
+        "repository": "https://cloud.google.com/sdk/docs/install",
+        "tag": "579.0.0",
+        "verified_at": "2026-09-14",
+        "assets": {
+          "linux-x86_64": {
+            "url": "https://storage.googleapis.com/cloud-sdk-release/google-cloud-cli-579.0.0-linux-x86_64.tar.gz",
+            "sha256": "a9a7fbe51cda37cf6142b1bbcff12227550e60a6c67e8cf84644fb301371c4de"
+          },
+          "linux-aarch64": {
+            "url": "https://storage.googleapis.com/cloud-sdk-release/google-cloud-cli-579.0.0-linux-arm.tar.gz",
+            "sha256": "edc914b75f8c5d50e1efc78b849d6fa636c4412346784c148c4130f5dc3eba00"
+          }
+        }
+      },
+      "update_policy": "pinned-bootstrap-managed; never invoke gcloud components update",
+      "bin_target": "${HOME}/.local/bin/gcloud",
+      "managed_receipt": "ubuntu-runtime-v1",
+      "os": [
+        "linux"
+      ],
+      "profiles": [
+        "desktop",
+        "desktop-builds",
+        "desktop-server",
+        "server"
+      ]
+    },
+    "resend": {
+      "version": "2.10.0",
+      "summary": "Resend CLI from the npm resend-cli package, installed through pinned Bun global.",
+      "install_method": "npm-registry",
+      "source": {
+        "kind": "npm",
+        "package": "resend-cli",
+        "registry": "https://registry.npmjs.org/resend-cli"
+      },
+      "update_policy": "pinned-bootstrap-managed exact npm version",
+      "bin_target": "${HOME}/.local/bin/resend",
+      "os": [
+        "linux"
+      ],
+      "profiles": [
+        "desktop",
+        "desktop-builds",
+        "desktop-server",
+        "server"
+      ]
+    },
+    "wrangler": {
+      "version": "4.120.0",
+      "summary": "Cloudflare Wrangler CLI from the npm wrangler package, installed through pinned Bun global.",
+      "install_method": "npm-registry",
+      "source": {
+        "kind": "npm",
+        "package": "wrangler",
+        "registry": "https://registry.npmjs.org/wrangler"
+      },
+      "update_policy": "pinned-bootstrap-managed exact npm version",
+      "bin_target": "${HOME}/.local/bin/wrangler",
+      "os": [
+        "linux"
+      ],
+      "profiles": [
+        "desktop",
+        "desktop-builds",
+        "desktop-server",
+        "server"
+      ]
     }
   },
   "desktop_entries": {

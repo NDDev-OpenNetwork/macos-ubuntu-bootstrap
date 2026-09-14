@@ -203,9 +203,8 @@ PINNED_SOURCE_TOOLS=(
 # User-selected CLI tools that are not language hosts, LSPs, or scanners but
 # belong on the desktop estate. Same row contract as PINNED_SOURCE_TOOLS
 # (name;version;kind;members_x64;members_arm64;links;sha_x64;sha_arm64;url_x64;url_arm64).
-# These are raw GitHub release binaries (kind=raw): the downloaded artifact IS
-# the executable, no archive to unpack. Every digest was confirmed by
-# downloading the artifact.
+# Every digest was confirmed by downloading the artifact, not copied from a
+# release note.
 #
 # herdr ships its own `herdr update` command that fetches https://herdr.dev/latest.json;
 # that live manifest is discovery-only. The canonical source tag, URLs, and
@@ -221,6 +220,17 @@ USER_TOOLS=(
   # used to hold the x86_64 values, which meant an arm64 desktop verified the
   # SHA-256 of an executable it could not run.
   "telegram;7.2.8;tarx;Telegram/Telegram;Telegram/Telegram;telegram-desktop;60313dfd5441d7013b2af351574bdf0a3688110d5bce00b837d54d14608cebd8;;https://github.com/telegramdesktop/tdesktop/releases/download/v7.2.8/td-setup-linux-x64-7.2.8.tar.xz;"
+  "doctl;1.168.0;tar0;doctl;doctl;doctl;ad817330e1a12fd60729f105d8c39af31ca845f221a60886a1b2215f74d9b35d;cb5bc103b00e83021f348e555df703f9b5a40d50be5ddbd549e867f4039ae3cb;https://github.com/digitalocean/doctl/releases/download/v1.168.0/doctl-1.168.0-linux-amd64.tar.gz;https://github.com/digitalocean/doctl/releases/download/v1.168.0/doctl-1.168.0-linux-arm64.tar.gz"
+  "stripe;1.50.11;tar0;stripe;stripe;stripe;a99c81b67ca7c322958fc19b46b5f906b15d22e9934a644b09038c29f53cd8b2;816023515eead49134c165e949d21d56fd61050f689a53f0fd77d07ca41ec1c6;https://github.com/stripe/stripe-cli/releases/download/v1.50.11/stripe_1.50.11_linux_x86_64.tar.gz;https://github.com/stripe/stripe-cli/releases/download/v1.50.11/stripe_1.50.11_linux_arm64.tar.gz"
+  "gcloud;579.0.0;tar1;bin/gcloud,bin/gsutil,bin/bq;bin/gcloud,bin/gsutil,bin/bq;gcloud,gsutil,bq;a9a7fbe51cda37cf6142b1bbcff12227550e60a6c67e8cf84644fb301371c4de;edc914b75f8c5d50e1efc78b849d6fa636c4412346784c148c4130f5dc3eba00;https://storage.googleapis.com/cloud-sdk-release/google-cloud-cli-579.0.0-linux-x86_64.tar.gz;https://storage.googleapis.com/cloud-sdk-release/google-cloud-cli-579.0.0-linux-arm.tar.gz"
+)
+
+# Operator CLIs that only exist as npm packages. Exact versions, same taxonomy
+# as BUN_LSP_PACKAGES. Wrangler is the exception to `--ignore-scripts`: its
+# postinstall fetches the workerd binary that package version requires.
+NPM_USER_TOOLS=(
+  "resend-cli@2.10.0"
+  "wrangler@4.120.0"
 )
 
 # The reviewed Telegram release installs these four files from
@@ -343,6 +353,31 @@ rldyour::ubuntu::preflight_managed_link() {
   fi
 }
 
+# Move an operator-installed ~/.local/bin launcher aside so a managed symlink
+# can take its name. Already-managed links (rldyour namespace or bun global)
+# are left alone. A leftover backup from a previous adopt fails closed rather
+# than clobbering it.
+rldyour::ubuntu::adopt_unmanaged_launcher() {
+  local name=$1 namespace=$2 current
+  local destination="$HOME/.local/bin/$name"
+  local backup="${destination}.unmanaged-pre-bootstrap"
+  if [ ! -e "$destination" ] && [ ! -L "$destination" ]; then
+    return 0
+  fi
+  if [ -L "$destination" ]; then
+    current=$(readlink "$destination")
+    case "$current" in
+      "$namespace"/*|"$HOME/.bun/bin/$name") return 0 ;;
+    esac
+  fi
+  if [ -e "$backup" ] || [ -L "$backup" ]; then
+    rldyour::log "error" "unmanaged launcher backup already exists; preserved: $destination and $backup"
+    return 1
+  fi
+  mv "$destination" "$backup"
+  rldyour::log "info" "adopted unmanaged launcher aside: $backup"
+}
+
 ensure_managed_tool_link() {
   local name=$1 source=$2 namespace=$3 destination current
   destination="$HOME/.local/bin/$name"
@@ -373,17 +408,77 @@ install_pinned_source_tools() {
 # Install user-selected CLI tools (USER_TOOLS). Same row contract and installer
 # as PINNED_SOURCE_TOOLS — the two arrays differ only in taxonomy: pinned source
 # tools are estate CI parity (gitleaks/osv/actionlint/...), user tools are
-# operator-chosen desktop conveniences (herdr). Reusing ensure_pinned_source_tool
-# keeps the receipt, SHA-256 verification, and managed-symlink contract uniform.
+# operator-chosen desktop conveniences (herdr, doctl, stripe, gcloud). Reusing
+# ensure_pinned_source_tool keeps the receipt, SHA-256 verification, and
+# managed-symlink contract uniform. Unmanaged copies already on PATH are adopted
+# aside, then replaced with the pinned launcher.
 install_user_tools() {
-  local row failed=0
+  local row failed=0 name links link
+  local -a link_list
   for row in "${USER_TOOLS[@]}"; do
     if [ "$GUI_ENABLED" -ne 1 ] && [ "${row%%;*}" = "telegram" ]; then
       continue
     fi
+    IFS=';' read -r name _ _ _ _ links _ <<<"$row"
+    IFS=',' read -r -a link_list <<<"$links"
+    for link in "${link_list[@]}"; do
+      if ! rldyour::ubuntu::adopt_unmanaged_launcher "$link" "$HOME/.local/share/rldyour/$name"; then
+        failed=1
+        continue 2
+      fi
+    done
     if ! ensure_pinned_source_tool "$row"; then
       failed=1
     fi
+  done
+  if ! install_npm_user_tools; then
+    failed=1
+  fi
+  return "$failed"
+}
+
+# Map npm package name -> published command. Scoped names are not used here.
+rldyour::ubuntu::npm_user_tool_command() {
+  case "$1" in
+    resend-cli) printf '%s\n' resend ;;
+    wrangler) printf '%s\n' wrangler ;;
+    *) return 1 ;;
+  esac
+}
+
+install_npm_user_tools() {
+  local entry name version cmd failed=0 bun_bin
+  bun_bin="$HOME/.bun/bin"
+  for entry in "${NPM_USER_TOOLS[@]}"; do
+    name="${entry%@*}"
+    version="${entry##*@}"
+    cmd="$(rldyour::ubuntu::npm_user_tool_command "$name")" || {
+      rldyour::log "error" "no command mapping for npm user tool $name"
+      failed=1
+      continue
+    }
+    if [ "${RLDYOUR_DRY_RUN:-1}" -eq 1 ]; then
+      rldyour::log "info" "[DRY-RUN] ensure pinned npm user tool: ${entry} -> ${cmd}"
+      continue
+    fi
+    if bun pm ls -g 2>/dev/null | grep -Fq "${name}@${version}"; then
+      rldyour::log "ok" "pinned npm user tool present: ${entry}"
+    elif [ "$name" = "wrangler" ]; then
+      # wrangler postinstall fetches workerd for this exact package version.
+      rldyour::run bun add -g "$entry" || { failed=1; continue; }
+    else
+      rldyour::run bun add -g --ignore-scripts "$entry" || { failed=1; continue; }
+    fi
+    if ! rldyour::ubuntu::adopt_unmanaged_launcher "$cmd" "$bun_bin"; then
+      failed=1
+      continue
+    fi
+    if [ ! -x "$bun_bin/$cmd" ]; then
+      rldyour::log "error" "bun global did not publish $cmd for $entry"
+      failed=1
+      continue
+    fi
+    ln -sfn "$bun_bin/$cmd" "$HOME/.local/bin/$cmd"
   done
   return "$failed"
 }

@@ -359,8 +359,21 @@ def _expand_home_path(value: str, home: Path) -> Path:
     return Path(value.replace("${HOME}", str(home), 1))
 
 
+def _user_tool_install_method(spec: dict[str, Any]) -> str:
+    """Return the linux/current-os install method string for a user_tool spec."""
+    method = spec.get("install_method")
+    if isinstance(method, dict):
+        method = method.get(_current_os()) or method.get("linux") or method.get("macos")
+    return str(method or "")
+
+
+def _user_tool_compares_binary_sha(spec: dict[str, Any]) -> bool:
+    """True only when the contract pin is the published binary, not an archive."""
+    return _user_tool_install_method(spec) == "verified-github-release-binary"
+
+
 def _user_tool_state(bin_dir: Path, home: Path) -> dict[str, dict[str, Any]]:
-    """Collect installed user tools (herdr, telegram) declared in the contract."""
+    """Collect installed user tools declared in the contract."""
     contract = load_contract()
     declared = contract.get("user_tools", {})
     state: dict[str, dict[str, Any]] = {}
@@ -378,10 +391,11 @@ def _user_tool_state(bin_dir: Path, home: Path) -> dict[str, dict[str, Any]]:
         # and mutates desktop-session state. The contract must opt those tools
         # into a non-executing presence probe; their version/provenance is
         # already bound by the install receipt and archive SHA-256.
+        version_flag = str(spec.get("version_flag") or "--version")
         if spec.get("version_probe") == "presence-only":
             raw = "presence-only" if path.exists() or path.is_symlink() else "absent"
         else:
-            raw = _run_version(path, "--version")
+            raw = _run_version(path, version_flag)
         if (
             spec.get("version_probe") == "presence-only"
             or not raw
@@ -746,7 +760,7 @@ def _verify_contract_versions(state: dict[str, Any], *, profile: str = "desktop"
             drifts.append(f"{name}: installed {installed} != contract {declared}")
         source = spec.get("source", {})
         assets = source.get("assets", {}) if isinstance(source, dict) else {}
-        if assets:
+        if assets and _user_tool_compares_binary_sha(spec):
             system = _current_os()
             machine = os.uname().machine
             normalized_machine = {

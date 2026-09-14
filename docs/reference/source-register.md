@@ -183,6 +183,24 @@ changes arrive through reviewed update PRs that refresh the tag, commit, asset
 URLs, hashes, tests, and this register together.
 
 
+## Operator CLIs (2026-09-14)
+
+Verified by downloading the install artifacts, not by copying a checksum file.
+
+| Tool | Version | Official artifact | SHA-256 |
+|---|---|---|---|
+| doctl | 1.168.0 | `doctl-1.168.0-linux-amd64.tar.gz` | `ad817330e1a12fd60729f105d8c39af31ca845f221a60886a1b2215f74d9b35d` |
+| doctl | 1.168.0 | `doctl-1.168.0-linux-arm64.tar.gz` | `cb5bc103b00e83021f348e555df703f9b5a40d50be5ddbd549e867f4039ae3cb` |
+| stripe | 1.50.11 | `stripe_1.50.11_linux_x86_64.tar.gz` | `a99c81b67ca7c322958fc19b46b5f906b15d22e9934a644b09038c29f53cd8b2` |
+| stripe | 1.50.11 | `stripe_1.50.11_linux_arm64.tar.gz` | `816023515eead49134c165e949d21d56fd61050f689a53f0fd77d07ca41ec1c6` |
+| gcloud | 579.0.0 | `google-cloud-cli-579.0.0-linux-x86_64.tar.gz` | `a9a7fbe51cda37cf6142b1bbcff12227550e60a6c67e8cf84644fb301371c4de` |
+| gcloud | 579.0.0 | `google-cloud-cli-579.0.0-linux-arm.tar.gz` | `edc914b75f8c5d50e1efc78b849d6fa636c4412346784c148c4130f5dc3eba00` |
+
+`resend-cli@2.10.0` and `wrangler@4.120.0` are exact npm versions installed through Bun global. Wrangler is allowed to run its postinstall so that version can fetch workerd; other npm user tools keep `--ignore-scripts`.
+
+`doctl` has no `--version` flag; the receipt probes `doctl version`. Installation never invokes `gcloud components update` or vendor self-update.
+
+
 ## Grok installer review (2026-09-07)
 
 The current [official xAI installer](https://x.ai/cli/install.sh) was downloaded

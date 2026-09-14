@@ -292,6 +292,7 @@ required_cmds=(
   starship atuin carapace
   cmake-language-server
   codex claude grok cx cl gk
+  doctl stripe gcloud gsutil bq resend wrangler
 )
 for cmd in "${required_cmds[@]}"; do
   rldyour::require_cmd "$cmd" required

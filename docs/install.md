@@ -45,6 +45,14 @@ or subsequently updated Homebrew formula for the managed macOS runtime. The pinn
 independently verified asset hashes, and update policy are recorded in the
 [dependency source register](reference/source-register.md).
 
+Ubuntu also pins the operator CLIs already used on the estate hosts: `doctl`,
+`stripe`, and the Google Cloud SDK (`gcloud`/`gsutil`/`bq`) as hashed release
+archives, plus `resend` and `wrangler` as exact npm versions installed through
+Bun. Unmanaged copies already on `~/.local/bin` are adopted aside and replaced
+with the managed launcher. `gh` remains an apt package. Operator-authored
+wrappers (`cf`, `cfapi`) and CLIs without a public hashed artifact (`gddy`) stay
+outside this contract.
+
 GUI profiles install current Google Chrome stable. macOS also installs the
 desktop applications listed in the contract. Ubuntu GUI installs RustDesk and
 Telegram, configures GNOME, and removes Firefox. `--no-gui` retains command-line

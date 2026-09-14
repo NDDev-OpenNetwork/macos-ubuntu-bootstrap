@@ -180,6 +180,7 @@ ensure_pinned_source_tool() {
   printf '%s\n' "${1%%;*}" >>"$CALLS_FILE"
   [ "${1%%;*}" != herdr ]
 }
+install_npm_user_tools() { return 0; }
 install_user_tools
 """,
             "_",
@@ -192,7 +193,9 @@ install_user_tools
         check=False,
     )
     assert result.returncode != 0
-    assert calls.read_text(encoding="utf-8").splitlines() == ["herdr", "telegram"]
+    names = calls.read_text(encoding="utf-8").splitlines()
+    assert "herdr" in names and "telegram" in names
+    assert names.index("herdr") < names.index("telegram")
 
 
 

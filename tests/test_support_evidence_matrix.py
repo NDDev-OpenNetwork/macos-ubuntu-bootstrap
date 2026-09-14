@@ -94,7 +94,7 @@ def test_installation_audit_covers_every_contract_install_domain() -> None:
         "macos-homebrew-formulae-and-casks", "ubuntu-apt-baseline",
         "ubuntu-pinned-source-tools", "ubuntu-node-uv-bun",
         "ubuntu-go-gopls-rust-dart", "herdr", "google-chrome", "rustdesk",
-        "telegram", "terminal-git-payloads", "ubuntu-docker",
+        "telegram", "operator-clis", "terminal-git-payloads", "ubuntu-docker",
         "ubuntu-server-hardening",
     } == audit_ids
 

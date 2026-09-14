@@ -283,15 +283,16 @@ def test_telegram_presence_probe_never_executes_the_gui(
 
     def fake_run_version(binary: Path, flag: str) -> str:
         calls.append(binary.name)
-        assert flag == "--version"
-        return "herdr 0.9.0"
+        assert flag in {"--version", "version"}
+        return f"{binary.name} 0.0.0"
 
     monkeypatch.setattr(di.shutil, "which", lambda name: str(bin_dir / name))
     monkeypatch.setattr(di, "_applies_to_current_os", lambda spec: True)
     monkeypatch.setattr(di, "_run_version", fake_run_version)
     state = di._user_tool_state(bin_dir, tmp_path)
 
-    assert calls == ["herdr"]
+    assert "herdr" in calls
+    assert "telegram-desktop" not in calls
     assert state["telegram"]["raw"] == "presence-only"
     assert state["telegram"]["installed_version"] == "7.2.8"
 
@@ -317,12 +318,24 @@ def _server_state_all_required_tools_present() -> dict[str, object]:
             for name, spec in rs[di.PINNED_SOURCE_TOOLS_CONTRACT].items()
         },
         "user_tools": {
-            "herdr": {
-                "installed_version": contract["user_tools"]["herdr"]["version"],
-                "sha256": contract["user_tools"]["herdr"]["source"]["assets"][
+            name: {
+                "installed_version": spec["version"],
+                "sha256": spec["source"]["assets"][
                     "macos-aarch64" if di._current_os() == "macos" else "linux-x86_64"
                 ]["sha256"],
             }
+            for name, spec in contract.get("user_tools", {}).items()
+            if not spec.get("gui_required")
+            and spec.get("source", {}).get("assets")
+            and di._user_tool_compares_binary_sha(spec)
+        } | {
+            name: {"installed_version": spec["version"]}
+            for name, spec in contract.get("user_tools", {}).items()
+            if not spec.get("gui_required")
+            and not (
+                spec.get("source", {}).get("assets")
+                and di._user_tool_compares_binary_sha(spec)
+            )
         },
     }
 

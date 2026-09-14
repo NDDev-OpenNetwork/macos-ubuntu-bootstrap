@@ -651,6 +651,20 @@
       "update_policy": "reviewed Ubuntu pin with external updater disabled; macOS cask channel"
     },
     {
+      "id": "operator-clis",
+      "inventory_ref": "rldyour-contract.json#/user_tools",
+      "source": "official GitHub release archives, Google Cloud SDK archives, and exact npm versions",
+      "version_discovery": "reviewed upstream releases and npm registry versions",
+      "integrity": "exact per-architecture archive SHA-256 for GitHub/Google artifacts; exact npm package version for registry CLIs",
+      "architectures": [
+        "linux-amd64",
+        "linux-arm64"
+      ],
+      "idempotency": "managed receipt and launcher; unmanaged PATH copies adopted aside",
+      "partial_failure": "unmanaged launchers preserved when adopt cannot proceed",
+      "update_policy": "reviewed pin only; never vendor self-update or latest"
+    },
+    {
       "id": "terminal-git-payloads",
       "inventory_ref": "templates/terminal/zsh_plugins.txt",
       "source": "official upstream Git commits",

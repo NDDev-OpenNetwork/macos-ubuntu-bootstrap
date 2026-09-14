@@ -14,7 +14,6 @@ import os
 import pathlib
 import re
 import shutil
-import stat
 import tempfile
 
 

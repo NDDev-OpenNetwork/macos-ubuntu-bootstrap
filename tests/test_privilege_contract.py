@@ -922,17 +922,35 @@ def test_secure_publisher_uses_anchored_no_follow_no_replace_and_fsync() -> None
     ast.parse(text)
     assert "dir_fd=" in text and "os.O_NOFOLLOW" in text
     assert "os.link(temp, leaf" in text
+    assert "os.link(leaf, aside_name" in text
     assert "os.replace" not in text and "os.rename" not in text
     assert text.count("os.fsync(") >= 3
     assert "revalidate_authorized_chain(parent, chain, authority, sandbox_root)" in text
     assert "destination exists with divergent" in text
 
 
+def test_publisher_unlink_targets_are_explicit() -> None:
+    tree = ast.parse(PUBLISHER.read_text(encoding="utf-8"))
+
+    def unlinks(name: str) -> list[str]:
+        for node in ast.walk(tree):
+            if isinstance(node, ast.FunctionDef) and node.name == name:
+                return [
+                    ast.unparse(call.args[0])
+                    for call in ast.walk(node)
+                    if isinstance(call, ast.Call) and ast.unparse(call.func) == "os.unlink"
+                ]
+        raise AssertionError(name)
+
+    assert set(unlinks("publish")) == {"temp"}
+    assert unlinks("retire") == ["leaf"]
+
+
 def test_publisher_race_contract_never_removes_destination() -> None:
     tree = ast.parse(PUBLISHER.read_text(encoding="utf-8"))
     calls = [node for node in ast.walk(tree) if isinstance(node, ast.Call)]
     unlink_args = [ast.unparse(node.args[0]) for node in calls if ast.unparse(node.func) == "os.unlink"]
-    assert unlink_args and set(unlink_args) == {"temp"}
+    assert unlink_args and set(unlink_args) == {"temp", "leaf"}
 
 
 def _publisher_module():
@@ -982,6 +1000,90 @@ def test_no_replace_preserves_concurrent_destination_and_cleans_temp(tmp_path: P
         raise AssertionError("concurrent unmanaged destination was replaced")
     assert destination.is_symlink() and os.readlink(destination) == "unmanaged"
     assert not list(tmp_path.glob(".rldyour-publish.*"))
+
+
+def test_retire_asides_matching_leaf_then_unlinks_original(tmp_path: Path, monkeypatch) -> None:
+    module = _publisher_module()
+    _unprivileged_publisher(module, monkeypatch)
+    destination = tmp_path / "rldyour-contract.json"
+    payload = b"prior-contract"
+    destination.write_bytes(payload)
+    destination.chmod(0o644)
+    digest = __import__("hashlib").sha256(payload).hexdigest()
+    module.retire(str(destination), f"rldyour-contract.json.aside-{digest}", digest, 0o644)
+    aside = tmp_path / f"rldyour-contract.json.aside-{digest}"
+    assert not destination.exists()
+    assert aside.read_bytes() == payload
+
+
+def test_retire_completes_when_aside_already_hardlinked(tmp_path: Path, monkeypatch) -> None:
+    module = _publisher_module()
+    _unprivileged_publisher(module, monkeypatch)
+    destination = tmp_path / "rldyour-contract.json"
+    payload = b"prior-contract"
+    destination.write_bytes(payload)
+    destination.chmod(0o644)
+    digest = __import__("hashlib").sha256(payload).hexdigest()
+    aside = tmp_path / f"rldyour-contract.json.aside-{digest}"
+    os.link(destination, aside)
+    module.retire(str(destination), aside.name, digest, 0o644)
+    assert not destination.exists()
+    assert aside.read_bytes() == payload
+
+
+def test_retire_refuses_a_divergent_leaf(tmp_path: Path, monkeypatch) -> None:
+    module = _publisher_module()
+    _unprivileged_publisher(module, monkeypatch)
+    destination = tmp_path / "rldyour-contract.json"
+    destination.write_bytes(b"prior-contract")
+    destination.chmod(0o644)
+    try:
+        module.retire(
+            str(destination),
+            "rldyour-contract.json.aside-" + ("a" * 64),
+            "a" * 64,
+            0o644,
+        )
+    except FileExistsError:
+        pass
+    else:
+        raise AssertionError("divergent leaf was retired")
+    assert destination.read_bytes() == b"prior-contract"
+
+
+def test_retire_refuses_aside_name_that_does_not_match_leaf(tmp_path: Path, monkeypatch) -> None:
+    module = _publisher_module()
+    _unprivileged_publisher(module, monkeypatch)
+    destination = tmp_path / "rldyour-contract.json"
+    payload = b"prior-contract"
+    destination.write_bytes(payload)
+    destination.chmod(0o644)
+    digest = __import__("hashlib").sha256(payload).hexdigest()
+    try:
+        module.retire(str(destination), f"other.json.aside-{digest}", digest, 0o644)
+    except ValueError:
+        pass
+    else:
+        raise AssertionError("mismatched aside name was accepted")
+    assert destination.read_bytes() == payload
+
+
+def test_retire_asides_under_actor_sandbox(tmp_path: Path) -> None:
+    module = _publisher_module()
+    anchor = tmp_path / "actor-root"
+    anchor.mkdir(mode=0o700)
+    destination = anchor / "rldyour-contract.json"
+    payload = b"prior-contract"
+    destination.write_bytes(payload)
+    destination.chmod(0o644)
+    digest = __import__("hashlib").sha256(payload).hexdigest()
+    module.retire(
+        str(destination), f"rldyour-contract.json.aside-{digest}", digest, 0o644,
+        module.AUTHORITY_SANDBOX, str(anchor),
+    )
+    aside = anchor / f"rldyour-contract.json.aside-{digest}"
+    assert not destination.exists()
+    assert aside.read_bytes() == payload
 
 
 def test_ancestor_identity_race_stops_before_publish_and_cleans(tmp_path: Path, monkeypatch) -> None:
@@ -1430,6 +1532,10 @@ def test_receipt_and_partial_transaction_are_immutable_fail_closed() -> None:
     assert "bundle is divergent; preserving it unchanged" in text
     assert "/bin/rm -f -- \"$RLDYOUR_PRIVILEGE_TRANSACTION\"" not in text
     assert "--destination \"$destination\"" in text
+    assert "--retire --destination" in text
+    assert "rldyour::privilege::upgrade_contract" in text
+    assert "rldyour::privilege::rewrite_records" in text
+    assert "rldyour-contract.json.aside-" in text
 
 
 def test_helper_rejects_hostile_pkexec_subject_and_non_gui_operation() -> None:

@@ -5,6 +5,15 @@ Versioning; the contract version in `config/rldyour-contract.json` moves with it
 
 ## [Unreleased]
 
+## [0.2.3] - 2026-09-15
+
+- Ubuntu privilege can take a new contract JSON when helper and policy already
+  match this source: aside the prior contract and records, then publish. A
+  partial transaction that is not that completed-bundle case still fail-closes.
+- Apply still runs strict verify before writing a device receipt, but does not
+  compare a prior receipt to the state this apply is about to record. Standalone
+  `verify.sh --strict` still does.
+
 ## [0.2.2] - 2026-09-14
 
 - Keep Ubuntu `--plan` from calling `bun pm bin -g` or `bun pm ls -g` when

@@ -293,12 +293,68 @@ rldyour::privilege::write_record_source() {
   return "$status"
 }
 
+rldyour::privilege::publisher() {
+  # python-surface: publisher-file
+  rldyour::privilege::root_exec /usr/bin/python3 -I "$RLDYOUR_PRIVILEGE_SOURCE_PUBLISHER" "$@"
+}
+
 rldyour::privilege::secure_publish() {
   local source=$1 destination=$2 mode=$3 digest
   digest=$(rldyour::privilege::file_sha256 "$source") || return 1
-  # python-surface: publisher-file
-  rldyour::privilege::root_exec /usr/bin/python3 -I "$RLDYOUR_PRIVILEGE_SOURCE_PUBLISHER" \
+  rldyour::privilege::publisher \
     --source "$source" --destination "$destination" --sha256 "$digest" --mode "$mode"
+}
+
+rldyour::privilege::retire() {
+  local destination=$1 aside_name=$2 digest=$3 mode=$4
+  rldyour::privilege::publisher \
+    --retire --destination "$destination" --aside-name "$aside_name" --sha256 "$digest" --mode "$mode"
+}
+
+# Rewrite privilege records after a completed bundle takes a new contract.
+# Helper and policy bytes stay; only the versioned adapter JSON moves. The
+# publisher never replaces, so each current leaf is linked to an exclusive
+# aside name and then unlinked before the new object is published.
+rldyour::privilege::rewrite_records() {
+  local helper_sha=$1 contract_sha=$2 policy_sha=$3 prior_contract=$4 digest
+  if [ -e "$RLDYOUR_PRIVILEGE_TRANSACTION" ] || [ -L "$RLDYOUR_PRIVILEGE_TRANSACTION" ]; then
+    digest=$(rldyour::privilege::file_sha256 "$RLDYOUR_PRIVILEGE_TRANSACTION") || return 1
+    rldyour::privilege::retire "$RLDYOUR_PRIVILEGE_TRANSACTION" \
+      "privilege-transaction.aside-${prior_contract}" "$digest" 0600 || return 1
+  fi
+  rldyour::privilege::write_record_source "$RLDYOUR_PRIVILEGE_TRANSACTION" \
+    "$helper_sha" "$contract_sha" "$policy_sha" || return 1
+  if [ -e "$RLDYOUR_PRIVILEGE_RECEIPT" ] || [ -L "$RLDYOUR_PRIVILEGE_RECEIPT" ]; then
+    digest=$(rldyour::privilege::file_sha256 "$RLDYOUR_PRIVILEGE_RECEIPT") || return 1
+    rldyour::privilege::retire "$RLDYOUR_PRIVILEGE_RECEIPT" \
+      "privilege-receipt.aside-${prior_contract}" "$digest" 0600 || return 1
+  fi
+  rldyour::privilege::write_record_source "$RLDYOUR_PRIVILEGE_RECEIPT" \
+    "$helper_sha" "$contract_sha" "$policy_sha"
+}
+
+rldyour::privilege::upgrade_contract() {
+  local helper_sha=$1 contract_sha=$2 policy_sha=$3 prior_contract=$4 installed_contract
+  if [ -e "$RLDYOUR_PRIVILEGE_CONTRACT" ] || [ -L "$RLDYOUR_PRIVILEGE_CONTRACT" ]; then
+    if [ -L "$RLDYOUR_PRIVILEGE_CONTRACT" ] || [ ! -f "$RLDYOUR_PRIVILEGE_CONTRACT" ]; then
+      rldyour::log "error" "unmanaged privilege destination exists; preserved: $RLDYOUR_PRIVILEGE_CONTRACT"
+      return 1
+    fi
+    installed_contract=$(rldyour::privilege::file_sha256 "$RLDYOUR_PRIVILEGE_CONTRACT") || return 1
+    if [ "$installed_contract" = "$prior_contract" ]; then
+      rldyour::privilege::retire "$RLDYOUR_PRIVILEGE_CONTRACT" \
+        "rldyour-contract.json.aside-${prior_contract}" "$prior_contract" 0644 || return 1
+      rldyour::privilege::secure_publish "$RLDYOUR_PRIVILEGE_SOURCE_CONTRACT" \
+        "$RLDYOUR_PRIVILEGE_CONTRACT" 0644 || return 1
+    elif [ "$installed_contract" != "$contract_sha" ]; then
+      rldyour::log "error" "managed privilege target differs from this source; no-replace policy preserves it"
+      return 1
+    fi
+  else
+    rldyour::privilege::secure_publish "$RLDYOUR_PRIVILEGE_SOURCE_CONTRACT" \
+      "$RLDYOUR_PRIVILEGE_CONTRACT" 0644 || return 1
+  fi
+  rldyour::privilege::rewrite_records "$helper_sha" "$contract_sha" "$policy_sha" "$prior_contract"
 }
 
 rldyour::privilege::transaction_matches_sources() {
@@ -313,6 +369,7 @@ rldyour::privilege::transaction_matches_sources() {
 
 rldyour::privilege::provision_bundle() {
   local helper_sha contract_sha policy_sha key source destination mode current expected
+  local installed_helper installed_policy installed_contract prior_contract completed=0
   helper_sha=$(rldyour::privilege::file_sha256 "$RLDYOUR_PRIVILEGE_SOURCE_HELPER") || return 1
   contract_sha=$(rldyour::privilege::file_sha256 "$RLDYOUR_PRIVILEGE_SOURCE_CONTRACT") || return 1
   policy_sha=$(rldyour::privilege::file_sha256 "$RLDYOUR_PRIVILEGE_SOURCE_POLICY") || return 1
@@ -323,27 +380,107 @@ rldyour::privilege::provision_bundle() {
       --ensure-directory "$destination" --mode 0755 || return 1
   done
 
+  if [ -e "$RLDYOUR_PRIVILEGE_HELPER" ] && [ ! -L "$RLDYOUR_PRIVILEGE_HELPER" ]; then
+    installed_helper=$(rldyour::privilege::file_sha256 "$RLDYOUR_PRIVILEGE_HELPER") || return 1
+  fi
+  if [ -e "$RLDYOUR_PRIVILEGE_POLICY" ] && [ ! -L "$RLDYOUR_PRIVILEGE_POLICY" ]; then
+    installed_policy=$(rldyour::privilege::file_sha256 "$RLDYOUR_PRIVILEGE_POLICY") || return 1
+  fi
+  if [ -e "$RLDYOUR_PRIVILEGE_CONTRACT" ] && [ ! -L "$RLDYOUR_PRIVILEGE_CONTRACT" ]; then
+    installed_contract=$(rldyour::privilege::file_sha256 "$RLDYOUR_PRIVILEGE_CONTRACT") || return 1
+  fi
+
+  if [ -e "$RLDYOUR_PRIVILEGE_RECEIPT" ] || [ -L "$RLDYOUR_PRIVILEGE_RECEIPT" ]; then
+    rldyour::privilege::record_valid "$RLDYOUR_PRIVILEGE_RECEIPT" || {
+      rldyour::log "error" "managed privilege bundle is divergent; preserving it unchanged"
+      return 1
+    }
+    if rldyour::privilege::bundle_matches_record "$RLDYOUR_PRIVILEGE_RECEIPT"; then
+      completed=1
+    fi
+  fi
+
   if [ -e "$RLDYOUR_PRIVILEGE_TRANSACTION" ] || [ -L "$RLDYOUR_PRIVILEGE_TRANSACTION" ]; then
     rldyour::privilege::record_valid "$RLDYOUR_PRIVILEGE_TRANSACTION" || {
       rldyour::log "error" "partial privilege transaction is invalid; preserving it unchanged"
       return 1
     }
-    if ! rldyour::privilege::transaction_matches_sources \
+  fi
+
+  # Completed helper+policy that already match this source may take a new
+  # contract. The publisher never replaces, so upgrade asides the prior JSON
+  # and records. A crash after aside and before publish leaves the canonical
+  # contract missing; the same receipt still authorizes publishing the source.
+  if [ -e "$RLDYOUR_PRIVILEGE_RECEIPT" ] || [ -L "$RLDYOUR_PRIVILEGE_RECEIPT" ]; then
+    prior_contract=$(rldyour::privilege::receipt_value "$RLDYOUR_PRIVILEGE_RECEIPT" contract_sha256) || return 1
+    if [ "${installed_helper:-}" = "$helper_sha" ] && [ "${installed_policy:-}" = "$policy_sha" ] &&
+      [ "$(rldyour::privilege::receipt_value "$RLDYOUR_PRIVILEGE_RECEIPT" helper_sha256)" = "$helper_sha" ] &&
+      [ "$(rldyour::privilege::receipt_value "$RLDYOUR_PRIVILEGE_RECEIPT" policy_sha256)" = "$policy_sha" ] &&
+      [ "$prior_contract" != "$contract_sha" ]; then
+      case "${installed_contract:-}" in
+        ""|"$prior_contract"|"$contract_sha")
+          rldyour::privilege::upgrade_contract "$helper_sha" "$contract_sha" "$policy_sha" "$prior_contract" || return 1
+          rldyour::privilege::bundle_current
+          return 0
+          ;;
+      esac
+    fi
+  fi
+
+  if [ -e "$RLDYOUR_PRIVILEGE_TRANSACTION" ] || [ -L "$RLDYOUR_PRIVILEGE_TRANSACTION" ]; then
+    if [ "$completed" -eq 1 ]; then
+      if rldyour::privilege::transaction_matches_sources \
+        "$RLDYOUR_PRIVILEGE_TRANSACTION" "$helper_sha" "$contract_sha" "$policy_sha"; then
+        :
+      elif [ "${installed_helper:-}" = "$helper_sha" ] && [ "${installed_policy:-}" = "$policy_sha" ] &&
+        [ "${installed_contract:-}" = "$contract_sha" ]; then
+        prior_contract=$(rldyour::privilege::receipt_value "$RLDYOUR_PRIVILEGE_RECEIPT" contract_sha256) || return 1
+        rldyour::privilege::rewrite_records "$helper_sha" "$contract_sha" "$policy_sha" "$prior_contract" || return 1
+        rldyour::privilege::bundle_current
+        return 0
+      else
+        rldyour::log "error" "managed privilege target differs from this source; no-replace policy preserves it"
+        return 1
+      fi
+    elif [ -e "$RLDYOUR_PRIVILEGE_RECEIPT" ] || [ -L "$RLDYOUR_PRIVILEGE_RECEIPT" ]; then
+      if [ "${installed_helper:-}" = "$helper_sha" ] && [ "${installed_policy:-}" = "$policy_sha" ] &&
+        [ "${installed_contract:-}" = "$contract_sha" ]; then
+        prior_contract=$(rldyour::privilege::receipt_value "$RLDYOUR_PRIVILEGE_RECEIPT" contract_sha256) || return 1
+        rldyour::privilege::rewrite_records "$helper_sha" "$contract_sha" "$policy_sha" "$prior_contract" || return 1
+        rldyour::privilege::bundle_current
+        return 0
+      fi
+      rldyour::log "error" "partial privilege transaction targets another source revision"
+      return 1
+    elif ! rldyour::privilege::transaction_matches_sources \
       "$RLDYOUR_PRIVILEGE_TRANSACTION" "$helper_sha" "$contract_sha" "$policy_sha"; then
       rldyour::log "error" "partial privilege transaction targets another source revision"
       return 1
     fi
   else
-    if [ -e "$RLDYOUR_PRIVILEGE_RECEIPT" ] || [ -L "$RLDYOUR_PRIVILEGE_RECEIPT" ]; then
-      rldyour::privilege::bundle_matches_record "$RLDYOUR_PRIVILEGE_RECEIPT" || {
-        rldyour::log "error" "managed privilege bundle is divergent; preserving it unchanged"
-        return 1
-      }
+    if [ "$completed" -eq 1 ]; then
+      :
+    elif [ -e "$RLDYOUR_PRIVILEGE_RECEIPT" ] || [ -L "$RLDYOUR_PRIVILEGE_RECEIPT" ]; then
+      rldyour::log "error" "managed privilege bundle is divergent; preserving it unchanged"
+      return 1
     else
-      for destination in "$RLDYOUR_PRIVILEGE_HELPER" "$RLDYOUR_PRIVILEGE_CONTRACT" "$RLDYOUR_PRIVILEGE_POLICY"; do
+      for key in helper contract policy; do
+        case "$key" in
+          helper) source=$RLDYOUR_PRIVILEGE_SOURCE_HELPER; destination=$RLDYOUR_PRIVILEGE_HELPER ;;
+          contract) source=$RLDYOUR_PRIVILEGE_SOURCE_CONTRACT; destination=$RLDYOUR_PRIVILEGE_CONTRACT ;;
+          policy) source=$RLDYOUR_PRIVILEGE_SOURCE_POLICY; destination=$RLDYOUR_PRIVILEGE_POLICY ;;
+        esac
         if [ -e "$destination" ] || [ -L "$destination" ]; then
-          rldyour::log "error" "unmanaged privilege destination exists; preserved: $destination"
-          return 1
+          if [ -L "$destination" ] || [ ! -f "$destination" ]; then
+            rldyour::log "error" "unmanaged privilege destination exists; preserved: $destination"
+            return 1
+          fi
+          current=$(rldyour::privilege::file_sha256 "$destination") || return 1
+          expected=$(rldyour::privilege::file_sha256 "$source") || return 1
+          if [ "$current" != "$expected" ]; then
+            rldyour::log "error" "unmanaged privilege destination exists; preserved: $destination"
+            return 1
+          fi
         fi
       done
     fi

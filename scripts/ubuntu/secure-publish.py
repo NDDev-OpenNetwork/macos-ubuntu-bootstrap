@@ -328,6 +328,26 @@ def revalidate_authorized_chain(path: str, expected: list[tuple[int, int, int, i
         os.close(fd)
 
 
+def same_dir_inode(parent_fd: int, left: str, right: str) -> bool:
+    try:
+        left_fd = os.open(left, os.O_RDONLY | os.O_CLOEXEC | os.O_NOFOLLOW, dir_fd=parent_fd)
+    except FileNotFoundError:
+        return False
+    try:
+        try:
+            right_fd = os.open(right, os.O_RDONLY | os.O_CLOEXEC | os.O_NOFOLLOW, dir_fd=parent_fd)
+        except FileNotFoundError:
+            return False
+        try:
+            left_stat = os.fstat(left_fd)
+            right_stat = os.fstat(right_fd)
+            return (left_stat.st_dev, left_stat.st_ino) == (right_stat.st_dev, right_stat.st_ino)
+        finally:
+            os.close(right_fd)
+    finally:
+        os.close(left_fd)
+
+
 def verify_existing(parent_fd: int, leaf: str, expected: str, mode: int, owner: int = 0, group: int = 0) -> bool:
     try:
         fd = os.open(leaf, os.O_RDONLY | os.O_CLOEXEC | os.O_NOFOLLOW, dir_fd=parent_fd)
@@ -342,6 +362,42 @@ def verify_existing(parent_fd: int, leaf: str, expected: str, mode: int, owner: 
         return True
     finally:
         os.close(fd)
+
+
+def retire(destination: str, aside_name: str, expected: str, mode: int, authority: str = AUTHORITY_ROOT, sandbox_root: str | None = None) -> None:
+    """Aside a published leaf, then unlink it, without replacing any path object.
+
+    The publisher itself never replaces. A completed privilege bundle that must
+    take a new contract therefore links the current leaf to an exclusive aside
+    name and only then unlinks the original name, so the next publish can
+    occupy the canonical path. Helper and policy leaves are not retired.
+    """
+    parent, leaf = os.path.split(destination)
+    if not leaf or "/" in leaf:
+        raise ValueError("invalid destination leaf")
+    if not aside_name or "/" in aside_name or aside_name in {".", ".."}:
+        raise ValueError("invalid aside name")
+    prefix = f"{leaf}.aside-"
+    if not aside_name.startswith(prefix) or aside_name == prefix:
+        raise ValueError("aside name must be <leaf>.aside-<token>")
+    parent_fd, chain = open_authorized_chain(parent, authority, sandbox_root)
+    owner = 0 if authority == AUTHORITY_ROOT else os.geteuid()
+    group = 0 if authority == AUTHORITY_ROOT else os.getegid()
+    try:
+        if not verify_existing(parent_fd, leaf, expected, mode, owner, group):
+            raise FileNotFoundError("retire source is missing")
+        revalidate_authorized_chain(parent, chain, authority, sandbox_root)
+        try:
+            os.link(leaf, aside_name, src_dir_fd=parent_fd, dst_dir_fd=parent_fd, follow_symlinks=False)
+        except FileExistsError:
+            if not same_dir_inode(parent_fd, leaf, aside_name):
+                raise
+        os.fsync(parent_fd)
+        os.unlink(leaf, dir_fd=parent_fd)
+        os.fsync(parent_fd)
+        revalidate_authorized_chain(parent, chain, authority, sandbox_root)
+    finally:
+        os.close(parent_fd)
 
 
 def publish(source: str, destination: str, expected: str, mode: int, authority: str = AUTHORITY_ROOT, sandbox_root: str | None = None) -> None:
@@ -412,16 +468,30 @@ def main() -> int:
     parser.add_argument("--destination")
     parser.add_argument("--sha256")
     parser.add_argument("--mode", required=True, choices=("0600", "0644", "0755"))
+    parser.add_argument("--retire", action="store_true")
+    parser.add_argument("--aside-name")
     parser.add_argument("--authority", choices=(AUTHORITY_ROOT, AUTHORITY_SANDBOX), default=AUTHORITY_ROOT)
     parser.add_argument("--sandbox-root")
     args = parser.parse_args()
     if (args.authority == AUTHORITY_ROOT) != (args.sandbox_root is None):
         parser.error("root-production forbids --sandbox-root; actor-sandbox requires it")
     if args.ensure_directory:
-        if args.source or args.destination or args.sha256 or args.mode != "0755":
+        if args.source or args.destination or args.sha256 or args.mode != "0755" or args.retire or args.aside_name:
             parser.error("directory mode accepts only --ensure-directory and --mode 0755")
         ensure_directory(args.ensure_directory, 0o755, args.authority, args.sandbox_root)
         return 0
+    if args.retire:
+        if args.source or not args.destination or not args.sha256 or not args.aside_name:
+            parser.error("retire requires destination, aside-name, sha256, and mode")
+        if len(args.sha256) != 64 or any(c not in "0123456789abcdef" for c in args.sha256):
+            parser.error("sha256 must be 64 lowercase hexadecimal characters")
+        retire(
+            args.destination, args.aside_name, args.sha256, int(args.mode, 8),
+            args.authority, args.sandbox_root,
+        )
+        return 0
+    if args.aside_name:
+        parser.error("--aside-name is only valid with --retire")
     if not args.source or not args.destination or not args.sha256:
         parser.error("publication requires source, destination, sha256, and mode")
     if len(args.sha256) != 64 or any(c not in "0123456789abcdef" for c in args.sha256):

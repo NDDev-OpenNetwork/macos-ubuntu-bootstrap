@@ -432,16 +432,21 @@ else
   bash "$SCRIPT_DIR/verify-server.sh" "${args[@]}"
 fi
 
-# A device receipt written by a previous apply must still describe this device.
-# device_integrity.py re-collects the state and compares it exactly, which is a
-# different question from the one the checks above answer: they ask whether each
-# declared thing is present and correct now, it asks whether anything changed
-# since the state was recorded. A device that has never been applied by this
-# repository has no receipt, and that is not a verification failure -- only a
-# receipt that no longer matches is.
+# A device receipt written by a previous apply must still describe this device
+# when verify runs on its own. device_integrity.py re-collects the state and
+# compares it exactly, which is a different question from the checks above:
+# they ask whether each declared thing is present and correct now; the receipt
+# asks whether anything changed since the state was recorded.
+#
+# Apply sets RLDYOUR_APPLY_RECEIPT_PENDING: it is about to record a new receipt
+# after these checks, so a prior receipt cannot describe the state this apply
+# just converged. A device that has never been applied has no receipt, and that
+# is not a verification failure.
 if [ "$STRICT" -eq 1 ]; then
   receipt="$HOME/.local/share/rldyour/device-receipt.json"
-  if [ -f "$receipt" ]; then
+  if [ "${RLDYOUR_APPLY_RECEIPT_PENDING:-0}" -eq 1 ]; then
+    rldyour::log "info" "apply will record the device receipt after these checks"
+  elif [ -f "$receipt" ]; then
     python3 "$REPO_ROOT/scripts/device_integrity.py" verify --receipt "$receipt" || {
       rldyour::log "missing" "device receipt no longer describes this device"
       exit 1

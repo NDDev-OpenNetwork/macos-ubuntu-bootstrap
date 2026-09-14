@@ -840,7 +840,12 @@ def test_apply_writes_a_receipt_and_strict_verify_checks_it() -> None:
     # after strict verification rather than instead of it.
     verify_apply = UBUNTU_INSTALL.split("verify_apply() {", 1)[1].split("\n}", 1)[0]
     assert verify_apply.index("verify.sh\" --strict") < verify_apply.index("build_device_receipt")
+    assert "RLDYOUR_APPLY_RECEIPT_PENDING=1" in verify_apply
+    assert verify_apply.index("build_device_receipt") < verify_apply.index(
+        "device_integrity.py\" verify --receipt"
+    )
     assert "device_integrity.py\" verify --receipt" in UBUNTU_VERIFY
+    assert "RLDYOUR_APPLY_RECEIPT_PENDING" in UBUNTU_VERIFY
 
 
 def test_no_document_claims_the_harness_collector_observes_nothing() -> None:

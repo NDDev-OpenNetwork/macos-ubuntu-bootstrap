@@ -249,6 +249,13 @@ def test_user_tools_match_the_contract() -> None:
             assert row[7] in {"", spec["archive_sha256"]}, f"{name}: archive SHA-256 (arm64 slot) drift"
 
 
+def test_npm_user_tools_use_bun_global_bin_not_a_hardcoded_home() -> None:
+    installer = UBUNTU_INSTALL_PATH.read_text(encoding="utf-8")
+    function = installer.split("install_npm_user_tools() {", 1)[1].split("\n}", 1)[0]
+    assert "bun pm bin -g" in function
+    assert 'bun_bin="$HOME/.bun/bin"' not in function
+
+
 def test_macos_herdr_asset_matches_contract_and_bypasses_homebrew() -> None:
     herdr = CONTRACT_DATA["user_tools"]["herdr"]
     macos = herdr["source"]["assets"]["macos-aarch64"]

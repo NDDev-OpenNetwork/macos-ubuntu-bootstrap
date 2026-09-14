@@ -26,6 +26,7 @@ LOCAL_EXECUTION_POLICY="${RLDYOUR_LOCAL_EXECUTION_POLICY:-container-execution-on
 HARDEN_SSH="${RLDYOUR_HARDEN_SSH:-0}"
 ENABLE_UFW="${RLDYOUR_ENABLE_UFW:-0}"
 WITH_FAIL2BAN="${RLDYOUR_WITH_FAIL2BAN:-0}"
+REMOTE_DESKTOP_USER="${RLDYOUR_REMOTE_DESKTOP_USER:-$(id -un)}"
 # Login shell change is explicit opt-in only; never mutated silently.
 SET_LOGIN_SHELL="${RLDYOUR_SET_LOGIN_SHELL:-0}"
 
@@ -35,18 +36,18 @@ NODE_SHA256_ARM64="6ad1325edbdb5649c379b75a237147a666c95d4f9ae8d340fef2d1575d289
 UV_VERSION="0.12.13"
 UV_SHA256_X64="745765a3b6e360ad76743599ae5c42e9278c7edf8bbff9fc76d05bf2623a04dd"
 UV_SHA256_ARM64="2eaa5d94f5db7b3a1a092156b9420459e42ab0217d917fe74a876309cef9b5e9"
-BUN_VERSION="1.3.14"
-BUN_SHA256_X64="951ee2aee855f08595aeec6225226a298d3fea83a3dcd6465c09cbccdf7e848f"
-BUN_SHA256_X64_BASELINE="a063908ae08b7852ca10939bbdc6ceed3ddabce8fb9402dce83d65d73b36e6c7"
-BUN_SHA256_ARM64="a27ffb63a8310375836e0d6f668ae17fa8d8d18b88c37c821c65331973a19a3b"
+BUN_VERSION="1.4.2"
+BUN_SHA256_X64="36368faef7527875d5ffa52e53cd48021741f2a83eb6208a8dd64068d422a913"
+BUN_SHA256_X64_BASELINE="c678040f14fe0440eb839d37cbd0ce4c051a32da72806ac97de6a6aab6bf728f"
+BUN_SHA256_ARM64="54328bbc2d9c8e0c9f892c544d66c57a83b84139e34909e5ee81758f1ac8fda7"
 # Go and Rust are desktop language-server hosts, exactly like Node and uv: they
 # back gopls and rust-analyzer over the estate's Go and Rust sources. Installing
 # them does not authorize local project builds; the desktop execution policy
 # stays `source-lsp-only` and the server profile never receives them (project
 # builds belong in Docker under `container-execution-only`).
-GO_VERSION="1.26.6"
-GO_SHA256_AMD64="708effb774be8237570d0add163225abbdfaf4fca28b2611df167beba4feef89"
-GO_SHA256_ARM64="d0507e9e9d7fe012aae570108cbd76c15de879e17130ab8cb90d4d7445cb1f2e"
+GO_VERSION="1.27.1"
+GO_SHA256_AMD64="b477e877a104211f3010911c61b501c0c015533d80290ddfa9f3dd43c5b4120e"
+GO_SHA256_ARM64="01d80e8ca1b7abddafaac6f0864a407aa35ab120483381df73d6070b9faec60b"
 # gopls publishes no prebuilt archive. It is pinned to an exact version and its
 # provenance comes from the Go module checksum database (sum.golang.org), which
 # is a transparency log rather than a hash this repository tracks. GOFLAGS and
@@ -54,10 +55,10 @@ GO_SHA256_ARM64="d0507e9e9d7fe012aae570108cbd76c15de879e17130ab8cb90d4d7445cb1f2
 GOPLS_VERSION="v0.23.0"
 # One combined archive per architecture carries rustc, cargo, rust-std, clippy,
 # rustfmt and rust-analyzer, so a single tracked hash covers the whole host.
-RUST_VERSION="1.97.1"
-RUST_CHANNEL_DATE="2026-07-16"
-RUST_SHA256_X86_64="88f28fa9af20594179f85d6df67078dfd6fa93e2f6da5e1e9b0ac4997988ca4f"
-RUST_SHA256_AARCH64="9a7a2c336b4787f1b72f6bab7c35d5b7af2fd03cbd39b4fc721466a70d402a7d"
+RUST_VERSION="1.98.1"
+RUST_CHANNEL_DATE="2026-09-03"
+RUST_SHA256_X86_64="5326b36c53de11d148c8f8dab6553a3d1006c2cfd32123683073fad3c302605b"
+RUST_SHA256_AARCH64="0b514a8cc1cbcd939bff0f151661fe58b6ea5c7a7f645a5098c69e32e8c1e0a2"
 # Dart is the third desktop language-server host (ADR 0005), on the same footing
 # as Go and Rust. One self-contained SDK archive carries `dart language-server`
 # (the analysis server) and `dart mcp-server` (the Dart/Flutter MCP transport the
@@ -65,9 +66,9 @@ RUST_SHA256_AARCH64="9a7a2c336b4787f1b72f6bab7c35d5b7af2fd03cbd39b4fc721466a70d4
 # SDK never mutates its own install tree, which is what keeps it compatible with
 # the runtime-receipt contract; the Flutter SDK is deliberately not installed
 # here because its bin/cache self-populates at runtime and would break that.
-DART_VERSION="3.13.0"
-DART_SHA256_X64="87902573facd8acacac7ee1fe73fa8d0668e06065016068e2ed6c5c99c6b1ee0"
-DART_SHA256_ARM64="20141a0653327939bb20c4b87b231226beba1128d8a9aedbb30cb5af1a2790d4"
+DART_VERSION="3.13.3"
+DART_SHA256_X64="549c182cffbdc6864df7509c16fec646c73fe6cb8a18c2cb572db1292f300cd7"
+DART_SHA256_ARM64="c59c535623f3ab9717e8755237df695f153fb3af3bfb0f6c281b2eb4fefe669e"
 # Prompt/history/completion pillars — parity with the macOS brew baseline
 # (starship, atuin, carapace). Installed as pinned standalone artifacts, never
 # via apt (stale) or a piped install script. Linux x64 + arm64 tarball SHA-256
@@ -83,7 +84,7 @@ CARAPACE_SHA256_X64="35ab52bfe7bdd8296d90c3687660bde80497599badde840ab615d2f421f
 CARAPACE_SHA256_ARM64="b2456cb09d77004db87de2567d6d7588a61ceb4724522c463e2b1c1f87b4d4b9"
 
 APT_SOURCE_PACKAGES=(
-  ca-certificates curl gpg gnupg git jq python3 python3-venv
+  ca-certificates curl gpg gnupg git jq python3 python3-venv python3-yaml
   shellcheck shfmt clangd zsh unzip xz-utils wget zip lsb-release yamllint
   fd-find bat fzf zoxide tmux btop duf hexyl gh ripgrep httpie miller
   software-properties-common wl-clipboard libsecret-tools
@@ -108,6 +109,8 @@ BUN_LSP_PACKAGES=(
   "markdownlint-cli2@0.23.1"
   "prettier@3.9.6"
   "@ansible/ansible-language-server@26.6.0"
+  "svelte-language-server@0.18.4"
+  "sql-language-server@1.7.1"
 )
 
 # Isolated Python source-analysis tools, pinned to exact versions so a device
@@ -186,11 +189,15 @@ PINNED_SOURCE_TOOLS=(
   # 24.04, lazygit and difftastic are in no Ubuntu archive at all, and jaq
   # arrived only in 24.10 -- so each is pinned rather than left to apt.
   "eza;0.23.5;tar0;eza;eza;eza;35c70c5c43c29108075e58b893234c67ef585f0b53a7eaf8e9e7d4eec9f339b4;40b87ae8628aa2ff0f0d2dc24ab52f689631366385c3da630bae745671fd71ec;https://github.com/eza-community/eza/releases/download/v0.23.5/eza_x86_64-unknown-linux-gnu.tar.gz;https://github.com/eza-community/eza/releases/download/v0.23.5/eza_aarch64-unknown-linux-gnu.tar.gz"
-  "lazygit;0.65.0;tar0;lazygit;lazygit;lazygit;44d8e7dd1484b4a66e191bd4ab25a71e8b4b3a65ab122f838e65677ef58c5506;d954a09c128bd37b2bd0d254308474e87de3729cfe0e37f5b46a49357a4fe257;https://github.com/jesseduffield/lazygit/releases/download/v0.65.0/lazygit_0.65.0_linux_x86_64.tar.gz;https://github.com/jesseduffield/lazygit/releases/download/v0.65.0/lazygit_0.65.0_linux_arm64.tar.gz"
+  "lazygit;0.65.1;tar0;lazygit;lazygit;lazygit;02beacbcda0fa342e50ae3480ba8147307353af3fb28e1d5f790e02329c201a6;49abecdf6adf4f2dfdb11bf7b9bfada267ea523612ed809d1c6d87f6c04000a7;https://github.com/jesseduffield/lazygit/releases/download/v0.65.1/lazygit_0.65.1_linux_x86_64.tar.gz;https://github.com/jesseduffield/lazygit/releases/download/v0.65.1/lazygit_0.65.1_linux_arm64.tar.gz"
   # difftastic publishes its binary as `difft`; the row is named for the command
   # it publishes, like every other row here.
   "difft;0.70.0;tar0;difft;difft;difft;2997d2bbe620534edbd79b0049f00ce84eef3fedb15c7822456d58e38d8b05c9;e729684907d67d1a1727a08f443877e19e40eeb2efebcd95c1b8f7fee4284e8e;https://github.com/Wilfred/difftastic/releases/download/0.70.0/difft-x86_64-unknown-linux-gnu.tar.gz;https://github.com/Wilfred/difftastic/releases/download/0.70.0/difft-aarch64-unknown-linux-gnu.tar.gz"
   "jaq;3.1.1;raw;jaq;jaq;jaq;5922c7b67d9bd6841d6676d1f954410c6bf04b47203dcb661c4f052dfef7f454;bdda42d5a8c060a2c7916b287a227e7750d5fccbd4c37aacf0ab863010921829;https://github.com/01mf02/jaq/releases/download/v3.1.1/jaq-x86_64-unknown-linux-gnu;https://github.com/01mf02/jaq/releases/download/v3.1.1/jaq-aarch64-unknown-linux-gnu"
+  # Official JetBrains Kotlin LSP. The standalone archive includes its own JBR,
+  # so no mutable system Java dependency is introduced. Upstream marks it alpha;
+  # the exact release and both CDN checksums keep that boundary explicit.
+  "kotlin-lsp;262.9593.0;tar1;kotlin-lsp.sh;kotlin-lsp.sh;kotlin-lsp;2d99d8e198fbe4aa8f4481e37799724ce94803b4ea12a60b416040e3fcd7cc5e;2317831c6e5607d05b7ebc1da655330125ce0e3d66fbf24517dfce442debc14e;https://download-cdn.jetbrains.com/language-server/kotlin-server/262.9593.0/kotlin-server-262.9593.0.tar.gz;https://download-cdn.jetbrains.com/language-server/kotlin-server/262.9593.0/kotlin-server-262.9593.0-aarch64.tar.gz"
 )
 
 # User-selected CLI tools that are not language hosts, LSPs, or scanners but
@@ -260,6 +267,7 @@ validate_target() {
   case "$PROFILE:$LOCAL_EXECUTION_POLICY:$DOCKER_MODE:$GUI_ENABLED" in
     desktop:source-lsp-only:none:0|desktop:source-lsp-only:none:1) ;;
     desktop-builds:local-dev-with-builds:rootful:0|desktop-builds:local-dev-with-builds:rootful:1) ;;
+    desktop-server:interactive-desktop-server:none:1|desktop-server:interactive-desktop-server:rootful:1|desktop-server:interactive-desktop-server:rootless:1) ;;
     server:container-execution-only:none:0|server:container-execution-only:rootful:0|server:container-execution-only:rootless:0) ;;
     *)
       rldyour::log "error" "invalid Ubuntu composition: profile=$PROFILE policy=$LOCAL_EXECUTION_POLICY docker=$DOCKER_MODE gui=$GUI_ENABLED"
@@ -672,6 +680,10 @@ rldyour::ubuntu::retire_telegram_generated_integrations() {
   # the corresponding apply has not created yet. If a candidate does exist,
   # its provenance remains bound to the exact managed launcher below.
   if [ ! -L "$launcher" ] || [ ! -x "$launcher" ]; then
+    if [ "$RLDYOUR_DRY_RUN" -eq 1 ]; then
+      rldyour::log "info" "[DRY-RUN] inspect and retire only Telegram-generated integrations after installing the managed launcher"
+      return 0
+    fi
     rldyour::log "error" "managed Telegram launcher is unavailable during integration migration"
     return 1
   fi
@@ -775,6 +787,10 @@ rldyour::ubuntu::retire_telegram_userapp_entries() {
   [ "${#candidates[@]}" -gt 0 ] || return 0
 
   if [ ! -L "$launcher" ] || [ ! -x "$launcher" ]; then
+    if [ "$RLDYOUR_DRY_RUN" -eq 1 ]; then
+      rldyour::log "info" "[DRY-RUN] inspect and retire only Telegram userapp launchers after installing the managed launcher"
+      return 0
+    fi
     rldyour::log "error" "managed Telegram launcher is unavailable during userapp migration"
     return 1
   fi
@@ -1026,7 +1042,7 @@ rldyour::ubuntu::validate_runtime_receipt() {
 
 ensure_node() {
   rldyour::section "Ensure Node.js LTS ${NODE_VERSION}"
-  local arch sha filename url archive stage destination parent
+  local arch sha module_version url archive stage destination parent
   case "$(uname -m)" in
     x86_64|amd64) arch="x64"; sha="$NODE_SHA256_X64" ;;
     aarch64|arm64) arch="arm64"; sha="$NODE_SHA256_ARM64" ;;
@@ -1139,8 +1155,12 @@ ensure_go() {
     aarch64|arm64) arch="arm64"; sha="$GO_SHA256_ARM64" ;;
     *) rldyour::log "error" "Go ${GO_VERSION} has no tracked artifact for $(uname -m)"; return 1 ;;
   esac
-  filename="go${GO_VERSION}.linux-${arch}.tar.gz"
-  url="https://go.dev/dl/${filename}"
+  # The official dl.google.com binary endpoint is not reachable from every
+  # supported server network. The Go module proxy is also an official Go
+  # distribution channel and publishes the same toolchain as a transparent,
+  # immutable module artifact.
+  module_version="v0.0.1-go${GO_VERSION}.linux-${arch}"
+  url="https://proxy.golang.org/golang.org/toolchain/@v/${module_version}.zip"
   destination="$HOME/.local/share/rldyour/go/${GO_VERSION}"
   parent="$(dirname "$destination")"
   if [ "$RLDYOUR_DRY_RUN" -eq 1 ]; then
@@ -1159,7 +1179,9 @@ ensure_go() {
     archive="$(mktemp)"; stage="$(mktemp -d "$parent/.go-${GO_VERSION}.tmp.XXXXXX")"
     trap 'rm -rf "$archive"; [ -z "${stage:-}" ] || rm -rf "$stage"' RETURN
     rldyour::download_verified_file "$url" "$sha" "$archive" || return 1
-    tar -xzf "$archive" --strip-components=1 -C "$stage"
+    unzip -q "$archive" -d "$stage.unpacked"
+    mv "$stage.unpacked/golang.org/toolchain@${module_version}"/* "$stage"/
+    rmdir "$stage.unpacked/golang.org/toolchain@${module_version}" "$stage.unpacked/golang.org" "$stage.unpacked"
     [ "$("$stage/bin/go" version 2>/dev/null | awk '{ print $3 }')" = "go${GO_VERSION}" ] || {
       rldyour::log "error" "staged Go artifact did not report go${GO_VERSION}"
       return 1
@@ -1647,8 +1669,9 @@ install_gui_apps() {
 
 run_server_layer() {
   local resolved_user=""
-  # No Docker work for the plain desktop profile. Server and desktop-builds
-  # both reach this function; desktop-builds installs Docker-only via --skip-baseline.
+  # No Docker or server-baseline work for the plain desktop profile. Server,
+  # desktop-server and desktop-builds reach this function; desktop-builds
+  # installs Docker-only via --skip-baseline.
   if [ "$PROFILE" = "desktop" ]; then
     return 0
   fi
@@ -1680,6 +1703,13 @@ run_server_layer() {
   fi
   [ "$WITH_FAIL2BAN" -eq 1 ] && args+=(--enable-fail2ban)
   rldyour::ubuntu_server::main "${args[@]}"
+}
+
+run_remote_desktop_layer() {
+  [ "$PROFILE" = "desktop-server" ] || return 0
+  local -a args=(--user "$REMOTE_DESKTOP_USER")
+  if [ "$RLDYOUR_DRY_RUN" -eq 1 ]; then args+=(--plan); else args+=(--apply); fi
+  bash "$SCRIPT_DIR/remote-desktop.sh" "${args[@]}"
 }
 
 # Record the proven device state as a canonical receipt. This runs only after
@@ -1775,6 +1805,7 @@ main() {
   fi
   install_gui_apps
   run_server_layer
+  run_remote_desktop_layer
 
   # The harness layer runs LAST of the installing layers, and deliberately so.
   # It delegates to a separate module whose own fail-closed guards depend on local

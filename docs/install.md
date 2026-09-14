@@ -7,6 +7,7 @@ Plan mode is the default and Ubuntu always requires an explicit profile.
 bash scripts/bootstrap.sh --platform macos [--no-gui] [--apply]
 bash scripts/bootstrap.sh --platform ubuntu --profile desktop [--no-gui] [--apply]
 bash scripts/bootstrap.sh --platform ubuntu --profile desktop-builds [--no-gui] [--apply]
+bash scripts/bootstrap.sh --platform ubuntu --profile desktop-server [--apply]
 bash scripts/bootstrap.sh --platform ubuntu --profile server [--apply]
 ```
 
@@ -14,6 +15,20 @@ bash scripts/bootstrap.sh --platform ubuntu --profile server [--apply]
 local static checks without Docker. `desktop-builds` adds rootful Docker for
 local builds/tests. `server` configures a headless Docker server and keeps risky
 network hardening behind explicit flags.
+
+The source-analysis baseline covers the estate's active Python, JavaScript and
+TypeScript, Svelte, SQL, Go, Rust, Dart, Kotlin, C/C++, shell, YAML, JSON,
+HTML/CSS, TOML, Markdown, Terraform, CMake, Dockerfile, GitHub Actions, and
+Ansible sources. Ubuntu receives JetBrains' official standalone Kotlin LSP;
+Swift and SwiftUI remain a macOS responsibility because useful SourceKit
+analysis depends on Apple's SDK toolchain.
+
+`desktop-server` targets Ubuntu 24.04 amd64 and combines the complete GUI and
+server baselines. It defaults to no Docker and configures XRDP exclusively on
+`127.0.0.1:3389`; do not add a public firewall rule for that port. Generate
+client files only after deployment, when the public host name, SSH account and
+server Ed25519 public host key are known. The complete workflow is in the
+[desktop-server reference](reference/desktop-server.md).
 
 Every profile installs official Codex, Claude Code, and Grok Build distributions
 through verified downloads. `cx`, `cl`, and `gk` launch them without approval or

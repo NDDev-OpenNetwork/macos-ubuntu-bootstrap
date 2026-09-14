@@ -17,8 +17,8 @@ SKIP_CHECKS="${RLDYOUR_SKIP_CHECKS:-0}"
 GUI_ENABLED="${RLDYOUR_GUI_ENABLED:-1}"
 LOCAL_EXECUTION_POLICY="${RLDYOUR_LOCAL_EXECUTION_POLICY:-source-lsp-only}"
 
-HOMEBREW_PKG_VERSION="6.0.22"
-HOMEBREW_PKG_SHA256="9d15f67a9478019754efd9c62ef206a6b802caad8be321db553baabd3394454d"
+HOMEBREW_PKG_VERSION="7.0.1"
+HOMEBREW_PKG_SHA256="c71d94541adad139c16e92c7774e2635e157c6ed60174787398ecd84bbcd82a9"
 HOMEBREW_INSTALLER_TEAM="927JGANW46"
 HERDR_VERSION="0.9.0"
 HERDR_MACOS_AARCH64_SHA256="32b53df09872628059c789a69f02a6b8e29e14ddf26711421f3463f70c1aef17"
@@ -28,10 +28,9 @@ HERDR_MACOS_AARCH64_URL="https://github.com/herdrdev/herdr/releases/download/v0.
 # test runner, or local project runtime. Homebrew's LLVM distribution is present
 # only because it is the supported clangd provider; this policy never invokes
 # its compiler/linker for project builds.
-# jdtls and kotlin-language-server are deliberately absent: their Homebrew
-# formulae depend on openjdk and openjdk@21, so installing them pulled the JDK
-# this manifest forbids by name. The estate has no Java sources, and its only
-# Kotlin lives in a Flutter Android app whose toolchain is out of scope here.
+# jdtls and a Kotlin language server are deliberately absent: useful Android
+# analysis on the macOS source hosts belongs to the project-owned Android/JDK
+# toolchain, while Ubuntu installs JetBrains' official standalone Kotlin LSP.
 BREW_SOURCE_PACKAGES=(
   git curl ca-certificates node bun uv python
   shellcheck shfmt llvm go gopls rust rust-analyzer dart-sdk docker-language-server
@@ -50,11 +49,11 @@ BREW_SOURCE_PACKAGES=(
 )
 
 # Registry-backed language servers, pinned to exact versions for reproducibility
-# (RVR-P2-003). This is a subset of the Ubuntu BUN_LSP_PACKAGES (6 of 13); the
+# (RVR-P2-003). This is a subset of the Ubuntu BUN_LSP_PACKAGES (8 of 15); the
 # remaining LSPs (vscode-langservers-extracted, @taplo/cli, @biomejs/biome,
 # oxlint, markdownlint-cli2, prettier, @ansible/ansible-language-server) arrive
 # via Homebrew formulae in BREW_SOURCE_PACKAGES below, where exact pins are not
-# possible. The 6 shared entries below are kept version-aligned with Ubuntu.
+# possible. The eight shared entries below are kept version-aligned with Ubuntu.
 BUN_LSP_PACKAGES=(
   "typescript@7.0.2"
   "@vtsls/language-server@0.3.0"
@@ -62,6 +61,8 @@ BUN_LSP_PACKAGES=(
   "bash-language-server@5.6.0"
   "dockerfile-language-server-nodejs@0.15.0"
   "gh-actions-language-server@0.0.3"
+  "svelte-language-server@0.18.4"
+  "sql-language-server@1.7.1"
 )
 
 GUI_CASKS=(ghostty cmux google-chrome chatgpt claude rustdesk telegram)

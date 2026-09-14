@@ -37,6 +37,24 @@ BASE_STUBS: dict[str, str] = {
 }
 
 
+def test_privileged_desktop_uses_ubuntu_keyboard_contract() -> None:
+    source = PRIVILEGED_HELPER.read_text(encoding="utf-8")
+    assert "localectl --no-convert set-x11-keymap" not in source
+    assert "configure_x11_keymap" in source
+    assert "XKBLAYOUT=\"us,ru\"" in source
+    assert "XKBOPTIONS=\"grp:alt_shift_toggle\"" in source
+    assert "/etc/default/keyboard" in source
+
+
+def test_privileged_chrome_migrates_only_the_exact_vendor_source() -> None:
+    source = PRIVILEGED_HELPER.read_text(encoding="utf-8")
+    assert "/etc/apt/sources.list.d/google-chrome.sources" in source
+    assert "google-chrome.sources.pre-managed" in source
+    assert "### THIS FILE IS AUTOMATICALLY CONFIGURED ###" in source
+    assert "URIs: https://dl.google.com/linux/chrome-stable/deb/" in source
+    assert "Signed-By: /usr/share/keyrings/google-chrome.gpg" in source
+
+
 # The package must be reported as absent so the step proceeds past its
 # already-installed short circuit, and the download must fail so the test never
 # fetches the real artifact.

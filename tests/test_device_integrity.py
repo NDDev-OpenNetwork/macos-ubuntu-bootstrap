@@ -355,6 +355,9 @@ def test_resolve_build_profile_precedence(monkeypatch: pytest.MonkeyPatch) -> No
     monkeypatch.delenv("RLDYOUR_PROFILE", raising=False)
     monkeypatch.setenv("RLDYOUR_LOCAL_EXECUTION_POLICY", "container-execution-only")
     assert di._resolve_build_profile(None) == "server"
+    monkeypatch.setenv("RLDYOUR_LOCAL_EXECUTION_POLICY", "interactive-desktop-server")
+    assert di._resolve_build_profile(None) == "desktop-server"
+    assert "desktop-server" in di.VALID_PROFILES
     # Nothing set falls back to the strict desktop superset.
     monkeypatch.delenv("RLDYOUR_LOCAL_EXECUTION_POLICY", raising=False)
     assert di._resolve_build_profile(None) == "desktop"

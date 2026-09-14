@@ -78,7 +78,7 @@ PINNED_SOURCE_TOOLS_CONTRACT = "ubuntu_pinned_source_tools"
 
 # The device profiles the receipt understands. These mirror the contract's
 # targets block and scripts/bootstrap.sh.
-VALID_PROFILES = ("desktop", "desktop-builds", "server")
+VALID_PROFILES = ("desktop", "desktop-builds", "desktop-server", "server")
 
 class IntegrityError(RuntimeError):
     """A device runtime invariant was not proven."""
@@ -158,6 +158,7 @@ def _resolve_build_profile(explicit: str | None) -> str:
     policy_map = {
         "source-lsp-only": "desktop",
         "local-dev-with-builds": "desktop-builds",
+        "interactive-desktop-server": "desktop-server",
         "container-execution-only": "server",
     }
     policy = os.environ.get("RLDYOUR_LOCAL_EXECUTION_POLICY", "").strip()

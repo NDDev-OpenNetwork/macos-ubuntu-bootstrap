@@ -4,6 +4,9 @@ Accepted records live in this directory, numbered in the order they were taken.
 A record that is still cited must still exist here; a citation that resolves to
 nothing is a defect, not a shorthand.
 
+Current records include ADR 0011, which defines the Ubuntu desktop-server
+boundary and its loopback XRDP over owner-managed OpenSSH transport.
+
 ## Retired records
 
 Two records were removed with the subjects they described, in

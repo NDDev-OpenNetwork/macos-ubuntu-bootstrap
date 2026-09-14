@@ -1843,8 +1843,13 @@ verify_apply() {
       RLDYOUR_SERVER_ENABLE_UFW="$ENABLE_UFW" \
       RLDYOUR_SERVER_HARDEN_SSH="$HARDEN_SSH" \
       RLDYOUR_SERVER_ENABLE_FAIL2BAN="$WITH_FAIL2BAN" \
+      RLDYOUR_APPLY_RECEIPT_PENDING=1 \
       bash "$SCRIPT_DIR/verify.sh" --strict
     build_device_receipt
+    python3 "$REPO_ROOT/scripts/device_integrity.py" verify --receipt "$HOME/.local/share/rldyour/device-receipt.json" || {
+      rldyour::log "error" "newly recorded device receipt does not describe this device"
+      return 1
+    }
   fi
 }
 

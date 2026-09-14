@@ -13,12 +13,14 @@ typed evidence tiers, and required-versus-optional proof. Device-integrity
 receipts report the state of one installed device; they do not redefine platform
 support or promote container/structural observations to native-host evidence.
 `scripts/device_integrity.py` is written by apply after strict verification
-passes and read back by `verify.sh --strict`; ADR 0007 records both call sites
+passes and read back by `verify.sh --strict`; apply sets
+`RLDYOUR_APPLY_RECEIPT_PENDING` so that first strict pass does not compare a
+prior receipt to the state this apply is about to record. ADR 0007 records both call sites
 and what the receipt does and does not assert. `harnesses.detection` in the
 contract is what makes one-owner-per-harness checkable — do not describe an
 enforcement this repository cannot observe.
 
-## Contract 0.2.2
+## Contract 0.2.3
 
 - macOS supports `desktop`, with optional GUI, no Docker, and source-analysis
   plus local-check tooling.

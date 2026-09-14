@@ -12,13 +12,18 @@ where prompt security updates are the explicit policy, such as Google Chrome.
 
 `scripts/device_integrity.py` is invoked at two points, and only those:
 
-- **apply**, from `verify_apply` in `scripts/ubuntu/install.sh`, *after* strict
-  verification has passed. The receipt records a state something else already
-  proved; it is never itself the proof. A prior receipt that fails
+- **apply**, from `verify_apply` in `scripts/ubuntu/install.sh`. Strict
+  verification first proves each declared tool is present and correct *now*
+  (`RLDYOUR_APPLY_RECEIPT_PENDING=1` skips comparing a prior receipt: this apply
+  is about to record a new one). The receipt is then built from that proven
+  state; it is never itself the proof. A prior receipt that fails
   self-integrity is retained beside the active one as `.rejected.N` rather than
-  destroyed, because that file is the evidence of tampering.
-- **strict verify**, from `scripts/ubuntu/verify.sh --strict`, which re-collects
-  the device state and compares it to the receipt exactly.
+  destroyed, because that file is the evidence of tampering. A prior receipt
+  that is merely stale against the newly applied contract is superseded as
+  `.json.bak`. The newly written receipt is then verified.
+- **strict verify**, from `scripts/ubuntu/verify.sh --strict` when not invoked
+  as part of apply, which re-collects the device state and compares it to the
+  receipt exactly.
 
 The two answer different questions. The verifier's own checks ask whether each
 declared thing is present and correct *now*. The receipt asks whether anything

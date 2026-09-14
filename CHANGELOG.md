@@ -5,11 +5,14 @@ Versioning; the contract version in `config/rldyour-contract.json` moves with it
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-09-14
+
 - Add Ubuntu's distribution-owned PyYAML binding to the baseline so estate
   diagnostics and plan-state readers work with system Python on a clean host.
-
-## [0.2.0] - 2026-09-13
-
+- Register already-installed operator CLIs (`doctl`, `stripe`, `gcloud`,
+  `resend`, `wrangler`) as contract `user_tools` so device receipts name them.
+- Record `require_extra_approval_for_unattributed_changes: false` on the `main`
+  ruleset so Cursor co-authors do not trip GitHub's extra-approval gate.
 - Add the Ubuntu 24.04 amd64 `desktop-server` profile: the GUI workstation and
   server baseline, with Docker disabled by default and XRDP restricted to
   `127.0.0.1:3389` behind an owner-managed OpenSSH tunnel.

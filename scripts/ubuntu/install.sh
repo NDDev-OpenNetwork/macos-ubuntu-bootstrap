@@ -448,6 +448,21 @@ rldyour::ubuntu::npm_user_tool_command() {
 
 install_npm_user_tools() {
   local entry name version cmd failed=0 bun_bin
+  if [ "${RLDYOUR_DRY_RUN:-1}" -eq 1 ]; then
+    # `bun pm bin -g` and `bun pm ls -g` create ~/.bun/install/global before
+    # they can answer, so a plan may not ask. State the pin apply will
+    # converge on.
+    for entry in "${NPM_USER_TOOLS[@]}"; do
+      name="${entry%@*}"
+      cmd="$(rldyour::ubuntu::npm_user_tool_command "$name")" || {
+        rldyour::log "error" "no command mapping for npm user tool $name"
+        failed=1
+        continue
+      }
+      rldyour::log "info" "[DRY-RUN] ensure pinned npm user tool: ${entry} -> ${cmd}"
+    done
+    return "$failed"
+  fi
   bun_bin="$(bun pm bin -g 2>/dev/null || true)"
   if [ -z "$bun_bin" ]; then
     bun_bin="${XDG_CACHE_HOME:-$HOME/.cache}/.bun/bin"
@@ -460,10 +475,6 @@ install_npm_user_tools() {
       failed=1
       continue
     }
-    if [ "${RLDYOUR_DRY_RUN:-1}" -eq 1 ]; then
-      rldyour::log "info" "[DRY-RUN] ensure pinned npm user tool: ${entry} -> ${cmd}"
-      continue
-    fi
     if bun pm ls -g 2>/dev/null | grep -Fq "${name}@${version}"; then
       rldyour::log "ok" "pinned npm user tool present: ${entry}"
     elif [ "$name" = "wrangler" ]; then

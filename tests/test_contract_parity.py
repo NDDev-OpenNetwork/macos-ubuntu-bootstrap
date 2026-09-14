@@ -252,7 +252,18 @@ def test_user_tools_match_the_contract() -> None:
 def test_npm_user_tools_use_bun_global_bin_not_a_hardcoded_home() -> None:
     installer = UBUNTU_INSTALL_PATH.read_text(encoding="utf-8")
     function = installer.split("install_npm_user_tools() {", 1)[1].split("\n}", 1)[0]
-    assert "bun pm bin -g" in function
+    dry, apply = function.split('return "$failed"', 1)
+
+    def code(text: str) -> str:
+        return "\n".join(
+            line for line in text.splitlines() if not line.lstrip().startswith("#")
+        )
+
+    assert "[DRY-RUN] ensure pinned npm user tool" in dry
+    assert "bun pm bin -g" not in code(dry)
+    assert "bun pm ls -g" not in code(dry)
+    assert "bun pm bin -g" in apply
+    assert "bun pm ls -g" in apply
     assert 'bun_bin="$HOME/.bun/bin"' not in function
 
 

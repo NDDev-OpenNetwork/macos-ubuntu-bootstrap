@@ -5,6 +5,13 @@ Versioning; the contract version in `config/rldyour-contract.json` moves with it
 
 ## [Unreleased]
 
+## [0.2.2] - 2026-09-14
+
+- Keep Ubuntu `--plan` from calling `bun pm bin -g` or `bun pm ls -g` when
+  describing npm `user_tools`. Those probes create `~/.bun/install/global`
+  before they can answer, so a plan wrote into the home it only describes.
+  Hosted unit tests missed it because they do not have `bun` on PATH.
+
 ## [0.2.1] - 2026-09-14
 
 - Republish the 0.2.0 contract: tag `0.2.0` landed on the merge commit, which

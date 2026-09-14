@@ -24,7 +24,7 @@ jobs:
       actions: read # Read workflow run metadata for the SARIF upload.
       contents: read
       security-events: write # SARIF upload to the Security tab
-    uses: NDDev-OpenNetwork/ci-workflows/.github/workflows/zizmor-sarif.yml@bc9c7919de1c39d947a8709a92856925051bae05 # commit:bc9c7919de1c39d947a8709a92856925051bae05
+    uses: NDDev-OpenNetwork/ci-workflows/.github/workflows/zizmor-sarif.yml@a624689c897c5f4733cf475159e77bba3a2b98c7 # commit:bc9c7919de1c39d947a8709a92856925051bae05
     with:
       # Public repo: pull_request runs untrusted fork code. Pin the hosted runner
       # explicitly. The estate runner platform forbids public/fork code on a

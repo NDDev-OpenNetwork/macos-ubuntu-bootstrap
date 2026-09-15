@@ -7,6 +7,8 @@ Versioning; the contract version in `config/rldyour-contract.json` moves with it
 
 - Name `desktop-server` in the `--profile` error and record that it may carry
   an explicit Docker mode. Behavior was already that; the comment lagged.
+- Document `--docker-mode rootful|rootless` on desktop-server in AGENTS,
+  README usage, and the install guide.
 
 ## [0.2.4] - 2026-09-15
 

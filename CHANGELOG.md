@@ -5,6 +5,9 @@ Versioning; the contract version in `config/rldyour-contract.json` moves with it
 
 ## [Unreleased]
 
+- Name `desktop-server` in the `--profile` error and record that it may carry
+  an explicit Docker mode. Behavior was already that; the comment lagged.
+
 ## [0.2.4] - 2026-09-15
 
 - Hash root-owned 0600 privilege records through `root_exec` when the applying

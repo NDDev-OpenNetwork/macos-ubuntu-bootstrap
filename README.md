@@ -2,7 +2,7 @@
 
 Plan-first bootstrap for Apple Silicon macOS, Ubuntu 24.04/26.04 desktops,
 headless Ubuntu servers, and an Ubuntu 24.04 amd64 remote desktop server. The
-current contract is `0.2.4`.
+current contract is `0.2.5`.
 
 ## Profiles
 

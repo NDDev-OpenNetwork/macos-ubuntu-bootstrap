@@ -5,10 +5,12 @@ Versioning; the contract version in `config/rldyour-contract.json` moves with it
 
 ## [Unreleased]
 
-- Name `desktop-server` in the `--profile` error and record that it may carry
-  an explicit Docker mode. Behavior was already that; the comment lagged.
-- Document `--docker-mode rootful|rootless` on desktop-server in AGENTS,
-  README usage, and the install guide.
+## [0.2.5] - 2026-09-15
+
+- Name `desktop-server` in the `--profile` error and document
+  `--docker-mode rootful|rootless` for a host that builds locally. Installer
+  behaviour was already that in 0.2.4; the comment lagged.
+- Pin reusable workflows to current module mains.
 
 ## [0.2.4] - 2026-09-15
 

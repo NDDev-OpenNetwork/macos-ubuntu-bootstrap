@@ -5,6 +5,15 @@ Versioning; the contract version in `config/rldyour-contract.json` moves with it
 
 ## [Unreleased]
 
+## [0.2.7] - 2026-09-15
+
+- Pin uv to 0.12.15 after independently hashing the linux x86_64 and aarch64
+  GitHub release tarballs against the published `sha256` files.
+- Pin Dart to 3.13.4 after independently hashing both linux SDK zips against
+  the dart-archive `.sha256sum` files.
+- Pin resend-cli to 2.21.0 from the npm registry.
+- Pin wrangler to 4.131.2 from the npm registry.
+
 ## [0.2.6] - 2026-09-15
 
 - Pin osv-scanner to 2.6.0 after independently hashing the linux amd64 and

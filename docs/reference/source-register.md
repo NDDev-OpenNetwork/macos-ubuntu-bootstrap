@@ -196,7 +196,7 @@ Verified by downloading the install artifacts, not by copying a checksum file.
 | gcloud | 579.0.0 | `google-cloud-cli-579.0.0-linux-x86_64.tar.gz` | `a9a7fbe51cda37cf6142b1bbcff12227550e60a6c67e8cf84644fb301371c4de` |
 | gcloud | 579.0.0 | `google-cloud-cli-579.0.0-linux-arm.tar.gz` | `edc914b75f8c5d50e1efc78b849d6fa636c4412346784c148c4130f5dc3eba00` |
 
-`resend-cli@2.10.0` and `wrangler@4.120.0` are exact npm versions installed through Bun global. Wrangler is allowed to run its postinstall so that version can fetch workerd; other npm user tools keep `--ignore-scripts`.
+`resend-cli@2.21.0` and `wrangler@4.131.2` are exact npm versions installed through Bun global. Wrangler is allowed to run its postinstall so that version can fetch workerd; other npm user tools keep `--ignore-scripts`.
 
 `doctl` has no `--version` flag; the receipt probes `doctl version`. Installation never invokes `gcloud components update` or vendor self-update.
 

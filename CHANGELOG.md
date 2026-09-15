@@ -5,6 +5,13 @@ Versioning; the contract version in `config/rldyour-contract.json` moves with it
 
 ## [Unreleased]
 
+## [0.2.6] - 2026-09-15
+
+- Pin osv-scanner to 2.6.0 after independently hashing the linux amd64 and
+  arm64 GitHub release binaries against `osv-scanner_SHA256SUMS`.
+- Pin JetBrains kotlin-lsp to 263.4702.0 from `download-cdn.jetbrains.com`,
+  verifying both architecture tarballs against the published `.sha256` files.
+
 ## [0.2.5] - 2026-09-15
 
 - Name `desktop-server` in the `--profile` error and document

@@ -3,13 +3,13 @@
   "repositories": [
     {
       "repository": "NDDev-OpenNetwork/ci-workflows",
-      "version": "commit:bc9c7919de1c39d947a8709a92856925051bae05",
-      "commit": "bc9c7919de1c39d947a8709a92856925051bae05"
+      "version": "commit:9eb9e070ae87b0fc3bdbd2cbed5afe3b92f7e2c7",
+      "commit": "9eb9e070ae87b0fc3bdbd2cbed5afe3b92f7e2c7"
     },
     {
       "repository": "NDDev-OpenNetwork/github-actions",
-      "version": "commit:c078ddcbcfb771f56a334184b7b6399cfd9c39c4",
-      "commit": "c078ddcbcfb771f56a334184b7b6399cfd9c39c4"
+      "version": "commit:6064b7d98a4e6b852de7572de12b8889e8fbfe38",
+      "commit": "6064b7d98a4e6b852de7572de12b8889e8fbfe38"
     }
   ]
 }

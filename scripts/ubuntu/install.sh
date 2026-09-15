@@ -153,7 +153,7 @@ PINNED_SOURCE_TOOLS=(
   # Reproduce the estate's CI checks locally: these four are exactly what the
   # gitleaks, OSV, actionlint, and hadolint workflows run.
   "gitleaks;8.30.1;tar0;gitleaks;gitleaks;gitleaks;551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb;e4a487ee7ccd7d3a7f7ec08657610aa3606637dab924210b3aee62570fb4b080;https://github.com/gitleaks/gitleaks/releases/download/v8.30.1/gitleaks_8.30.1_linux_x64.tar.gz;https://github.com/gitleaks/gitleaks/releases/download/v8.30.1/gitleaks_8.30.1_linux_arm64.tar.gz"
-  "osv-scanner;2.5.1;raw;osv-scanner;osv-scanner;osv-scanner;f9f25499a2c8cc367b3af45df2ea7eeca7fbccceab9c35079968f4b3652194be;3d0f5aa5a6baa8eb32bcef247388e149ef6030a6634ccae6fa0d62681fb27a6d;https://github.com/google/osv-scanner/releases/download/v2.5.1/osv-scanner_linux_amd64;https://github.com/google/osv-scanner/releases/download/v2.5.1/osv-scanner_linux_arm64"
+  "osv-scanner;2.6.0;raw;osv-scanner;osv-scanner;osv-scanner;ca69b3d3cd08f889a49dc0a383122f71cc528b83803671df5fd874d97485b108;2c71403eb443d05891c4f268c3ad771cf4f16e5443463fd7851ef8f454d3c7e4;https://github.com/google/osv-scanner/releases/download/v2.6.0/osv-scanner_linux_amd64;https://github.com/google/osv-scanner/releases/download/v2.6.0/osv-scanner_linux_arm64"
   "actionlint;1.7.12;tar0;actionlint;actionlint;actionlint;8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8;325e971b6ba9bfa504672e29be93c24981eeb1c07576d730e9f7c8805afff0c6;https://github.com/rhysd/actionlint/releases/download/v1.7.12/actionlint_1.7.12_linux_amd64.tar.gz;https://github.com/rhysd/actionlint/releases/download/v1.7.12/actionlint_1.7.12_linux_arm64.tar.gz"
   "hadolint;2.15.1;raw;hadolint;hadolint;hadolint;c7187db94eeeeca956519a6af171adc31453941a1e777961f6e680f697c8c507;f6198ef8090f404dbb771abfee086eb8c48ac177f30da7fd3510aca35b344b5d;https://github.com/hadolint/hadolint/releases/download/v2.15.1/hadolint-linux-x86_64;https://github.com/hadolint/hadolint/releases/download/v2.15.1/hadolint-linux-arm64"
   # Markdown language server. Ubuntu uses markdown-oxide rather than macOS's
@@ -197,7 +197,7 @@ PINNED_SOURCE_TOOLS=(
   # Official JetBrains Kotlin LSP. The standalone archive includes its own JBR,
   # so no mutable system Java dependency is introduced. Upstream marks it alpha;
   # the exact release and both CDN checksums keep that boundary explicit.
-  "kotlin-lsp;262.9593.0;tar1;kotlin-lsp.sh;kotlin-lsp.sh;kotlin-lsp;2d99d8e198fbe4aa8f4481e37799724ce94803b4ea12a60b416040e3fcd7cc5e;2317831c6e5607d05b7ebc1da655330125ce0e3d66fbf24517dfce442debc14e;https://download-cdn.jetbrains.com/language-server/kotlin-server/262.9593.0/kotlin-server-262.9593.0.tar.gz;https://download-cdn.jetbrains.com/language-server/kotlin-server/262.9593.0/kotlin-server-262.9593.0-aarch64.tar.gz"
+  "kotlin-lsp;263.4702.0;tar1;kotlin-lsp.sh;kotlin-lsp.sh;kotlin-lsp;1e11d2e5fefbf9ea215ad8dd6be95f2222897cd086e8cb7a661a52084a590405;ec7cb254a6662a07fff9f10e4365226afab6c40008f8a974c10ac5e785d6510f;https://download-cdn.jetbrains.com/language-server/kotlin-server/263.4702.0/kotlin-server-263.4702.0.tar.gz;https://download-cdn.jetbrains.com/language-server/kotlin-server/263.4702.0/kotlin-server-263.4702.0-aarch64.tar.gz"
 )
 
 # User-selected CLI tools that are not language hosts, LSPs, or scanners but

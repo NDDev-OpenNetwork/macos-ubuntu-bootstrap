@@ -2,7 +2,7 @@
   "schema_version": 2,
   "adapter": {
     "id": "macos-ubuntu-bootstrap",
-    "version": "0.2.6"
+    "version": "0.2.7"
   },
   "support_evidence": {
     "path": "config/support-evidence-matrix.json",
@@ -194,10 +194,10 @@
       "x64": "fd8e59d5a511510f6a298afb548f18c7d2b1be404d8b4a27d94fbe49f56cb2d6",
       "arm64": "6ad1325edbdb5649c379b75a237147a666c95d4f9ae8d340fef2d1575d289ad2"
     },
-    "ubuntu_uv": "0.12.13",
+    "ubuntu_uv": "0.12.15",
     "ubuntu_uv_sha256": {
-      "x64": "745765a3b6e360ad76743599ae5c42e9278c7edf8bbff9fc76d05bf2623a04dd",
-      "arm64": "2eaa5d94f5db7b3a1a092156b9420459e42ab0217d917fe74a876309cef9b5e9"
+      "x64": "f97935763c04be3e692460a7aaeaaab8fc3b78fcf8b389da820b38ae7423a638",
+      "arm64": "0e9a3499b0587d449c9ff684c0160da607826e4af1cee220bc87f378702d3e08"
     },
     "ubuntu_bun": "1.4.2",
     "ubuntu_bun_sha256": {
@@ -226,10 +226,10 @@
       "rustfmt-preview",
       "rust-analyzer-preview"
     ],
-    "ubuntu_dart": "3.13.3",
+    "ubuntu_dart": "3.13.4",
     "ubuntu_dart_sha256": {
-      "x64": "549c182cffbdc6864df7509c16fec646c73fe6cb8a18c2cb572db1292f300cd7",
-      "arm64": "c59c535623f3ab9717e8755237df695f153fb3af3bfb0f6c281b2eb4fefe669e"
+      "x64": "6487a10df5eab890d746d14a55f4c70bec3c1c0633f51804eb504cbc0fc395bb",
+      "arm64": "1d545609bdf9da6fb5e68fbd96a599e2836e44ee64379991bd4493ee764d2fdb"
     },
     "ubuntu_dart_provides": [
       "dart",
@@ -553,7 +553,7 @@
       ]
     },
     "resend": {
-      "version": "2.10.0",
+      "version": "2.21.0",
       "summary": "Resend CLI from the npm resend-cli package, installed through pinned Bun global.",
       "install_method": "npm-registry",
       "source": {
@@ -574,7 +574,7 @@
       ]
     },
     "wrangler": {
-      "version": "4.120.0",
+      "version": "4.131.2",
       "summary": "Cloudflare Wrangler CLI from the npm wrangler package, installed through pinned Bun global.",
       "install_method": "npm-registry",
       "source": {

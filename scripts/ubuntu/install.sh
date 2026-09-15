@@ -33,9 +33,9 @@ SET_LOGIN_SHELL="${RLDYOUR_SET_LOGIN_SHELL:-0}"
 NODE_VERSION="24.21.0"
 NODE_SHA256_X64="fd8e59d5a511510f6a298afb548f18c7d2b1be404d8b4a27d94fbe49f56cb2d6"
 NODE_SHA256_ARM64="6ad1325edbdb5649c379b75a237147a666c95d4f9ae8d340fef2d1575d289ad2"
-UV_VERSION="0.12.13"
-UV_SHA256_X64="745765a3b6e360ad76743599ae5c42e9278c7edf8bbff9fc76d05bf2623a04dd"
-UV_SHA256_ARM64="2eaa5d94f5db7b3a1a092156b9420459e42ab0217d917fe74a876309cef9b5e9"
+UV_VERSION="0.12.15"
+UV_SHA256_X64="f97935763c04be3e692460a7aaeaaab8fc3b78fcf8b389da820b38ae7423a638"
+UV_SHA256_ARM64="0e9a3499b0587d449c9ff684c0160da607826e4af1cee220bc87f378702d3e08"
 BUN_VERSION="1.4.2"
 BUN_SHA256_X64="36368faef7527875d5ffa52e53cd48021741f2a83eb6208a8dd64068d422a913"
 BUN_SHA256_X64_BASELINE="c678040f14fe0440eb839d37cbd0ce4c051a32da72806ac97de6a6aab6bf728f"
@@ -66,9 +66,9 @@ RUST_SHA256_AARCH64="0b514a8cc1cbcd939bff0f151661fe58b6ea5c7a7f645a5098c69e32e8c
 # SDK never mutates its own install tree, which is what keeps it compatible with
 # the runtime-receipt contract; the Flutter SDK is deliberately not installed
 # here because its bin/cache self-populates at runtime and would break that.
-DART_VERSION="3.13.3"
-DART_SHA256_X64="549c182cffbdc6864df7509c16fec646c73fe6cb8a18c2cb572db1292f300cd7"
-DART_SHA256_ARM64="c59c535623f3ab9717e8755237df695f153fb3af3bfb0f6c281b2eb4fefe669e"
+DART_VERSION="3.13.4"
+DART_SHA256_X64="6487a10df5eab890d746d14a55f4c70bec3c1c0633f51804eb504cbc0fc395bb"
+DART_SHA256_ARM64="1d545609bdf9da6fb5e68fbd96a599e2836e44ee64379991bd4493ee764d2fdb"
 # Prompt/history/completion pillars — parity with the macOS brew baseline
 # (starship, atuin, carapace). Installed as pinned standalone artifacts, never
 # via apt (stale) or a piped install script. Linux x64 + arm64 tarball SHA-256
@@ -229,8 +229,8 @@ USER_TOOLS=(
 # as BUN_LSP_PACKAGES. Wrangler is the exception to `--ignore-scripts`: its
 # postinstall fetches the workerd binary that package version requires.
 NPM_USER_TOOLS=(
-  "resend-cli@2.10.0"
-  "wrangler@4.120.0"
+  "resend-cli@2.21.0"
+  "wrangler@4.131.2"
 )
 
 # The reviewed Telegram release installs these four files from

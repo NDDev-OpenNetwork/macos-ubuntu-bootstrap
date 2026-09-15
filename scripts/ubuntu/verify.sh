@@ -168,12 +168,12 @@ rldyour::ubuntu_verify::tool_host_provenance() {
   if [ "$arch" = "x64" ] && ! rldyour::cpu_has_avx2; then bun_arch="x64-baseline"; fi
   bun_sha=$(rldyour::ubuntu_verify::contract_hash ubuntu_bun_sha256 "$bun_arch")
   node_root="$HOME/.local/share/rldyour/node/v24.21.0"
-  uv_root="$HOME/.local/share/rldyour/uv/0.12.13"
+  uv_root="$HOME/.local/share/rldyour/uv/0.12.15"
   bun_root="$HOME/.local/share/rldyour/bun/1.4.2"
 
   rldyour::ubuntu_verify::runtime_receipt node 24.21.0 "$node_sha" "$node_root" \
     bin/node bin/npm bin/npx bin/corepack || return 1
-  rldyour::ubuntu_verify::runtime_receipt uv 0.12.13 "$uv_sha" "$uv_root" uv uvx || return 1
+  rldyour::ubuntu_verify::runtime_receipt uv 0.12.15 "$uv_sha" "$uv_root" uv uvx || return 1
   rldyour::ubuntu_verify::runtime_receipt bun 1.4.2 "$bun_sha" "$bun_root" bun || return 1
   # Only node is published to the managed PATH; npm/npx/corepack must NOT be
   # linked (uv and bun are the only package managers). Their integrity inside
@@ -305,8 +305,8 @@ done
   rldyour::log "missing" "Bun exact managed Ubuntu version 1.4.2"
   exit 1
 }
-uv --version 2>/dev/null | head -n 1 | grep -Eq '^uv 0\.12\.13([[:space:]]|$)' || {
-  rldyour::log "missing" "uv exact managed Ubuntu version 0.12.13"
+uv --version 2>/dev/null | head -n 1 | grep -Eq '^uv 0\.12\.15([[:space:]]|$)' || {
+  rldyour::log "missing" "uv exact managed Ubuntu version 0.12.15"
   exit 1
 }
 rldyour::verify_terminal_environment
@@ -356,8 +356,8 @@ if [ "$PROFILE" != "server" ]; then
   # the exact version and the mcp-server subcommand are proven: an SDK that
   # resolves but cannot serve MCP would leave the declared marketplace server
   # broken while verification passed.
-  [ "$(dart --version 2>&1 | awk 'NR == 1 { print $4 }')" = "3.13.3" ] || {
-    rldyour::log "missing" "Dart exact managed Ubuntu version 3.13.3"
+  [ "$(dart --version 2>&1 | awk 'NR == 1 { print $4 }')" = "3.13.4" ] || {
+    rldyour::log "missing" "Dart exact managed Ubuntu version 3.13.4"
     exit 1
   }
   dart mcp-server --version >/dev/null 2>&1 || {
@@ -418,8 +418,8 @@ else
   [ "$(rustc --version 2>/dev/null | awk '{ print $2 }')" = "1.98.1" ] || {
     rldyour::log "missing" "Rust exact managed Ubuntu version 1.98.1"; exit 1;
   }
-  [ "$(dart --version 2>&1 | awk 'NR == 1 { print $4 }')" = "3.13.3" ] || {
-    rldyour::log "missing" "Dart exact managed Ubuntu version 3.13.3"; exit 1;
+  [ "$(dart --version 2>&1 | awk 'NR == 1 { print $4 }')" = "3.13.4" ] || {
+    rldyour::log "missing" "Dart exact managed Ubuntu version 3.13.4"; exit 1;
   }
   dart mcp-server --version >/dev/null 2>&1 || {
     rldyour::log "missing" "'dart mcp-server' transport for the dart-flutter MCP server"; exit 1;

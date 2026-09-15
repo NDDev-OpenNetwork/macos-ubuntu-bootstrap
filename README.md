@@ -60,6 +60,7 @@ bash scripts/bootstrap.sh --platform macos --no-gui
 bash scripts/bootstrap.sh --platform ubuntu --profile desktop
 bash scripts/bootstrap.sh --platform ubuntu --profile desktop-builds
 bash scripts/bootstrap.sh --platform ubuntu --profile desktop-server
+bash scripts/bootstrap.sh --platform ubuntu --profile desktop-server --docker-mode rootful
 bash scripts/bootstrap.sh --platform ubuntu --profile server
 
 # Apply
@@ -67,6 +68,7 @@ bash scripts/bootstrap.sh --platform macos --apply
 bash scripts/bootstrap.sh --platform ubuntu --profile desktop --apply
 bash scripts/bootstrap.sh --platform ubuntu --profile desktop-builds --apply
 bash scripts/bootstrap.sh --platform ubuntu --profile desktop-server --apply
+bash scripts/bootstrap.sh --platform ubuntu --profile desktop-server --docker-mode rootful --apply
 bash scripts/bootstrap.sh --platform ubuntu --profile server --apply
 ```
 

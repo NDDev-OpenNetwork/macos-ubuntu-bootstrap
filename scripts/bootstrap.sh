@@ -62,7 +62,7 @@ while [ "$#" -gt 0 ]; do
       shift 2
       ;;
     --profile)
-      PROFILE="${2:?--profile requires one of desktop|desktop-builds|server}"
+      PROFILE="${2:?--profile requires one of desktop|desktop-builds|desktop-server|server}"
       shift 2
       ;;
     --gui)
@@ -203,7 +203,7 @@ case "$DOCKER_MODE" in none|rootful|rootless) ;; *)
   ;;
 esac
 # The plain desktop profile is source/LSP-only and cannot install Docker.
-# desktop-builds and server are the only profiles that may carry a Docker mode.
+# desktop-builds, desktop-server and server may carry an explicit Docker mode.
 if [ "$PROFILE" = "desktop" ] && [ "$DOCKER_MODE" != "none" ]; then
   echo "The desktop profile is source/LSP-only; use --profile desktop-builds for local Docker" >&2
   exit 2

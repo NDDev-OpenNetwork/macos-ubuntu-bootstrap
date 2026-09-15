@@ -23,7 +23,9 @@ Plan and, after operator review, apply:
 
 ```bash
 bash scripts/bootstrap.sh --platform ubuntu --profile desktop-server
+bash scripts/bootstrap.sh --platform ubuntu --profile desktop-server --docker-mode rootful
 bash scripts/bootstrap.sh --platform ubuntu --profile desktop-server --apply
+bash scripts/bootstrap.sh --platform ubuntu --profile desktop-server --docker-mode rootful --apply
 ```
 
 The second command changes packages, systemd services and XRDP configuration.

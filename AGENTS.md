@@ -33,8 +33,10 @@ enforcement this repository cannot observe.
 - Ubuntu `server` is headless, defaults to rootful Docker, and supports explicit
   `rootless` or `none` alternatives.
 - Ubuntu `desktop-server` is Ubuntu 24.04 amd64 only, requires GUI, defaults to
-  no Docker, composes the full server baseline, and exposes XRDP only on
-  loopback through an owner-managed SSH tunnel. It never owns credentials.
+  no Docker, and accepts explicit `--docker-mode rootful` or `rootless` for a
+  host that develops, deploys and tests locally. It still composes the full
+  server baseline and exposes XRDP only on loopback through an owner-managed
+  SSH tunnel. It never owns credentials.
 - All profiles receive Codex CLI, Claude Code, Grok Build, zsh configuration,
   modern terminal tools, source-quality tools, and applicable language servers.
 - `terminal_tools` in the contract owns the interactive tool boundary. Every

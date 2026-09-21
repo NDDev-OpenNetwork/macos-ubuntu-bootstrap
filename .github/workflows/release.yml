@@ -186,13 +186,28 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          conclusion="$(
-            gh api -H "Accept: application/vnd.github+json" \
-              "/repos/${GITHUB_REPOSITORY}/commits/${GITHUB_SHA}/check-runs?check_name=bootstrap-gate&status=completed&filter=latest&per_page=1" \
-              --jq '.check_runs[0].conclusion // ""'
-          )"
+          # A tag push can outrun the check-run itself: GitHub creates the
+          # `bootstrap-gate` run for the merge commit asynchronously, so a
+          # single lookup read `absent` on 0.2.10 and refused a candidate whose
+          # gate reported success seconds later. Poll a bounded window for the
+          # run to appear and settle; a completed non-success still fails
+          # immediately, and `absent` after the deadline still fails closed.
+          deadline=$((SECONDS + 360))
+          conclusion=""
+          while [ "$SECONDS" -lt "$deadline" ]; do
+            conclusion="$(
+              gh api -H "Accept: application/vnd.github+json" \
+                "/repos/${GITHUB_REPOSITORY}/commits/${GITHUB_SHA}/check-runs?check_name=bootstrap-gate&filter=latest&per_page=1" \
+                --jq '.check_runs[0] | if .status == "completed" then .conclusion else "pending" end // ""'
+            )"
+            case "$conclusion" in
+              success) break ;;
+              pending|"") sleep 15 ;;
+              *) echo "candidate ${GITHUB_SHA} has bootstrap-gate=$conclusion" >&2; exit 1 ;;
+            esac
+          done
           [ "$conclusion" = success ] || {
-            echo "candidate ${GITHUB_SHA} has bootstrap-gate=${conclusion:-absent}" >&2
+            echo "candidate ${GITHUB_SHA} has bootstrap-gate=${conclusion:-absent} after ${SECONDS}s" >&2
             exit 1
           }
           echo "bootstrap-gate: success on ${GITHUB_SHA}"

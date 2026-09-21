@@ -5,6 +5,12 @@ Versioning; the contract version in `config/rldyour-contract.json` moves with it
 
 ## [Unreleased]
 
+- Poll the `bootstrap-gate` check-run for a bounded window in `release.yml`
+  instead of reading it once: a tag push can outrun check-run creation on the
+  merge commit, and the single lookup refused 0.2.10 as `absent` while the gate
+  was still settling. A completed non-success still fails immediately and
+  `absent` after the deadline still fails closed.
+
 ## [0.2.10] - 2026-09-21
 
 - Pin Wrangler to 4.136.0 (npm published it after the 0.2.9 freeze; caught by

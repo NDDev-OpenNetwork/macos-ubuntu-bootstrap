@@ -192,7 +192,7 @@ PINNED_SOURCE_TOOLS=(
   "lazygit;0.65.1;tar0;lazygit;lazygit;lazygit;02beacbcda0fa342e50ae3480ba8147307353af3fb28e1d5f790e02329c201a6;49abecdf6adf4f2dfdb11bf7b9bfada267ea523612ed809d1c6d87f6c04000a7;https://github.com/jesseduffield/lazygit/releases/download/v0.65.1/lazygit_0.65.1_linux_x86_64.tar.gz;https://github.com/jesseduffield/lazygit/releases/download/v0.65.1/lazygit_0.65.1_linux_arm64.tar.gz"
   # difftastic publishes its binary as `difft`; the row is named for the command
   # it publishes, like every other row here.
-  "difft;0.71.0;tar0;difft;difft;difft;61aea5394a53c56f144637cf39b3a0c0dafa27769731745e5851ff276e6478da;5f046098b36ff985d0f99fec6f22cf74961db60386ff9d40df39fd99660aae2c;https://github.com/Wilfred/difftastic/releases/download/0.71.0/difft-x86_64-unknown-linux-gnu.tar.gz;https://github.com/Wilfred/difftastic/releases/download/0.71.0/difft-aarch64-unknown-linux-gnu.tar.gz"
+  "difft;0.71.0;tar0;difft;difft;difft;61aea5394a53c56f144637cf39b3a0c0dafa27769731745e5851ff276e6478da;5f046098b36ff985d0f99fec6f22cf74961db60386ff9d40df39fd99660aae2c;https://github.com/Wilfred/difftastic/releases/download/0.71.0/difft-0.71.0-x86_64-unknown-linux-gnu.tar.gz;https://github.com/Wilfred/difftastic/releases/download/0.71.0/difft-0.71.0-aarch64-unknown-linux-gnu.tar.gz"
   "jaq;3.1.1;raw;jaq;jaq;jaq;5922c7b67d9bd6841d6676d1f954410c6bf04b47203dcb661c4f052dfef7f454;bdda42d5a8c060a2c7916b287a227e7750d5fccbd4c37aacf0ab863010921829;https://github.com/01mf02/jaq/releases/download/v3.1.1/jaq-x86_64-unknown-linux-gnu;https://github.com/01mf02/jaq/releases/download/v3.1.1/jaq-aarch64-unknown-linux-gnu"
   # Official JetBrains Kotlin LSP. The standalone archive includes its own JBR,
   # so no mutable system Java dependency is introduced. Upstream marks it alpha;
@@ -1068,7 +1068,7 @@ ensure_pinned_source_tool() {
   else
     local archive stage
     archive="$(mktemp)"; stage="$(mktemp -d "$parent/.$name-$version.tmp.XXXXXX")"
-    trap 'rm -rf "$archive"; [ -z "${stage:-}" ] || rm -rf "$stage"' RETURN
+    trap 'rm -rf "${archive:-}"; [ -z "${stage:-}" ] || rm -rf "$stage"; trap - RETURN' RETURN
     rldyour::download_verified_file "$url" "$sha" "$archive" || return 1
     case "$kind" in
       tar0) tar -xzf "$archive" -C "$stage" ;;
@@ -1176,7 +1176,7 @@ ensure_node() {
     fi
   else
     archive="$(mktemp)"; stage="$(mktemp -d "$parent/.node-${NODE_VERSION}.tmp.XXXXXX")"
-    trap 'rm -rf "$archive"; [ -z "${stage:-}" ] || rm -rf "$stage"' RETURN
+    trap 'rm -rf "${archive:-}"; [ -z "${stage:-}" ] || rm -rf "$stage"; trap - RETURN' RETURN
     rldyour::download_verified_file "$url" "$sha" "$archive" || return 1
     tar -xJf "$archive" --strip-components=1 -C "$stage"
     [ "$("$stage/bin/node" --version 2>/dev/null)" = "v${NODE_VERSION}" ] || {
@@ -1227,7 +1227,7 @@ ensure_uv() {
     fi
   else
     archive="$(mktemp)"; stage="$(mktemp -d "$parent/.uv-${UV_VERSION}.tmp.XXXXXX")"
-    trap 'rm -rf "$archive"; [ -z "${stage:-}" ] || rm -rf "$stage"' RETURN
+    trap 'rm -rf "${archive:-}"; [ -z "${stage:-}" ] || rm -rf "$stage"; trap - RETURN' RETURN
     url="https://github.com/astral-sh/uv/releases/download/${UV_VERSION}/uv-${triple}.tar.gz"
     rldyour::download_verified_file "$url" "$sha" "$archive"
     tar -xzf "$archive" --strip-components=1 -C "$stage"
@@ -1286,7 +1286,7 @@ ensure_go() {
     fi
   else
     archive="$(mktemp)"; stage="$(mktemp -d "$parent/.go-${GO_VERSION}.tmp.XXXXXX")"
-    trap 'rm -rf "$archive"; [ -z "${stage:-}" ] || rm -rf "$stage"' RETURN
+    trap 'rm -rf "${archive:-}"; [ -z "${stage:-}" ] || rm -rf "$stage"; trap - RETURN' RETURN
     rldyour::download_verified_file "$url" "$sha" "$archive" || return 1
     unzip -q "$archive" -d "$stage.unpacked"
     mv "$stage.unpacked/golang.org/toolchain@${module_version}"/* "$stage"/
@@ -1374,7 +1374,7 @@ ensure_rust() {
     fi
   else
     archive="$(mktemp)"; stage="$(mktemp -d "$parent/.rust-${RUST_VERSION}.tmp.XXXXXX")"
-    trap 'rm -rf "$archive"; [ -z "${stage:-}" ] || rm -rf "$stage"' RETURN
+    trap 'rm -rf "${archive:-}"; [ -z "${stage:-}" ] || rm -rf "$stage"; trap - RETURN' RETURN
     rldyour::download_verified_file "$url" "$sha" "$archive" || return 1
     # The installer ships inside the SHA-256-verified archive; it is a verified
     # artifact, never remote code piped to a shell.
@@ -1459,7 +1459,7 @@ ensure_dart() {
     fi
   else
     archive="$(mktemp)"; stage="$(mktemp -d "$parent/.dart-${DART_VERSION}.tmp.XXXXXX")"
-    trap 'rm -rf "$archive"; [ -z "${stage:-}" ] || rm -rf "$stage"' RETURN
+    trap 'rm -rf "${archive:-}"; [ -z "${stage:-}" ] || rm -rf "$stage"; trap - RETURN' RETURN
     rldyour::download_verified_file "$url" "$sha" "$archive" || return 1
     # unzip has no --strip-components; the archive's single top-level `dart-sdk`
     # directory is promoted explicitly instead.
@@ -1542,7 +1542,7 @@ ensure_bun() {
     fi
   else
     archive="$(mktemp)"; stage="$(mktemp -d "$parent/.bun-${BUN_VERSION}.tmp.XXXXXX")"
-    trap 'rm -rf "$archive"; [ -z "${stage:-}" ] || rm -rf "$stage"' RETURN
+    trap 'rm -rf "${archive:-}"; [ -z "${stage:-}" ] || rm -rf "$stage"; trap - RETURN' RETURN
     url="https://github.com/oven-sh/bun/releases/download/bun-v${BUN_VERSION}/bun-linux-${arch}.zip"
     rldyour::download_verified_file "$url" "$sha" "$archive"
     extract_dir="$stage/extracted"
@@ -1593,7 +1593,7 @@ rldyour::ubuntu::ensure_standalone_tool() {
     fi
   else
     archive="$(mktemp)"; stage="$(mktemp -d "$parent/.${name}-${version}.tmp.XXXXXX")"
-    trap 'rm -rf "$archive"; [ -z "${stage:-}" ] || rm -rf "$stage"' RETURN
+    trap 'rm -rf "${archive:-}"; [ -z "${stage:-}" ] || rm -rf "$stage"; trap - RETURN' RETURN
     rldyour::download_verified_file "$url" "$sha" "$archive" || return 1
     tar -xzf "$archive" --strip-components="$strip" -C "$stage"
     [ -x "$stage/$binrel" ] || {

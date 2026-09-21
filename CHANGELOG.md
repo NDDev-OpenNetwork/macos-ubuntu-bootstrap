@@ -25,6 +25,12 @@ Versioning; the contract version in `config/rldyour-contract.json` moves with it
 - Pin Google Cloud CLI to 585.0.0, hashing both linux release tarballs.
 - Keep Node.js on the 24.x LTS line (24.21.0); the 26.x major is out of
   scope for a pin refresh.
+- Track difftastic's new asset naming: 0.71.0 publishes
+  `difft-<version>-<triple>.tar.gz` instead of `difft-<triple>.tar.gz`.
+- Make every pinned-download RETURN trap self-clearing and unset-safe: an
+  early failure return used to leave the trap armed globally, so the next
+  function return re-fired it with `archive`/`stage` unbound and the real
+  error surfaced as `unbound variable` under `set -u`.
 
 ## [0.2.7] - 2026-09-15
 

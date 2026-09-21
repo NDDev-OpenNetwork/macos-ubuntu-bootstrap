@@ -87,7 +87,7 @@ ensure_homebrew() {
   fi
   local installer signature
   installer="$(mktemp -d)/Homebrew.pkg"
-  trap 'rm -rf "$(dirname "$installer")"' RETURN
+  trap '[ -z "${installer:-}" ] || rm -rf "$(dirname "$installer")"; trap - RETURN' RETURN
   rldyour::download_verified_file \
     "https://github.com/Homebrew/brew/releases/download/${HOMEBREW_PKG_VERSION}/Homebrew.pkg" \
     "$HOMEBREW_PKG_SHA256" "$installer"

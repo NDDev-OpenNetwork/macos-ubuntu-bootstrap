@@ -58,7 +58,7 @@ BUN_LSP_PACKAGES=(
   "typescript@7.0.2"
   "@vtsls/language-server@0.3.0"
   "yaml-language-server@1.24.0"
-  "bash-language-server@5.6.0"
+  "bash-language-server@5.8.1"
   "dockerfile-language-server-nodejs@0.15.0"
   "gh-actions-language-server@0.0.3"
   "svelte-language-server@0.18.4"

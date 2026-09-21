@@ -99,7 +99,7 @@ BUN_LSP_PACKAGES=(
   "typescript@7.0.2"
   "@vtsls/language-server@0.3.0"
   "yaml-language-server@1.24.0"
-  "bash-language-server@5.6.0"
+  "bash-language-server@5.8.1"
   "dockerfile-language-server-nodejs@0.15.0"
   "vscode-langservers-extracted@4.10.0"
   "@taplo/cli@0.7.0"

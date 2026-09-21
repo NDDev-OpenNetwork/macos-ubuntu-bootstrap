@@ -5,6 +5,14 @@ Versioning; the contract version in `config/rldyour-contract.json` moves with it
 
 ## [Unreleased]
 
+## [0.2.9] - 2026-09-21
+
+- Converge the thirteen ci-workflows reusable callers and
+  `config/reusable-workflow-pins.json` on the signed 0.1.26 tag.
+- Pin bash-language-server to 5.8.1 in the contract and both installers.
+- Recompile the hash-locked test requirements: packaging 26.3, pygments 2.21.0.
+- Correct the Herdr version reference in AGENTS.md to the installed 0.9.1.
+
 ## [0.2.8] - 2026-09-21
 
 - Pin uv to 0.12.17 after independently hashing the linux x86_64 and aarch64

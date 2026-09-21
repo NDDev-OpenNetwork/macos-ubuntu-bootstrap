@@ -2,7 +2,7 @@
   "schema_version": 2,
   "adapter": {
     "id": "macos-ubuntu-bootstrap",
-    "version": "0.2.8"
+    "version": "0.2.9"
   },
   "support_evidence": {
     "path": "config/support-evidence-matrix.json",
@@ -893,7 +893,7 @@
     ],
     "registry-pinned": [
       "@vtsls/language-server@0.3.0",
-      "bash-language-server@5.6.0",
+      "bash-language-server@5.8.1",
       "dockerfile-language-server-nodejs@0.15.0",
       "gh-actions-language-server@0.0.3",
       "svelte-language-server@0.18.4",

@@ -20,7 +20,7 @@ and what the receipt does and does not assert. `harnesses.detection` in the
 contract is what makes one-owner-per-harness checkable — do not describe an
 enforcement this repository cannot observe.
 
-## Contract 0.2.7
+## Contract 0.2.8
 
 - macOS supports `desktop`, with optional GUI, no Docker, and source-analysis
   plus local-check tooling.
@@ -49,7 +49,7 @@ enforcement this repository cannot observe.
 - Google Chrome stable is the only installed browser. macOS GUI installs
   ChatGPT, Claude, Ghostty, cmux, RustDesk, and Telegram. Ubuntu GUI installs
   Chrome, RustDesk, Telegram, and removes Firefox.
-- Herdr 0.9.0 is installed from the official, checksum-pinned GitHub release
+- Herdr 0.9.1 is installed from the official, checksum-pinned GitHub release
   asset on macOS and every Ubuntu profile; `config/rldyour-contract.json` owns
   its tag, source URLs, architecture hashes, and receipt identities. Never
   substitute a downstream Homebrew formula for that exact managed artifact,

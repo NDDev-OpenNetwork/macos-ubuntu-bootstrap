@@ -2,7 +2,7 @@
   "schema_version": 2,
   "adapter": {
     "id": "macos-ubuntu-bootstrap",
-    "version": "0.2.7"
+    "version": "0.2.8"
   },
   "support_evidence": {
     "path": "config/support-evidence-matrix.json",
@@ -141,10 +141,10 @@
       "grok-build"
     ],
     "codex": {
-      "version": "0.154.0",
+      "version": "0.155.1",
       "install_method": "verified-npm-tarball",
       "launcher": "cx",
-      "sha512": "155ff1d4e1d762ffe27e37f79978fd4e14d301671464de9c18845046147190a34e3ee226bb5596d1cf1ebf5bd4904f57187f747449d81b5b418c8931462920d3"
+      "sha512": "d367c0006c81b65035ccf8c4a379138ff6ce4986cfcf90ef8cbc11649755ef07851440f334538c8d01a667ffb90ae8ab615d2113e0194eb9e3cf05d853801d01"
     },
     "claude-code": {
       "channel": "stable",
@@ -194,10 +194,10 @@
       "x64": "fd8e59d5a511510f6a298afb548f18c7d2b1be404d8b4a27d94fbe49f56cb2d6",
       "arm64": "6ad1325edbdb5649c379b75a237147a666c95d4f9ae8d340fef2d1575d289ad2"
     },
-    "ubuntu_uv": "0.12.15",
+    "ubuntu_uv": "0.12.17",
     "ubuntu_uv_sha256": {
-      "x64": "f97935763c04be3e692460a7aaeaaab8fc3b78fcf8b389da820b38ae7423a638",
-      "arm64": "0e9a3499b0587d449c9ff684c0160da607826e4af1cee220bc87f378702d3e08"
+      "x64": "fa82fd8dde8e8eefdecada6aa0889666556cfceb690d06e0c3bca49eb3070a63",
+      "arm64": "d636d1b678e9e7f367ecb22b46bd1cabbed234d6bc3b4d96365d2b507f72f86c"
     },
     "ubuntu_bun": "1.4.2",
     "ubuntu_bun_sha256": {
@@ -324,10 +324,10 @@
         }
       },
       "difft": {
-        "version": "0.70.0",
+        "version": "0.71.0",
         "sha256": {
-          "x64": "2997d2bbe620534edbd79b0049f00ce84eef3fedb15c7822456d58e38d8b05c9",
-          "arm64": "e729684907d67d1a1727a08f443877e19e40eeb2efebcd95c1b8f7fee4284e8e"
+          "x64": "61aea5394a53c56f144637cf39b3a0c0dafa27769731745e5851ff276e6478da",
+          "arm64": "5f046098b36ff985d0f99fec6f22cf74961db60386ff9d40df39fd99660aae2c"
         }
       },
       "jaq": {
@@ -365,13 +365,13 @@
     ]
   },
   "supply_chain": {
-    "homebrew_pkg_version": "7.0.1",
-    "homebrew_pkg_sha256": "c71d94541adad139c16e92c7774e2635e157c6ed60174787398ecd84bbcd82a9",
+    "homebrew_pkg_version": "7.0.4",
+    "homebrew_pkg_sha256": "1e9ba33b7ac76bd8bcda43af0dba0e6945f467aa56d412179f828b3cbddf1181",
     "homebrew_installer_team": "927JGANW46"
   },
   "user_tools": {
     "herdr": {
-      "version": "0.9.0",
+      "version": "0.9.1",
       "summary": "Terminal workspace manager for AI coding agents (tmux-style multiplexer with agent session support).",
       "install_method": {
         "linux": "verified-github-release-binary",
@@ -379,25 +379,25 @@
       },
       "source": {
         "repository": "https://github.com/herdrdev/herdr",
-        "tag": "v0.9.0",
-        "tag_object": "cca4af8dfad160bc5fb5ae133b70882b5fe28f61",
-        "commit": "b99002ac99b09e00b4ca692436cb15a6b0d676f1",
-        "release": "https://github.com/herdrdev/herdr/releases/tag/v0.9.0",
+        "tag": "v0.9.1",
+        "tag_object": "8544776216a8d28088db59a5344ea21ee2d05d2b",
+        "commit": "065ef9d6a531c49fb8bee7e818ef837065b21ee9",
+        "release": "https://github.com/herdrdev/herdr/releases/tag/v0.9.1",
         "release_feed": "https://github.com/herdrdev/herdr/releases.atom",
         "upstream_manifest": "https://herdr.dev/latest.json",
-        "verified_at": "2026-09-10",
+        "verified_at": "2026-09-21",
         "assets": {
           "macos-aarch64": {
-            "url": "https://github.com/herdrdev/herdr/releases/download/v0.9.0/herdr-macos-aarch64",
-            "sha256": "32b53df09872628059c789a69f02a6b8e29e14ddf26711421f3463f70c1aef17"
+            "url": "https://github.com/herdrdev/herdr/releases/download/v0.9.1/herdr-macos-aarch64",
+            "sha256": "5fc7a7e7adfaca56fa80aa89dcb025693357268dab8285b9ce2d08a2313c89de"
           },
           "linux-x86_64": {
-            "url": "https://github.com/herdrdev/herdr/releases/download/v0.9.0/herdr-linux-x86_64",
-            "sha256": "4fa1a01158dd8043da92d31b270780b0dcc10603038d9b61cac4d81ab63fb71f"
+            "url": "https://github.com/herdrdev/herdr/releases/download/v0.9.1/herdr-linux-x86_64",
+            "sha256": "2a02fed16beb651ef006e1d43f048f652ca4dc58ad053cd2d44450563d5c54b7"
           },
           "linux-aarch64": {
-            "url": "https://github.com/herdrdev/herdr/releases/download/v0.9.0/herdr-linux-aarch64",
-            "sha256": "9c8db20fb7e7427b138d5367113f1621ffd319f2f65d6f009e2594029115f0d2"
+            "url": "https://github.com/herdrdev/herdr/releases/download/v0.9.1/herdr-linux-aarch64",
+            "sha256": "f4ccf4de745f2cb9a39a983e9ba3703dad50ec2a58dea83026ceab721bbd8d9e"
           }
         }
       },
@@ -424,12 +424,12 @@
       ]
     },
     "telegram": {
-      "version": "7.2.8",
+      "version": "7.2.9",
       "summary": "Telegram Desktop messenger from the official telegramdesktop/tdesktop GitHub release.",
       "install_method": "verified-github-release-tarball",
       "repo": "telegramdesktop/tdesktop",
-      "url": "https://github.com/telegramdesktop/tdesktop/releases/download/v7.2.8/td-setup-linux-x64-7.2.8.tar.xz",
-      "archive_sha256": "60313dfd5441d7013b2af351574bdf0a3688110d5bce00b837d54d14608cebd8",
+      "url": "https://github.com/telegramdesktop/tdesktop/releases/download/v7.2.9/td-setup-linux-x64-7.2.9.tar.xz",
+      "archive_sha256": "dc0698eb8011ed4e75f1fad9d55a8ab54e375c9791b9c577baa6073d9a4c50fa",
       "architectures": [
         "x86_64"
       ],
@@ -454,23 +454,23 @@
       "gui_required": true
     },
     "doctl": {
-      "version": "1.168.0",
+      "version": "1.169.0",
       "summary": "DigitalOcean command-line interface from the official digitalocean/doctl GitHub release.",
       "install_method": "verified-github-release-tarball",
       "version_flag": "version",
       "source": {
         "repository": "https://github.com/digitalocean/doctl",
-        "tag": "v1.168.0",
-        "release": "https://github.com/digitalocean/doctl/releases/tag/v1.168.0",
-        "verified_at": "2026-09-14",
+        "tag": "v1.169.0",
+        "release": "https://github.com/digitalocean/doctl/releases/tag/v1.169.0",
+        "verified_at": "2026-09-21",
         "assets": {
           "linux-x86_64": {
-            "url": "https://github.com/digitalocean/doctl/releases/download/v1.168.0/doctl-1.168.0-linux-amd64.tar.gz",
-            "sha256": "ad817330e1a12fd60729f105d8c39af31ca845f221a60886a1b2215f74d9b35d"
+            "url": "https://github.com/digitalocean/doctl/releases/download/v1.169.0/doctl-1.169.0-linux-amd64.tar.gz",
+            "sha256": "790f22a2f3d644b7bb9e9dbb491245ee19e64266434f941d8395aba8a99c38cf"
           },
           "linux-aarch64": {
-            "url": "https://github.com/digitalocean/doctl/releases/download/v1.168.0/doctl-1.168.0-linux-arm64.tar.gz",
-            "sha256": "cb5bc103b00e83021f348e555df703f9b5a40d50be5ddbd549e867f4039ae3cb"
+            "url": "https://github.com/digitalocean/doctl/releases/download/v1.169.0/doctl-1.169.0-linux-arm64.tar.gz",
+            "sha256": "7076455ba1464b608446ab83b2272e1b2cb814a5540cba735a32bcea918dff0d"
           }
         }
       },
@@ -488,22 +488,22 @@
       ]
     },
     "stripe": {
-      "version": "1.50.11",
+      "version": "1.51.0",
       "summary": "Stripe CLI from the official stripe/stripe-cli GitHub release.",
       "install_method": "verified-github-release-tarball",
       "source": {
         "repository": "https://github.com/stripe/stripe-cli",
-        "tag": "v1.50.11",
-        "release": "https://github.com/stripe/stripe-cli/releases/tag/v1.50.11",
-        "verified_at": "2026-09-14",
+        "tag": "v1.51.0",
+        "release": "https://github.com/stripe/stripe-cli/releases/tag/v1.51.0",
+        "verified_at": "2026-09-21",
         "assets": {
           "linux-x86_64": {
-            "url": "https://github.com/stripe/stripe-cli/releases/download/v1.50.11/stripe_1.50.11_linux_x86_64.tar.gz",
-            "sha256": "a99c81b67ca7c322958fc19b46b5f906b15d22e9934a644b09038c29f53cd8b2"
+            "url": "https://github.com/stripe/stripe-cli/releases/download/v1.51.0/stripe_1.51.0_linux_x86_64.tar.gz",
+            "sha256": "e49d94a6805d726aeec50353436c665d22aa3258b8ccf85c207968e5c99be52d"
           },
           "linux-aarch64": {
-            "url": "https://github.com/stripe/stripe-cli/releases/download/v1.50.11/stripe_1.50.11_linux_arm64.tar.gz",
-            "sha256": "816023515eead49134c165e949d21d56fd61050f689a53f0fd77d07ca41ec1c6"
+            "url": "https://github.com/stripe/stripe-cli/releases/download/v1.51.0/stripe_1.51.0_linux_arm64.tar.gz",
+            "sha256": "c4b0a2e0d2d44497154aa98deece3abe859d40098493766055949b80828dcd7d"
           }
         }
       },
@@ -521,21 +521,21 @@
       ]
     },
     "gcloud": {
-      "version": "579.0.0",
+      "version": "585.0.0",
       "summary": "Google Cloud SDK CLI (gcloud, gsutil, bq) from the versioned cloud-sdk-release archive.",
       "install_method": "verified-google-cloud-sdk-tarball",
       "source": {
         "repository": "https://cloud.google.com/sdk/docs/install",
-        "tag": "579.0.0",
-        "verified_at": "2026-09-14",
+        "tag": "585.0.0",
+        "verified_at": "2026-09-21",
         "assets": {
           "linux-x86_64": {
-            "url": "https://storage.googleapis.com/cloud-sdk-release/google-cloud-cli-579.0.0-linux-x86_64.tar.gz",
-            "sha256": "a9a7fbe51cda37cf6142b1bbcff12227550e60a6c67e8cf84644fb301371c4de"
+            "url": "https://storage.googleapis.com/cloud-sdk-release/google-cloud-cli-585.0.0-linux-x86_64.tar.gz",
+            "sha256": "7b97198ef306f5400b67f057f7415a46bd9a34367eeabd87516ee3f74bc76a36"
           },
           "linux-aarch64": {
-            "url": "https://storage.googleapis.com/cloud-sdk-release/google-cloud-cli-579.0.0-linux-arm.tar.gz",
-            "sha256": "edc914b75f8c5d50e1efc78b849d6fa636c4412346784c148c4130f5dc3eba00"
+            "url": "https://storage.googleapis.com/cloud-sdk-release/google-cloud-cli-585.0.0-linux-arm.tar.gz",
+            "sha256": "58cb835c823514d1eee2b87f938f2bc6240f5a745e9cc73d142a1260da129e25"
           }
         }
       },
@@ -553,7 +553,7 @@
       ]
     },
     "resend": {
-      "version": "2.21.0",
+      "version": "2.21.1",
       "summary": "Resend CLI from the npm resend-cli package, installed through pinned Bun global.",
       "install_method": "npm-registry",
       "source": {
@@ -574,7 +574,7 @@
       ]
     },
     "wrangler": {
-      "version": "4.131.2",
+      "version": "4.135.0",
       "summary": "Cloudflare Wrangler CLI from the npm wrangler package, installed through pinned Bun global.",
       "install_method": "npm-registry",
       "source": {
@@ -616,7 +616,7 @@
       "target": "${HOME}/.local/share/applications/org.telegram.desktop.desktop",
       "icon": "org.telegram.desktop",
       "upstream_source_commit": "a1e89e1f64f08cb058caf1c61ff43f319f98a6ec",
-      "upstream_desktop_entry": "https://github.com/telegramdesktop/tdesktop/blob/v7.2.8/lib/xdg/org.telegram.desktop.desktop",
+      "upstream_desktop_entry": "https://github.com/telegramdesktop/tdesktop/blob/v7.2.9/lib/xdg/org.telegram.desktop.desktop",
       "icon_assets": [
         {
           "source_url": "https://raw.githubusercontent.com/telegramdesktop/tdesktop/a1e89e1f64f08cb058caf1c61ff43f319f98a6ec/Telegram/Resources/art/logo_256.png",

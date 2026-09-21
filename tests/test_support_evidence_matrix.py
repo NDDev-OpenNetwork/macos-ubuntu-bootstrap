@@ -454,7 +454,7 @@ def test_every_lane_records_every_step_that_lane_declares() -> None:
 
 
 def _write_lane(root: Path, lane_name: str, arch: str, release: str | None = None,
-                **override) -> Path:
+                attempt: int | None = None, **override) -> Path:
     lane = support_evidence.resolve_lane(MATRIX, lane_name, arch, release)
     payload = {
         "lane": lane_name,
@@ -468,8 +468,13 @@ def _write_lane(root: Path, lane_name: str, arch: str, release: str | None = Non
             item["id"] for item in lane["capabilities"] if item["status"] == "NOT_PROVEN"
         ),
     }
+    if attempt is not None:
+        payload["run_id"] = "1"
+        payload["run_attempt"] = str(attempt)
     payload.update(override)
     directory = root / f"platform-{lane_name}-{lane['release']}-{lane['architecture']}"
+    if attempt is not None:
+        directory = directory.with_name(f"{directory.name}-{attempt}")
     directory.mkdir(parents=True, exist_ok=True)
     path = directory / "evidence.json"
     path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
@@ -544,6 +549,54 @@ def test_gate_rejects_evidence_from_a_different_commit(tmp_path) -> None:
     _complete_evidence(tmp_path)
     _write_lane(tmp_path, "macos-gui", "arm64", sha="b" * 40)
     with pytest.raises(gate.GateError, match="carries sha"):
+        gate.verify(tmp_path, sha="a" * 40)
+
+
+def _retire_as_attempt(root: Path, lane_dir: str, attempt: int) -> None:
+    """Mark the complete-set payload for `lane_dir` as an earlier run attempt."""
+    source = root / lane_dir
+    target = source.with_name(f"{source.name}-{attempt}")
+    source.rename(target)
+    path = target / "evidence.json"
+    payload = json.loads(path.read_text())
+    payload["run_id"] = "1"
+    payload["run_attempt"] = str(attempt)
+    path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+
+
+def test_gate_ignores_a_superseded_attempt_artifact(tmp_path) -> None:
+    """A failed attempt-1 artifact must not veto a retry that proved green."""
+    _complete_evidence(tmp_path)
+    _retire_as_attempt(tmp_path, "platform-macos-gui-runner-image-arm64", 1)
+    stale = tmp_path / "platform-macos-gui-runner-image-arm64-1" / "evidence.json"
+    payload = json.loads(stale.read_text())
+    payload["result"] = "failure"
+    stale.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+    _write_lane(tmp_path, "macos-gui", "arm64", attempt=2)
+    assert gate.verify(tmp_path, sha="a" * 40) == 0
+
+
+def test_gate_reads_the_latest_attempt_not_the_oldest(tmp_path) -> None:
+    """A retry that failed must fail the gate even if attempt 1 passed."""
+    _complete_evidence(tmp_path)
+    _retire_as_attempt(tmp_path, "platform-macos-gui-runner-image-arm64", 1)
+    _write_lane(tmp_path, "macos-gui", "arm64", attempt=2, result="failure")
+    with pytest.raises(gate.GateError, match="result is 'failure'"):
+        gate.verify(tmp_path, sha="a" * 40)
+
+
+def test_gate_still_rejects_same_attempt_duplicates(tmp_path) -> None:
+    _complete_evidence(tmp_path)
+    _write_lane(tmp_path, "macos-gui", "arm64", attempt=2)
+    duplicate = tmp_path / "platform-macos-gui-runner-image-arm64-2bis"
+    duplicate.mkdir()
+    import shutil
+
+    shutil.copy(
+        tmp_path / "platform-macos-gui-runner-image-arm64-2" / "evidence.json",
+        duplicate / "evidence.json",
+    )
+    with pytest.raises(gate.GateError, match="duplicate evidence"):
         gate.verify(tmp_path, sha="a" * 40)
 
 

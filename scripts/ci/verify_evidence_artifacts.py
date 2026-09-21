@@ -23,6 +23,13 @@ This is what the gate runs instead. Given the directory that
    dropped from the artifact;
 7. every payload to carry the exact SHA the run was dispatched for.
 
+Lanes upload one artifact per run attempt, and a ``--failed`` rerun leaves the
+earlier attempt's artifact in place, so the download directory can hold a stale
+failure next to the retry's success. Before any check above runs, payloads are
+deduplicated per ``(lane, release, architecture)``: only the highest recorded
+``run_attempt`` counts, and several payloads tied at that attempt stay a
+duplicate and still fail.
+
 Exit status is 0 only if all of that holds for every artifact.
 """
 
@@ -76,6 +83,62 @@ def load_payloads(root: Path) -> list[tuple[Path, dict[str, Any]]]:
     if not payloads:
         raise GateError(f"no evidence.json found under {root}")
     return payloads
+
+
+def lane_key_of(payload: dict[str, Any]) -> tuple[str, str, str] | None:
+    """The (lane, release, architecture) instance a payload claims, or None.
+
+    A payload that cannot name its instance is kept rather than guessed at:
+    check_payload will reject it on its own missing field.
+    """
+    lane_name = payload.get("lane")
+    arch = (payload.get("composition") or {}).get("architecture")
+    release = payload.get("release") or (payload.get("composition") or {}).get("release")
+    if not all(isinstance(value, str) and value for value in (lane_name, arch, release)):
+        return None
+    try:
+        return (lane_name, release, support_evidence.canonical_arch(arch))
+    except support_evidence.MatrixError:
+        return None
+
+
+def attempt_of(payload: dict[str, Any]) -> int | None:
+    """The run attempt a payload recorded, or None when it recorded none."""
+    try:
+        return int(payload.get("run_attempt"))
+    except (TypeError, ValueError):
+        return None
+
+
+def select_latest_attempts(
+    payloads: list[tuple[Path, dict[str, Any]]],
+) -> list[tuple[Path, dict[str, Any]]]:
+    """Drop evidence superseded by a later run attempt of the same lane.
+
+    Artifact names carry ``run_attempt`` because a rerun uploads again; the
+    earlier attempt's payload stays downloaded. Only the newest attempt may
+    speak for a lane. Members that tie at the newest attempt all survive, so a
+    genuine same-attempt duplicate still trips the duplicate check downstream.
+    """
+    groups: dict[tuple[str, str, str], list[tuple[Path, dict[str, Any]]]] = {}
+    survivors: list[tuple[Path, dict[str, Any]]] = []
+    for path, payload in payloads:
+        key = lane_key_of(payload)
+        if key is None:
+            survivors.append((path, payload))
+        else:
+            groups.setdefault(key, []).append((path, payload))
+    for members in groups.values():
+        attempts = [attempt_of(payload) for _, payload in members]
+        known = [attempt for attempt in attempts if attempt is not None]
+        if not known:
+            survivors.extend(members)
+            continue
+        best = max(known)
+        survivors.extend(
+            member for member, attempt in zip(members, attempts) if attempt == best
+        )
+    return survivors
 
 
 def check_payload(
@@ -173,7 +236,7 @@ def verify(root: Path, *, sha: str | None = None, verdict: Path | None = None) -
     contract = support_evidence.load_json(support_evidence.DEFAULT_CONTRACT)
     support_evidence.validate_matrix(matrix, contract)
 
-    payloads = load_payloads(root)
+    payloads = select_latest_attempts(load_payloads(root))
     seen: set[tuple[str, str, str]] = set()
     for path, payload in payloads:
         key = check_payload(path, payload, matrix, sha)

@@ -31,6 +31,11 @@ Versioning; the contract version in `config/rldyour-contract.json` moves with it
   early failure return used to leave the trap armed globally, so the next
   function return re-fired it with `archive`/`stage` unbound and the real
   error surfaced as `unbound variable` under `set -u`.
+- Deduplicate `evidence-gate` artifacts by `run_attempt`: a `--failed` rerun
+  leaves the earlier attempt's `platform-*` artifact in the download set, and
+  the gate used to read its stale `result: failure` even after the lane
+  proved green on retry. Only the newest attempt per lane instance is
+  verified now; same-attempt duplicates still fail.
 
 ## [0.2.7] - 2026-09-15
 

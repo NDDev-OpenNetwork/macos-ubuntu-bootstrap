@@ -230,7 +230,7 @@ USER_TOOLS=(
 # postinstall fetches the workerd binary that package version requires.
 NPM_USER_TOOLS=(
   "resend-cli@2.21.1"
-  "wrangler@4.135.0"
+  "wrangler@4.136.0"
 )
 
 # The reviewed Telegram release installs these four files from

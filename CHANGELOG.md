@@ -5,6 +5,11 @@ Versioning; the contract version in `config/rldyour-contract.json` moves with it
 
 ## [Unreleased]
 
+## [0.2.10] - 2026-09-21
+
+- Pin Wrangler to 4.136.0 (npm published it after the 0.2.9 freeze; caught by
+  the source-drift lane).
+
 ## [0.2.9] - 2026-09-21
 
 - Converge the thirteen ci-workflows reusable callers and

@@ -33,9 +33,9 @@ SET_LOGIN_SHELL="${RLDYOUR_SET_LOGIN_SHELL:-0}"
 NODE_VERSION="24.21.0"
 NODE_SHA256_X64="fd8e59d5a511510f6a298afb548f18c7d2b1be404d8b4a27d94fbe49f56cb2d6"
 NODE_SHA256_ARM64="6ad1325edbdb5649c379b75a237147a666c95d4f9ae8d340fef2d1575d289ad2"
-UV_VERSION="0.12.15"
-UV_SHA256_X64="f97935763c04be3e692460a7aaeaaab8fc3b78fcf8b389da820b38ae7423a638"
-UV_SHA256_ARM64="0e9a3499b0587d449c9ff684c0160da607826e4af1cee220bc87f378702d3e08"
+UV_VERSION="0.12.17"
+UV_SHA256_X64="fa82fd8dde8e8eefdecada6aa0889666556cfceb690d06e0c3bca49eb3070a63"
+UV_SHA256_ARM64="d636d1b678e9e7f367ecb22b46bd1cabbed234d6bc3b4d96365d2b507f72f86c"
 BUN_VERSION="1.4.2"
 BUN_SHA256_X64="36368faef7527875d5ffa52e53cd48021741f2a83eb6208a8dd64068d422a913"
 BUN_SHA256_X64_BASELINE="c678040f14fe0440eb839d37cbd0ce4c051a32da72806ac97de6a6aab6bf728f"
@@ -76,9 +76,9 @@ DART_SHA256_ARM64="1d545609bdf9da6fb5e68fbd96a599e2836e44ee64379991bd4493ee764d2
 STARSHIP_VERSION="1.26.0"
 STARSHIP_SHA256_X64="321f0dd7af8340a5f2e6a8fec6538a04f617486f9ec70d878f91c09cd8deef22"
 STARSHIP_SHA256_ARM64="dc30189378d2f2e287384e8a692d3f95ad1df64cf0e8c36aa9201516028aed6b"
-ATUIN_VERSION="18.17.1"
-ATUIN_SHA256_X64="72395cf7ae86b3698c04ba4a331773e7c4f027630bfd2b522bb14d4c80cb2410"
-ATUIN_SHA256_ARM64="9412210a9cdd6d0ff7635693e940096d82b368628326d334d27a8ca0ba173b0f"
+ATUIN_VERSION="18.22.0"
+ATUIN_SHA256_X64="920200b8e2ecff88eb8f2c2d4bfc4c62ed1c2f4efca2ba854a23bd157a542328"
+ATUIN_SHA256_ARM64="591680ad8045f87f2b524a3654232a1e91b4ba7e8d52fe2d18885437a3fc5265"
 CARAPACE_VERSION="1.7.3"
 CARAPACE_SHA256_X64="35ab52bfe7bdd8296d90c3687660bde80497599badde840ab615d2f421f5f053"
 CARAPACE_SHA256_ARM64="b2456cb09d77004db87de2567d6d7588a61ceb4724522c463e2b1c1f87b4d4b9"
@@ -192,7 +192,7 @@ PINNED_SOURCE_TOOLS=(
   "lazygit;0.65.1;tar0;lazygit;lazygit;lazygit;02beacbcda0fa342e50ae3480ba8147307353af3fb28e1d5f790e02329c201a6;49abecdf6adf4f2dfdb11bf7b9bfada267ea523612ed809d1c6d87f6c04000a7;https://github.com/jesseduffield/lazygit/releases/download/v0.65.1/lazygit_0.65.1_linux_x86_64.tar.gz;https://github.com/jesseduffield/lazygit/releases/download/v0.65.1/lazygit_0.65.1_linux_arm64.tar.gz"
   # difftastic publishes its binary as `difft`; the row is named for the command
   # it publishes, like every other row here.
-  "difft;0.70.0;tar0;difft;difft;difft;2997d2bbe620534edbd79b0049f00ce84eef3fedb15c7822456d58e38d8b05c9;e729684907d67d1a1727a08f443877e19e40eeb2efebcd95c1b8f7fee4284e8e;https://github.com/Wilfred/difftastic/releases/download/0.70.0/difft-x86_64-unknown-linux-gnu.tar.gz;https://github.com/Wilfred/difftastic/releases/download/0.70.0/difft-aarch64-unknown-linux-gnu.tar.gz"
+  "difft;0.71.0;tar0;difft;difft;difft;61aea5394a53c56f144637cf39b3a0c0dafa27769731745e5851ff276e6478da;5f046098b36ff985d0f99fec6f22cf74961db60386ff9d40df39fd99660aae2c;https://github.com/Wilfred/difftastic/releases/download/0.71.0/difft-x86_64-unknown-linux-gnu.tar.gz;https://github.com/Wilfred/difftastic/releases/download/0.71.0/difft-aarch64-unknown-linux-gnu.tar.gz"
   "jaq;3.1.1;raw;jaq;jaq;jaq;5922c7b67d9bd6841d6676d1f954410c6bf04b47203dcb661c4f052dfef7f454;bdda42d5a8c060a2c7916b287a227e7750d5fccbd4c37aacf0ab863010921829;https://github.com/01mf02/jaq/releases/download/v3.1.1/jaq-x86_64-unknown-linux-gnu;https://github.com/01mf02/jaq/releases/download/v3.1.1/jaq-aarch64-unknown-linux-gnu"
   # Official JetBrains Kotlin LSP. The standalone archive includes its own JBR,
   # so no mutable system Java dependency is introduced. Upstream marks it alpha;
@@ -211,7 +211,7 @@ PINNED_SOURCE_TOOLS=(
 # architecture hashes live in config/rldyour-contract.json and parity tests bind
 # this shell row to them; installation never resolves mutable `latest` state.
 USER_TOOLS=(
-  "herdr;0.9.0;raw;herdr;herdr;herdr;4fa1a01158dd8043da92d31b270780b0dcc10603038d9b61cac4d81ab63fb71f;9c8db20fb7e7427b138d5367113f1621ffd319f2f65d6f009e2594029115f0d2;https://github.com/herdrdev/herdr/releases/download/v0.9.0/herdr-linux-x86_64;https://github.com/herdrdev/herdr/releases/download/v0.9.0/herdr-linux-aarch64"
+  "herdr;0.9.1;raw;herdr;herdr;herdr;2a02fed16beb651ef006e1d43f048f652ca4dc58ad053cd2d44450563d5c54b7;f4ccf4de745f2cb9a39a983e9ba3703dad50ec2a58dea83026ceab721bbd8d9e;https://github.com/herdrdev/herdr/releases/download/v0.9.1/herdr-linux-x86_64;https://github.com/herdrdev/herdr/releases/download/v0.9.1/herdr-linux-aarch64"
   # Telegram Desktop official portable build. Only Telegram/Telegram is
   # published. The binary also has an internal updater, disabled separately by
   # install_telegram_update_policy so it cannot mutate this receipt-bound tree.
@@ -219,18 +219,18 @@ USER_TOOLS=(
   # digest and URL are deliberately empty and the row is skipped there. They
   # used to hold the x86_64 values, which meant an arm64 desktop verified the
   # SHA-256 of an executable it could not run.
-  "telegram;7.2.8;tarx;Telegram/Telegram;Telegram/Telegram;telegram-desktop;60313dfd5441d7013b2af351574bdf0a3688110d5bce00b837d54d14608cebd8;;https://github.com/telegramdesktop/tdesktop/releases/download/v7.2.8/td-setup-linux-x64-7.2.8.tar.xz;"
-  "doctl;1.168.0;tar0;doctl;doctl;doctl;ad817330e1a12fd60729f105d8c39af31ca845f221a60886a1b2215f74d9b35d;cb5bc103b00e83021f348e555df703f9b5a40d50be5ddbd549e867f4039ae3cb;https://github.com/digitalocean/doctl/releases/download/v1.168.0/doctl-1.168.0-linux-amd64.tar.gz;https://github.com/digitalocean/doctl/releases/download/v1.168.0/doctl-1.168.0-linux-arm64.tar.gz"
-  "stripe;1.50.11;tar0;stripe;stripe;stripe;a99c81b67ca7c322958fc19b46b5f906b15d22e9934a644b09038c29f53cd8b2;816023515eead49134c165e949d21d56fd61050f689a53f0fd77d07ca41ec1c6;https://github.com/stripe/stripe-cli/releases/download/v1.50.11/stripe_1.50.11_linux_x86_64.tar.gz;https://github.com/stripe/stripe-cli/releases/download/v1.50.11/stripe_1.50.11_linux_arm64.tar.gz"
-  "gcloud;579.0.0;tar1;bin/gcloud,bin/gsutil,bin/bq;bin/gcloud,bin/gsutil,bin/bq;gcloud,gsutil,bq;a9a7fbe51cda37cf6142b1bbcff12227550e60a6c67e8cf84644fb301371c4de;edc914b75f8c5d50e1efc78b849d6fa636c4412346784c148c4130f5dc3eba00;https://storage.googleapis.com/cloud-sdk-release/google-cloud-cli-579.0.0-linux-x86_64.tar.gz;https://storage.googleapis.com/cloud-sdk-release/google-cloud-cli-579.0.0-linux-arm.tar.gz"
+  "telegram;7.2.9;tarx;Telegram/Telegram;Telegram/Telegram;telegram-desktop;dc0698eb8011ed4e75f1fad9d55a8ab54e375c9791b9c577baa6073d9a4c50fa;;https://github.com/telegramdesktop/tdesktop/releases/download/v7.2.9/td-setup-linux-x64-7.2.9.tar.xz;"
+  "doctl;1.169.0;tar0;doctl;doctl;doctl;790f22a2f3d644b7bb9e9dbb491245ee19e64266434f941d8395aba8a99c38cf;7076455ba1464b608446ab83b2272e1b2cb814a5540cba735a32bcea918dff0d;https://github.com/digitalocean/doctl/releases/download/v1.169.0/doctl-1.169.0-linux-amd64.tar.gz;https://github.com/digitalocean/doctl/releases/download/v1.169.0/doctl-1.169.0-linux-arm64.tar.gz"
+  "stripe;1.51.0;tar0;stripe;stripe;stripe;e49d94a6805d726aeec50353436c665d22aa3258b8ccf85c207968e5c99be52d;c4b0a2e0d2d44497154aa98deece3abe859d40098493766055949b80828dcd7d;https://github.com/stripe/stripe-cli/releases/download/v1.51.0/stripe_1.51.0_linux_x86_64.tar.gz;https://github.com/stripe/stripe-cli/releases/download/v1.51.0/stripe_1.51.0_linux_arm64.tar.gz"
+  "gcloud;585.0.0;tar1;bin/gcloud,bin/gsutil,bin/bq;bin/gcloud,bin/gsutil,bin/bq;gcloud,gsutil,bq;7b97198ef306f5400b67f057f7415a46bd9a34367eeabd87516ee3f74bc76a36;58cb835c823514d1eee2b87f938f2bc6240f5a745e9cc73d142a1260da129e25;https://storage.googleapis.com/cloud-sdk-release/google-cloud-cli-585.0.0-linux-x86_64.tar.gz;https://storage.googleapis.com/cloud-sdk-release/google-cloud-cli-585.0.0-linux-arm.tar.gz"
 )
 
 # Operator CLIs that only exist as npm packages. Exact versions, same taxonomy
 # as BUN_LSP_PACKAGES. Wrangler is the exception to `--ignore-scripts`: its
 # postinstall fetches the workerd binary that package version requires.
 NPM_USER_TOOLS=(
-  "resend-cli@2.21.0"
-  "wrangler@4.131.2"
+  "resend-cli@2.21.1"
+  "wrangler@4.135.0"
 )
 
 # The reviewed Telegram release installs these four files from
@@ -593,7 +593,7 @@ rldyour::ubuntu::install_telegram_desktop_assets() {
       if [ "$RLDYOUR_DRY_RUN" -eq 0 ]; then
         chmod 0644 "$target" || return 1
       fi
-      rldyour::log "ok" "$(basename "$target") already matches Telegram 7.2.8"
+      rldyour::log "ok" "$(basename "$target") already matches the pinned Telegram desktop asset"
       continue
     fi
 

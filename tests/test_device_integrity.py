@@ -294,7 +294,7 @@ def test_telegram_presence_probe_never_executes_the_gui(
     assert "herdr" in calls
     assert "telegram-desktop" not in calls
     assert state["telegram"]["raw"] == "presence-only"
-    assert state["telegram"]["installed_version"] == "7.2.8"
+    assert state["telegram"]["installed_version"] == "7.2.9"
 
 
 # ----------------------------- profile awareness -----------------------------
@@ -420,13 +420,13 @@ def test_herdr_declared_in_contract_and_install_sh() -> None:
     contract = di.load_contract()
     assert "herdr" in contract["user_tools"], "herdr not in contract user_tools"
     assert (
-        contract["user_tools"]["herdr"]["version"] == "0.9.0"
+        contract["user_tools"]["herdr"]["version"] == "0.9.1"
     ), "herdr version mismatch in contract"
 
     installer = (ROOT / "scripts/ubuntu/install.sh").read_text(encoding="utf-8")
     assert "USER_TOOLS=(" in installer, "USER_TOOLS array missing from install.sh"
     assert (
-        "herdr;0.9.0;raw" in installer
+        "herdr;0.9.1;raw" in installer
     ), "herdr row missing from USER_TOOLS array in install.sh"
 
 

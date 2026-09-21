@@ -7,9 +7,9 @@ SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck disable=SC1091
 source "$SCRIPT_DIR/../lib/common.sh"
 
-HERDR_VERSION="0.9.0"
-HERDR_MACOS_AARCH64_SHA256="32b53df09872628059c789a69f02a6b8e29e14ddf26711421f3463f70c1aef17"
-HERDR_MACOS_AARCH64_URL="https://github.com/herdrdev/herdr/releases/download/v0.9.0/herdr-macos-aarch64"
+HERDR_VERSION="0.9.1"
+HERDR_MACOS_AARCH64_SHA256="5fc7a7e7adfaca56fa80aa89dcb025693357268dab8285b9ce2d08a2313c89de"
+HERDR_MACOS_AARCH64_URL="https://github.com/herdrdev/herdr/releases/download/v0.9.1/herdr-macos-aarch64"
 
 STRICT=0
 GUI_ENABLED="${RLDYOUR_GUI_ENABLED:-1}"

@@ -280,9 +280,9 @@ def test_macos_herdr_asset_matches_contract_and_bypasses_homebrew() -> None:
     assert "herdr" not in set(_parse_bash_array(MACOS_INSTALL_PATH, "BREW_SOURCE_PACKAGES"))
     assert "ensure_herdr" in MACOS_INSTALL_TEXT.split("main() {", 1)[1]
     assert herdr["source"]["tag"] == f"v{herdr['version']}"
-    assert herdr["source"]["tag_object"] == "cca4af8dfad160bc5fb5ae133b70882b5fe28f61"
-    assert herdr["source"]["commit"] == "b99002ac99b09e00b4ca692436cb15a6b0d676f1"
-    assert herdr["source"]["verified_at"] == "2026-09-10"
+    assert herdr["source"]["tag_object"] == "8544776216a8d28088db59a5344ea21ee2d05d2b"
+    assert herdr["source"]["commit"] == "065ef9d6a531c49fb8bee7e818ef837065b21ee9"
+    assert herdr["source"]["verified_at"] == "2026-09-21"
     assert "never invoke mutable herdr update" in herdr["update_policy"]
     assert "herdr update" not in MACOS_INSTALL
 

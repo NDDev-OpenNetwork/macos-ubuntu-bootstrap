@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "adapter_version": "0.2.7",
+  "adapter_version": "0.2.8",
   "verified_on": "2026-08-28",
   "expected_hosted_artifact_instances": 26,
   "status_vocabulary": [

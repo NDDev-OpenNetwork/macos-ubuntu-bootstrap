@@ -183,20 +183,20 @@ changes arrive through reviewed update PRs that refresh the tag, commit, asset
 URLs, hashes, tests, and this register together.
 
 
-## Operator CLIs (2026-09-14)
+## Operator CLIs (2026-09-21)
 
 Verified by downloading the install artifacts, not by copying a checksum file.
 
 | Tool | Version | Official artifact | SHA-256 |
 |---|---|---|---|
-| doctl | 1.168.0 | `doctl-1.168.0-linux-amd64.tar.gz` | `ad817330e1a12fd60729f105d8c39af31ca845f221a60886a1b2215f74d9b35d` |
-| doctl | 1.168.0 | `doctl-1.168.0-linux-arm64.tar.gz` | `cb5bc103b00e83021f348e555df703f9b5a40d50be5ddbd549e867f4039ae3cb` |
-| stripe | 1.50.11 | `stripe_1.50.11_linux_x86_64.tar.gz` | `a99c81b67ca7c322958fc19b46b5f906b15d22e9934a644b09038c29f53cd8b2` |
-| stripe | 1.50.11 | `stripe_1.50.11_linux_arm64.tar.gz` | `816023515eead49134c165e949d21d56fd61050f689a53f0fd77d07ca41ec1c6` |
-| gcloud | 579.0.0 | `google-cloud-cli-579.0.0-linux-x86_64.tar.gz` | `a9a7fbe51cda37cf6142b1bbcff12227550e60a6c67e8cf84644fb301371c4de` |
-| gcloud | 579.0.0 | `google-cloud-cli-579.0.0-linux-arm.tar.gz` | `edc914b75f8c5d50e1efc78b849d6fa636c4412346784c148c4130f5dc3eba00` |
+| doctl | 1.169.0 | `doctl-1.169.0-linux-amd64.tar.gz` | `790f22a2f3d644b7bb9e9dbb491245ee19e64266434f941d8395aba8a99c38cf` |
+| doctl | 1.169.0 | `doctl-1.169.0-linux-arm64.tar.gz` | `7076455ba1464b608446ab83b2272e1b2cb814a5540cba735a32bcea918dff0d` |
+| stripe | 1.51.0 | `stripe_1.51.0_linux_x86_64.tar.gz` | `e49d94a6805d726aeec50353436c665d22aa3258b8ccf85c207968e5c99be52d` |
+| stripe | 1.51.0 | `stripe_1.51.0_linux_arm64.tar.gz` | `c4b0a2e0d2d44497154aa98deece3abe859d40098493766055949b80828dcd7d` |
+| gcloud | 585.0.0 | `google-cloud-cli-585.0.0-linux-x86_64.tar.gz` | `7b97198ef306f5400b67f057f7415a46bd9a34367eeabd87516ee3f74bc76a36` |
+| gcloud | 585.0.0 | `google-cloud-cli-585.0.0-linux-arm.tar.gz` | `58cb835c823514d1eee2b87f938f2bc6240f5a745e9cc73d142a1260da129e25` |
 
-`resend-cli@2.21.0` and `wrangler@4.131.2` are exact npm versions installed through Bun global. Wrangler is allowed to run its postinstall so that version can fetch workerd; other npm user tools keep `--ignore-scripts`.
+`resend-cli@2.21.1` and `wrangler@4.135.0` are exact npm versions installed through Bun global. Wrangler is allowed to run its postinstall so that version can fetch workerd; other npm user tools keep `--ignore-scripts`.
 
 `doctl` has no `--version` flag; the receipt probes `doctl version`. Installation never invokes `gcloud components update` or vendor self-update.
 

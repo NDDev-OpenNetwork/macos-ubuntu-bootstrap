@@ -5,6 +5,27 @@ Versioning; the contract version in `config/rldyour-contract.json` moves with it
 
 ## [Unreleased]
 
+## [0.2.8] - 2026-09-21
+
+- Pin uv to 0.12.17 after independently hashing the linux x86_64 and aarch64
+  GitHub release tarballs against the published `sha256` files.
+- Pin difftastic to 0.71.0 after hashing both linux release tarballs.
+- Pin Herdr to 0.9.1 (`herdrdev/herdr`, tag object `8544776`), hashing the
+  macOS aarch64 and both linux release assets.
+- Pin Telegram Desktop to 7.2.9, hashing `td-setup-linux-x64-7.2.9.tar.xz`;
+  the icon asset pin stays on commit `a1e89e1` because the blobs are
+  byte-identical at the v7.2.9 tag.
+- Pin doctl to 1.169.0 and Stripe CLI to 1.51.0, hashing both linux
+  architecture tarballs for each.
+- Pin resend-cli to 2.21.1 and wrangler to 4.135.0 from npm registry
+  `dist.integrity` metadata.
+- Pin @openai/codex to 0.155.1 from npm registry `dist.integrity`.
+- Pin atuin to 18.22.0 against the published upstream `.sha256` assets.
+- Pin the Homebrew installer package to 7.0.4, hashing the `.pkg` download.
+- Pin Google Cloud CLI to 585.0.0, hashing both linux release tarballs.
+- Keep Node.js on the 24.x LTS line (24.21.0); the 26.x major is out of
+  scope for a pin refresh.
+
 ## [0.2.7] - 2026-09-15
 
 - Pin uv to 0.12.15 after independently hashing the linux x86_64 and aarch64

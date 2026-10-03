@@ -14,7 +14,7 @@ provider:
   name: "macos-ubuntu-bootstrap"
 
 classification:
-  portfolios: ["portfolio:opennetwork-projects"]
+  portfolios: ["portfolio:nddev-opennetwork"]
   visibility_contract: "public"
   data_classification: "public"
 

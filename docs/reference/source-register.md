@@ -183,20 +183,20 @@ changes arrive through reviewed update PRs that refresh the tag, commit, asset
 URLs, hashes, tests, and this register together.
 
 
-## Operator CLIs (2026-09-21)
+## Operator CLIs (2026-10-04)
 
 Verified by downloading the install artifacts, not by copying a checksum file.
 
 | Tool | Version | Official artifact | SHA-256 |
 |---|---|---|---|
-| doctl | 1.169.0 | `doctl-1.169.0-linux-amd64.tar.gz` | `790f22a2f3d644b7bb9e9dbb491245ee19e64266434f941d8395aba8a99c38cf` |
-| doctl | 1.169.0 | `doctl-1.169.0-linux-arm64.tar.gz` | `7076455ba1464b608446ab83b2272e1b2cb814a5540cba735a32bcea918dff0d` |
-| stripe | 1.51.0 | `stripe_1.51.0_linux_x86_64.tar.gz` | `e49d94a6805d726aeec50353436c665d22aa3258b8ccf85c207968e5c99be52d` |
-| stripe | 1.51.0 | `stripe_1.51.0_linux_arm64.tar.gz` | `c4b0a2e0d2d44497154aa98deece3abe859d40098493766055949b80828dcd7d` |
+| doctl | 1.177.0 | `doctl-1.177.0-linux-amd64.tar.gz` | `34d3954721bfb8cdb42032e78d98274f157426fa6332511ae356edcce59dade3` |
+| doctl | 1.177.0 | `doctl-1.177.0-linux-arm64.tar.gz` | `3adfe5bb667c2cdee15eb3501d53b57d8f04dfa945ddd4584f6f760834506992` |
+| stripe | 1.53.0 | `stripe_1.53.0_linux_x86_64.tar.gz` | `a12205df4aecb18153b8b3f76d5029386b1e94944d559900f9082ca489a8521b` |
+| stripe | 1.53.0 | `stripe_1.53.0_linux_arm64.tar.gz` | `6cc195da6081237634f5b7feba4e2e9d71d33ed805d6219e443fd066fae07109` |
 | gcloud | 585.0.0 | `google-cloud-cli-585.0.0-linux-x86_64.tar.gz` | `7b97198ef306f5400b67f057f7415a46bd9a34367eeabd87516ee3f74bc76a36` |
 | gcloud | 585.0.0 | `google-cloud-cli-585.0.0-linux-arm.tar.gz` | `58cb835c823514d1eee2b87f938f2bc6240f5a745e9cc73d142a1260da129e25` |
 
-`resend-cli@2.21.1` and `wrangler@4.135.0` are exact npm versions installed through Bun global. Wrangler is allowed to run its postinstall so that version can fetch workerd; other npm user tools keep `--ignore-scripts`.
+`resend-cli@2.23.0` and `wrangler@4.147.0` are exact npm versions installed through Bun global. Wrangler is allowed to run its postinstall so that version can fetch workerd; other npm user tools keep `--ignore-scripts`.
 
 `doctl` has no `--version` flag; the receipt probes `doctl version`. Installation never invokes `gcloud components update` or vendor self-update.
 

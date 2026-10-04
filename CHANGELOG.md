@@ -5,11 +5,19 @@ Versioning; the contract version in `config/rldyour-contract.json` moves with it
 
 ## [Unreleased]
 
+## [0.2.11] - 2026-10-04
+
 - Poll the `bootstrap-gate` check-run for a bounded window in `release.yml`
   instead of reading it once: a tag push can outrun check-run creation on the
   merge commit, and the single lookup refused 0.2.10 as `absent` while the gate
   was still settling. A completed non-success still fails immediately and
   `absent` after the deadline still fails closed.
+- Refresh twelve source pins flagged by the source-drift lane: uv 0.12.23,
+  resend-cli 2.23.0, wrangler 4.147.0, codex 0.160.0,
+  dart 3.13.5, rust 1.99.0 (channel date 2026-10-01), doctl 1.177.0,
+  stripe-cli 1.53.0, herdr 0.9.3, homebrew pkg 7.0.7, yq 4.54.1,
+  kotlin-lsp 263.6379.0. Hashes verified against the downloaded artifacts
+  (Rust against the official stable channel manifest).
 
 ## [0.2.10] - 2026-09-21
 

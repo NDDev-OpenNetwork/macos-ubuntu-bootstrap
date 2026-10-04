@@ -2,7 +2,7 @@
   "schema_version": 2,
   "adapter": {
     "id": "macos-ubuntu-bootstrap",
-    "version": "0.2.10"
+    "version": "0.2.11"
   },
   "support_evidence": {
     "path": "config/support-evidence-matrix.json",
@@ -141,10 +141,10 @@
       "grok-build"
     ],
     "codex": {
-      "version": "0.155.1",
+      "version": "0.160.0",
       "install_method": "verified-npm-tarball",
       "launcher": "cx",
-      "sha512": "d367c0006c81b65035ccf8c4a379138ff6ce4986cfcf90ef8cbc11649755ef07851440f334538c8d01a667ffb90ae8ab615d2113e0194eb9e3cf05d853801d01"
+      "sha512": "904b551b38d101800c3b0271377f5b19c9daecb4f7203420abae0d349fdd0d37eee0ecd96a870973235be7f80627f21517f563ee82bb1369b79e64da9fb9698e"
     },
     "claude-code": {
       "channel": "stable",
@@ -194,10 +194,10 @@
       "x64": "fd8e59d5a511510f6a298afb548f18c7d2b1be404d8b4a27d94fbe49f56cb2d6",
       "arm64": "6ad1325edbdb5649c379b75a237147a666c95d4f9ae8d340fef2d1575d289ad2"
     },
-    "ubuntu_uv": "0.12.17",
+    "ubuntu_uv": "0.12.23",
     "ubuntu_uv_sha256": {
-      "x64": "fa82fd8dde8e8eefdecada6aa0889666556cfceb690d06e0c3bca49eb3070a63",
-      "arm64": "d636d1b678e9e7f367ecb22b46bd1cabbed234d6bc3b4d96365d2b507f72f86c"
+      "x64": "9167d72b3319674b6303c4cbe071854bba13ebdf3d76b1a7cbdc175471fb66d6",
+      "arm64": "6524bd338177ed50d035d39354e12545e993bbeba2ecbddf0480c5b3a81d313f"
     },
     "ubuntu_bun": "1.4.2",
     "ubuntu_bun_sha256": {
@@ -212,11 +212,11 @@
     },
     "ubuntu_gopls": "v0.23.0",
     "ubuntu_gopls_provenance": "go-module-checksum-database",
-    "ubuntu_rust": "1.98.1",
-    "ubuntu_rust_channel_date": "2026-09-03",
+    "ubuntu_rust": "1.99.0",
+    "ubuntu_rust_channel_date": "2026-10-01",
     "ubuntu_rust_sha256": {
-      "x86_64": "5326b36c53de11d148c8f8dab6553a3d1006c2cfd32123683073fad3c302605b",
-      "aarch64": "0b514a8cc1cbcd939bff0f151661fe58b6ea5c7a7f645a5098c69e32e8c1e0a2"
+      "x86_64": "891c6366d7100feda0bca4c03ce63f3c9ac827cbebbc283e7433061d42c6a376",
+      "aarch64": "5a30ce742be0835d9b23fc862db5cbbbc71464e1c9b1fca22917e10e4ba32a92"
     },
     "ubuntu_rust_components": [
       "rustc",
@@ -226,10 +226,10 @@
       "rustfmt-preview",
       "rust-analyzer-preview"
     ],
-    "ubuntu_dart": "3.13.4",
+    "ubuntu_dart": "3.13.5",
     "ubuntu_dart_sha256": {
-      "x64": "6487a10df5eab890d746d14a55f4c70bec3c1c0633f51804eb504cbc0fc395bb",
-      "arm64": "1d545609bdf9da6fb5e68fbd96a599e2836e44ee64379991bd4493ee764d2fdb"
+      "x64": "ea864bc64df30a6b8bdf30b2e32550f7717d9a890de8f40293aeabb924fe232b",
+      "arm64": "19a731647c3ed55058ee46dde00330150e6a8729bb6121b4a31e86084c8a3e6d"
     },
     "ubuntu_dart_provides": [
       "dart",
@@ -282,10 +282,10 @@
         }
       },
       "yq": {
-        "version": "4.53.6",
+        "version": "4.54.1",
         "sha256": {
-          "x64": "38b907b21b1b04327fb9481c595331d925a67c6ee1aabd0ef419d0b7d12dfb3d",
-          "arm64": "d5e7531273d45c5d4b7abb4a1597c47a0fecb5d6b081dfa755064b38ffcc34f4"
+          "x64": "e68a456f90c577af3fe4960184b3a3cf5c461e0348407c10f107da3a5fec8972",
+          "arm64": "8c27f6e7476fb5acefb9352e3d30f6bc2dc93f1956eb92e8da727173fb7ec6d3"
         }
       },
       "just": {
@@ -338,12 +338,12 @@
         }
       },
       "kotlin-lsp": {
-        "version": "263.4702.0",
+        "version": "263.6379.0",
         "maturity": "upstream-alpha",
         "source": "official-jetbrains-standalone-archive",
         "sha256": {
-          "x64": "1e11d2e5fefbf9ea215ad8dd6be95f2222897cd086e8cb7a661a52084a590405",
-          "arm64": "ec7cb254a6662a07fff9f10e4365226afab6c40008f8a974c10ac5e785d6510f"
+          "x64": "ab8ca4455dc2fc5fe1a24db2bccc46c104254d2c465155c4251ee65df8f3f7cc",
+          "arm64": "50999901ef8bcfa1e58561b6a8d782a72dea5620fcf92a64130807f8924a56fc"
         }
       }
     }
@@ -365,13 +365,13 @@
     ]
   },
   "supply_chain": {
-    "homebrew_pkg_version": "7.0.4",
-    "homebrew_pkg_sha256": "1e9ba33b7ac76bd8bcda43af0dba0e6945f467aa56d412179f828b3cbddf1181",
+    "homebrew_pkg_version": "7.0.7",
+    "homebrew_pkg_sha256": "75f699be3059d0068262cab830b5eadce048229aecb469018b5a883b4f3206d7",
     "homebrew_installer_team": "927JGANW46"
   },
   "user_tools": {
     "herdr": {
-      "version": "0.9.1",
+      "version": "0.9.3",
       "summary": "Terminal workspace manager for AI coding agents (tmux-style multiplexer with agent session support).",
       "install_method": {
         "linux": "verified-github-release-binary",
@@ -379,25 +379,25 @@
       },
       "source": {
         "repository": "https://github.com/herdrdev/herdr",
-        "tag": "v0.9.1",
-        "tag_object": "8544776216a8d28088db59a5344ea21ee2d05d2b",
-        "commit": "065ef9d6a531c49fb8bee7e818ef837065b21ee9",
-        "release": "https://github.com/herdrdev/herdr/releases/tag/v0.9.1",
+        "tag": "v0.9.3",
+        "tag_object": "7eaf574ba6362c36c3d8fe89f411bb7d5bb34660",
+        "commit": "7b116c05bfda646af39d2524c54e70c751f57ee8",
+        "release": "https://github.com/herdrdev/herdr/releases/tag/v0.9.3",
         "release_feed": "https://github.com/herdrdev/herdr/releases.atom",
         "upstream_manifest": "https://herdr.dev/latest.json",
-        "verified_at": "2026-09-21",
+        "verified_at": "2026-10-04",
         "assets": {
           "macos-aarch64": {
-            "url": "https://github.com/herdrdev/herdr/releases/download/v0.9.1/herdr-macos-aarch64",
-            "sha256": "5fc7a7e7adfaca56fa80aa89dcb025693357268dab8285b9ce2d08a2313c89de"
+            "url": "https://github.com/herdrdev/herdr/releases/download/v0.9.3/herdr-macos-aarch64",
+            "sha256": "5173a3e0ae42d5d1ab7ebfa5d5e6329f7c3d23f8e1a3677c7ce3231da2884157"
           },
           "linux-x86_64": {
-            "url": "https://github.com/herdrdev/herdr/releases/download/v0.9.1/herdr-linux-x86_64",
-            "sha256": "2a02fed16beb651ef006e1d43f048f652ca4dc58ad053cd2d44450563d5c54b7"
+            "url": "https://github.com/herdrdev/herdr/releases/download/v0.9.3/herdr-linux-x86_64",
+            "sha256": "18a8dc65f1c2fa485884344356dea1cfd911c6f06cf46fa78e193f4087f4dba7"
           },
           "linux-aarch64": {
-            "url": "https://github.com/herdrdev/herdr/releases/download/v0.9.1/herdr-linux-aarch64",
-            "sha256": "f4ccf4de745f2cb9a39a983e9ba3703dad50ec2a58dea83026ceab721bbd8d9e"
+            "url": "https://github.com/herdrdev/herdr/releases/download/v0.9.3/herdr-linux-aarch64",
+            "sha256": "4de7aa3e25678812e92960de64f7c2aaa1bca1f0f80a3c5e559837e231e1f5c0"
           }
         }
       },
@@ -454,23 +454,23 @@
       "gui_required": true
     },
     "doctl": {
-      "version": "1.169.0",
+      "version": "1.177.0",
       "summary": "DigitalOcean command-line interface from the official digitalocean/doctl GitHub release.",
       "install_method": "verified-github-release-tarball",
       "version_flag": "version",
       "source": {
         "repository": "https://github.com/digitalocean/doctl",
-        "tag": "v1.169.0",
-        "release": "https://github.com/digitalocean/doctl/releases/tag/v1.169.0",
-        "verified_at": "2026-09-21",
+        "tag": "v1.177.0",
+        "release": "https://github.com/digitalocean/doctl/releases/tag/v1.177.0",
+        "verified_at": "2026-10-04",
         "assets": {
           "linux-x86_64": {
-            "url": "https://github.com/digitalocean/doctl/releases/download/v1.169.0/doctl-1.169.0-linux-amd64.tar.gz",
-            "sha256": "790f22a2f3d644b7bb9e9dbb491245ee19e64266434f941d8395aba8a99c38cf"
+            "url": "https://github.com/digitalocean/doctl/releases/download/v1.177.0/doctl-1.177.0-linux-amd64.tar.gz",
+            "sha256": "34d3954721bfb8cdb42032e78d98274f157426fa6332511ae356edcce59dade3"
           },
           "linux-aarch64": {
-            "url": "https://github.com/digitalocean/doctl/releases/download/v1.169.0/doctl-1.169.0-linux-arm64.tar.gz",
-            "sha256": "7076455ba1464b608446ab83b2272e1b2cb814a5540cba735a32bcea918dff0d"
+            "url": "https://github.com/digitalocean/doctl/releases/download/v1.177.0/doctl-1.177.0-linux-arm64.tar.gz",
+            "sha256": "3adfe5bb667c2cdee15eb3501d53b57d8f04dfa945ddd4584f6f760834506992"
           }
         }
       },
@@ -488,22 +488,22 @@
       ]
     },
     "stripe": {
-      "version": "1.51.0",
+      "version": "1.53.0",
       "summary": "Stripe CLI from the official stripe/stripe-cli GitHub release.",
       "install_method": "verified-github-release-tarball",
       "source": {
         "repository": "https://github.com/stripe/stripe-cli",
-        "tag": "v1.51.0",
-        "release": "https://github.com/stripe/stripe-cli/releases/tag/v1.51.0",
-        "verified_at": "2026-09-21",
+        "tag": "v1.53.0",
+        "release": "https://github.com/stripe/stripe-cli/releases/tag/v1.53.0",
+        "verified_at": "2026-10-04",
         "assets": {
           "linux-x86_64": {
-            "url": "https://github.com/stripe/stripe-cli/releases/download/v1.51.0/stripe_1.51.0_linux_x86_64.tar.gz",
-            "sha256": "e49d94a6805d726aeec50353436c665d22aa3258b8ccf85c207968e5c99be52d"
+            "url": "https://github.com/stripe/stripe-cli/releases/download/v1.53.0/stripe_1.53.0_linux_x86_64.tar.gz",
+            "sha256": "a12205df4aecb18153b8b3f76d5029386b1e94944d559900f9082ca489a8521b"
           },
           "linux-aarch64": {
-            "url": "https://github.com/stripe/stripe-cli/releases/download/v1.51.0/stripe_1.51.0_linux_arm64.tar.gz",
-            "sha256": "c4b0a2e0d2d44497154aa98deece3abe859d40098493766055949b80828dcd7d"
+            "url": "https://github.com/stripe/stripe-cli/releases/download/v1.53.0/stripe_1.53.0_linux_arm64.tar.gz",
+            "sha256": "6cc195da6081237634f5b7feba4e2e9d71d33ed805d6219e443fd066fae07109"
           }
         }
       },
@@ -527,7 +527,7 @@
       "source": {
         "repository": "https://cloud.google.com/sdk/docs/install",
         "tag": "585.0.0",
-        "verified_at": "2026-09-21",
+        "verified_at": "2026-10-04",
         "assets": {
           "linux-x86_64": {
             "url": "https://storage.googleapis.com/cloud-sdk-release/google-cloud-cli-585.0.0-linux-x86_64.tar.gz",
@@ -553,7 +553,7 @@
       ]
     },
     "resend": {
-      "version": "2.21.1",
+      "version": "2.23.0",
       "summary": "Resend CLI from the npm resend-cli package, installed through pinned Bun global.",
       "install_method": "npm-registry",
       "source": {
@@ -574,7 +574,7 @@
       ]
     },
     "wrangler": {
-      "version": "4.136.0",
+      "version": "4.147.0",
       "summary": "Cloudflare Wrangler CLI from the npm wrangler package, installed through pinned Bun global.",
       "install_method": "npm-registry",
       "source": {

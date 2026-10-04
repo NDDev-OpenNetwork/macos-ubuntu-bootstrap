@@ -33,9 +33,9 @@ SET_LOGIN_SHELL="${RLDYOUR_SET_LOGIN_SHELL:-0}"
 NODE_VERSION="24.21.0"
 NODE_SHA256_X64="fd8e59d5a511510f6a298afb548f18c7d2b1be404d8b4a27d94fbe49f56cb2d6"
 NODE_SHA256_ARM64="6ad1325edbdb5649c379b75a237147a666c95d4f9ae8d340fef2d1575d289ad2"
-UV_VERSION="0.12.17"
-UV_SHA256_X64="fa82fd8dde8e8eefdecada6aa0889666556cfceb690d06e0c3bca49eb3070a63"
-UV_SHA256_ARM64="d636d1b678e9e7f367ecb22b46bd1cabbed234d6bc3b4d96365d2b507f72f86c"
+UV_VERSION="0.12.23"
+UV_SHA256_X64="9167d72b3319674b6303c4cbe071854bba13ebdf3d76b1a7cbdc175471fb66d6"
+UV_SHA256_ARM64="6524bd338177ed50d035d39354e12545e993bbeba2ecbddf0480c5b3a81d313f"
 BUN_VERSION="1.4.2"
 BUN_SHA256_X64="36368faef7527875d5ffa52e53cd48021741f2a83eb6208a8dd64068d422a913"
 BUN_SHA256_X64_BASELINE="c678040f14fe0440eb839d37cbd0ce4c051a32da72806ac97de6a6aab6bf728f"
@@ -55,10 +55,10 @@ GO_SHA256_ARM64="01d80e8ca1b7abddafaac6f0864a407aa35ab120483381df73d6070b9faec60
 GOPLS_VERSION="v0.23.0"
 # One combined archive per architecture carries rustc, cargo, rust-std, clippy,
 # rustfmt and rust-analyzer, so a single tracked hash covers the whole host.
-RUST_VERSION="1.98.1"
-RUST_CHANNEL_DATE="2026-09-03"
-RUST_SHA256_X86_64="5326b36c53de11d148c8f8dab6553a3d1006c2cfd32123683073fad3c302605b"
-RUST_SHA256_AARCH64="0b514a8cc1cbcd939bff0f151661fe58b6ea5c7a7f645a5098c69e32e8c1e0a2"
+RUST_VERSION="1.99.0"
+RUST_CHANNEL_DATE="2026-10-01"
+RUST_SHA256_X86_64="891c6366d7100feda0bca4c03ce63f3c9ac827cbebbc283e7433061d42c6a376"
+RUST_SHA256_AARCH64="5a30ce742be0835d9b23fc862db5cbbbc71464e1c9b1fca22917e10e4ba32a92"
 # Dart is the third desktop language-server host (ADR 0005), on the same footing
 # as Go and Rust. One self-contained SDK archive carries `dart language-server`
 # (the analysis server) and `dart mcp-server` (the Dart/Flutter MCP transport the
@@ -66,9 +66,9 @@ RUST_SHA256_AARCH64="0b514a8cc1cbcd939bff0f151661fe58b6ea5c7a7f645a5098c69e32e8c
 # SDK never mutates its own install tree, which is what keeps it compatible with
 # the runtime-receipt contract; the Flutter SDK is deliberately not installed
 # here because its bin/cache self-populates at runtime and would break that.
-DART_VERSION="3.13.4"
-DART_SHA256_X64="6487a10df5eab890d746d14a55f4c70bec3c1c0633f51804eb504cbc0fc395bb"
-DART_SHA256_ARM64="1d545609bdf9da6fb5e68fbd96a599e2836e44ee64379991bd4493ee764d2fdb"
+DART_VERSION="3.13.5"
+DART_SHA256_X64="ea864bc64df30a6b8bdf30b2e32550f7717d9a890de8f40293aeabb924fe232b"
+DART_SHA256_ARM64="19a731647c3ed55058ee46dde00330150e6a8729bb6121b4a31e86084c8a3e6d"
 # Prompt/history/completion pillars — parity with the macOS brew baseline
 # (starship, atuin, carapace). Installed as pinned standalone artifacts, never
 # via apt (stale) or a piped install script. Linux x64 + arm64 tarball SHA-256
@@ -164,7 +164,7 @@ PINNED_SOURCE_TOOLS=(
   # both platforms, but Ubuntu never installed it, so the call silently skipped
   # on every Linux desktop.
   "delta;0.19.2;tar1;delta;delta;delta;8e695c5f586a8c53d6c3b01be0b4a422ed218bfed2a56191caebe373a1c18ab2;0bfce159a5cddd5feb3d6db4a616d883ff51253ce08ac7ec11cb1d208cfaab9e;https://github.com/dandavison/delta/releases/download/0.19.2/delta-0.19.2-x86_64-unknown-linux-gnu.tar.gz;https://github.com/dandavison/delta/releases/download/0.19.2/delta-0.19.2-aarch64-unknown-linux-gnu.tar.gz"
-  "yq;4.53.6;tar0;yq_linux_amd64;yq_linux_arm64;yq;38b907b21b1b04327fb9481c595331d925a67c6ee1aabd0ef419d0b7d12dfb3d;d5e7531273d45c5d4b7abb4a1597c47a0fecb5d6b081dfa755064b38ffcc34f4;https://github.com/mikefarah/yq/releases/download/v4.53.6/yq_linux_amd64.tar.gz;https://github.com/mikefarah/yq/releases/download/v4.53.6/yq_linux_arm64.tar.gz"
+  "yq;4.54.1;tar0;yq_linux_amd64;yq_linux_arm64;yq;e68a456f90c577af3fe4960184b3a3cf5c461e0348407c10f107da3a5fec8972;8c27f6e7476fb5acefb9352e3d30f6bc2dc93f1956eb92e8da727173fb7ec6d3;https://github.com/mikefarah/yq/releases/download/v4.54.1/yq_linux_amd64.tar.gz;https://github.com/mikefarah/yq/releases/download/v4.54.1/yq_linux_arm64.tar.gz"
   # The archive also ships an `sg` shim. It is not published: upstream prints a
   # deprecation banner and exits non-zero, and on a host that has util-linux it
   # would shadow the setgid `sg`.
@@ -197,7 +197,7 @@ PINNED_SOURCE_TOOLS=(
   # Official JetBrains Kotlin LSP. The standalone archive includes its own JBR,
   # so no mutable system Java dependency is introduced. Upstream marks it alpha;
   # the exact release and both CDN checksums keep that boundary explicit.
-  "kotlin-lsp;263.4702.0;tar1;kotlin-lsp.sh;kotlin-lsp.sh;kotlin-lsp;1e11d2e5fefbf9ea215ad8dd6be95f2222897cd086e8cb7a661a52084a590405;ec7cb254a6662a07fff9f10e4365226afab6c40008f8a974c10ac5e785d6510f;https://download-cdn.jetbrains.com/language-server/kotlin-server/263.4702.0/kotlin-server-263.4702.0.tar.gz;https://download-cdn.jetbrains.com/language-server/kotlin-server/263.4702.0/kotlin-server-263.4702.0-aarch64.tar.gz"
+  "kotlin-lsp;263.6379.0;tar1;kotlin-lsp.sh;kotlin-lsp.sh;kotlin-lsp;ab8ca4455dc2fc5fe1a24db2bccc46c104254d2c465155c4251ee65df8f3f7cc;50999901ef8bcfa1e58561b6a8d782a72dea5620fcf92a64130807f8924a56fc;https://download-cdn.jetbrains.com/language-server/kotlin-server/263.6379.0/kotlin-server-263.6379.0.tar.gz;https://download-cdn.jetbrains.com/language-server/kotlin-server/263.6379.0/kotlin-server-263.6379.0-aarch64.tar.gz"
 )
 
 # User-selected CLI tools that are not language hosts, LSPs, or scanners but
@@ -211,7 +211,7 @@ PINNED_SOURCE_TOOLS=(
 # architecture hashes live in config/rldyour-contract.json and parity tests bind
 # this shell row to them; installation never resolves mutable `latest` state.
 USER_TOOLS=(
-  "herdr;0.9.1;raw;herdr;herdr;herdr;2a02fed16beb651ef006e1d43f048f652ca4dc58ad053cd2d44450563d5c54b7;f4ccf4de745f2cb9a39a983e9ba3703dad50ec2a58dea83026ceab721bbd8d9e;https://github.com/herdrdev/herdr/releases/download/v0.9.1/herdr-linux-x86_64;https://github.com/herdrdev/herdr/releases/download/v0.9.1/herdr-linux-aarch64"
+  "herdr;0.9.3;raw;herdr;herdr;herdr;18a8dc65f1c2fa485884344356dea1cfd911c6f06cf46fa78e193f4087f4dba7;4de7aa3e25678812e92960de64f7c2aaa1bca1f0f80a3c5e559837e231e1f5c0;https://github.com/herdrdev/herdr/releases/download/v0.9.3/herdr-linux-x86_64;https://github.com/herdrdev/herdr/releases/download/v0.9.3/herdr-linux-aarch64"
   # Telegram Desktop official portable build. Only Telegram/Telegram is
   # published. The binary also has an internal updater, disabled separately by
   # install_telegram_update_policy so it cannot mutate this receipt-bound tree.
@@ -220,8 +220,8 @@ USER_TOOLS=(
   # used to hold the x86_64 values, which meant an arm64 desktop verified the
   # SHA-256 of an executable it could not run.
   "telegram;7.2.9;tarx;Telegram/Telegram;Telegram/Telegram;telegram-desktop;dc0698eb8011ed4e75f1fad9d55a8ab54e375c9791b9c577baa6073d9a4c50fa;;https://github.com/telegramdesktop/tdesktop/releases/download/v7.2.9/td-setup-linux-x64-7.2.9.tar.xz;"
-  "doctl;1.169.0;tar0;doctl;doctl;doctl;790f22a2f3d644b7bb9e9dbb491245ee19e64266434f941d8395aba8a99c38cf;7076455ba1464b608446ab83b2272e1b2cb814a5540cba735a32bcea918dff0d;https://github.com/digitalocean/doctl/releases/download/v1.169.0/doctl-1.169.0-linux-amd64.tar.gz;https://github.com/digitalocean/doctl/releases/download/v1.169.0/doctl-1.169.0-linux-arm64.tar.gz"
-  "stripe;1.51.0;tar0;stripe;stripe;stripe;e49d94a6805d726aeec50353436c665d22aa3258b8ccf85c207968e5c99be52d;c4b0a2e0d2d44497154aa98deece3abe859d40098493766055949b80828dcd7d;https://github.com/stripe/stripe-cli/releases/download/v1.51.0/stripe_1.51.0_linux_x86_64.tar.gz;https://github.com/stripe/stripe-cli/releases/download/v1.51.0/stripe_1.51.0_linux_arm64.tar.gz"
+  "doctl;1.177.0;tar0;doctl;doctl;doctl;34d3954721bfb8cdb42032e78d98274f157426fa6332511ae356edcce59dade3;3adfe5bb667c2cdee15eb3501d53b57d8f04dfa945ddd4584f6f760834506992;https://github.com/digitalocean/doctl/releases/download/v1.177.0/doctl-1.177.0-linux-amd64.tar.gz;https://github.com/digitalocean/doctl/releases/download/v1.177.0/doctl-1.177.0-linux-arm64.tar.gz"
+  "stripe;1.53.0;tar0;stripe;stripe;stripe;a12205df4aecb18153b8b3f76d5029386b1e94944d559900f9082ca489a8521b;6cc195da6081237634f5b7feba4e2e9d71d33ed805d6219e443fd066fae07109;https://github.com/stripe/stripe-cli/releases/download/v1.53.0/stripe_1.53.0_linux_x86_64.tar.gz;https://github.com/stripe/stripe-cli/releases/download/v1.53.0/stripe_1.53.0_linux_arm64.tar.gz"
   "gcloud;585.0.0;tar1;bin/gcloud,bin/gsutil,bin/bq;bin/gcloud,bin/gsutil,bin/bq;gcloud,gsutil,bq;7b97198ef306f5400b67f057f7415a46bd9a34367eeabd87516ee3f74bc76a36;58cb835c823514d1eee2b87f938f2bc6240f5a745e9cc73d142a1260da129e25;https://storage.googleapis.com/cloud-sdk-release/google-cloud-cli-585.0.0-linux-x86_64.tar.gz;https://storage.googleapis.com/cloud-sdk-release/google-cloud-cli-585.0.0-linux-arm.tar.gz"
 )
 
@@ -229,8 +229,8 @@ USER_TOOLS=(
 # as BUN_LSP_PACKAGES. Wrangler is the exception to `--ignore-scripts`: its
 # postinstall fetches the workerd binary that package version requires.
 NPM_USER_TOOLS=(
-  "resend-cli@2.21.1"
-  "wrangler@4.136.0"
+  "resend-cli@2.23.0"
+  "wrangler@4.147.0"
 )
 
 # The reviewed Telegram release installs these four files from

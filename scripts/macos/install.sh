@@ -17,12 +17,12 @@ SKIP_CHECKS="${RLDYOUR_SKIP_CHECKS:-0}"
 GUI_ENABLED="${RLDYOUR_GUI_ENABLED:-1}"
 LOCAL_EXECUTION_POLICY="${RLDYOUR_LOCAL_EXECUTION_POLICY:-source-lsp-only}"
 
-HOMEBREW_PKG_VERSION="7.0.4"
-HOMEBREW_PKG_SHA256="1e9ba33b7ac76bd8bcda43af0dba0e6945f467aa56d412179f828b3cbddf1181"
+HOMEBREW_PKG_VERSION="7.0.7"
+HOMEBREW_PKG_SHA256="75f699be3059d0068262cab830b5eadce048229aecb469018b5a883b4f3206d7"
 HOMEBREW_INSTALLER_TEAM="927JGANW46"
-HERDR_VERSION="0.9.1"
-HERDR_MACOS_AARCH64_SHA256="5fc7a7e7adfaca56fa80aa89dcb025693357268dab8285b9ce2d08a2313c89de"
-HERDR_MACOS_AARCH64_URL="https://github.com/herdrdev/herdr/releases/download/v0.9.1/herdr-macos-aarch64"
+HERDR_VERSION="0.9.3"
+HERDR_MACOS_AARCH64_SHA256="5173a3e0ae42d5d1ab7ebfa5d5e6329f7c3d23f8e1a3677c7ce3231da2884157"
+HERDR_MACOS_AARCH64_URL="https://github.com/herdrdev/herdr/releases/download/v0.9.3/herdr-macos-aarch64"
 
 # Source/LSP-only workstation baseline. No Docker, project build orchestration,
 # test runner, or local project runtime. Homebrew's LLVM distribution is present

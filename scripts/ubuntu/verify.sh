@@ -291,7 +291,7 @@ required_cmds=(
   biome oxlint markdownlint-cli2 prettier
   starship atuin carapace
   cmake-language-server
-  codex claude grok cx cl gk
+  agy claude codex cursor-agent grok opencode pi gddy cx cl gk
   doctl stripe gcloud gsutil bq resend wrangler
 )
 for cmd in "${required_cmds[@]}"; do
@@ -310,6 +310,7 @@ uv --version 2>/dev/null | head -n 1 | grep -Eq '^uv 0\.12\.23([[:space:]]|$)' |
   exit 1
 }
 rldyour::verify_terminal_environment
+rldyour::verify_managed_clis
 
 if [ "$PROFILE" != "server" ]; then
   # Go and Rust are desktop/desktop-builds language-server hosts. The server

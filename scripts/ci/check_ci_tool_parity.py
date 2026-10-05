@@ -298,38 +298,25 @@ def _python_shell_handoffs(path: Path, text: str) -> list[str]:
     return findings
 
 
-def check_vendor_pin_shape() -> list[str]:
-    """The vendor CLI pins hold a digest, not merely a name.
-
-    The previous gate asserted these identifiers existed. That passes against a
-    pin whose digest has been replaced with anything at all, including the empty
-    string, so it proved only that someone had once written the word.
-    """
+def check_vendor_pin_shape(contract: dict | None = None) -> list[str]:
+    """Reject incomplete or mutable platform pins for any of the seven CLIs."""
     findings: list[str] = []
+    contract = contract if contract is not None else load_contract()
+    entries = {name: contract["harnesses"][name] for name in contract["harnesses"]["active"]}
+    entries["gddy"] = contract["user_tools"]["gddy"]
+    for name, spec in entries.items():
+        for platform in ("linux/x86_64", "linux/arm64", "macos/arm64"):
+            artifact = spec.get("artifacts", {}).get(platform, {})
+            if not re.fullmatch(r"[0-9a-f]{64}", artifact.get("sha256", "")):
+                findings.append(f"{name}/{platform}: missing exact SHA-256")
+            if artifact.get("bytes", 0) <= 0:
+                findings.append(f"{name}/{platform}: missing reviewed byte length")
+            url = artifact.get("url", "")
+            if not url.startswith("https://") or spec["version"] not in url or "/latest/" in url:
+                findings.append(f"{name}/{platform}: URL is not bound to its exact version")
     text = COMMON.read_text(encoding="utf-8")
-    for name, width in (
-        ("RLDYOUR_CLAUDE_INSTALLER_SHA256", 64),
-        ("RLDYOUR_GROK_INSTALLER_SHA256", 64),
-        ("RLDYOUR_CODEX_SHA512", 128),
-    ):
-        match = re.search(rf'^{name}="([^"]*)"', text, re.M)
-        if match is None:
-            findings.append(f"scripts/lib/common.sh: {name} is not declared")
-            continue
-        value = match.group(1)
-        if not re.fullmatch(rf"[0-9a-f]{{{width}}}", value):
-            findings.append(
-                f"scripts/lib/common.sh: {name} is not a {width}-character "
-                f"lowercase hex digest: {value!r}"
-            )
-    if not re.search(r"^RLDYOUR_CODEX_VERSION=\"\d+\.\d+\.\d+\"", text, re.M):
-        findings.append(
-            "scripts/lib/common.sh: RLDYOUR_CODEX_VERSION is not an exact "
-            "three-part version"
-        )
-    for helper in ("rldyour::download_verified_file", "rldyour::install_vendor_ai_clis"):
-        if f"{helper}()" not in text:
-            findings.append(f"scripts/lib/common.sh: {helper} is not defined")
+    if 'managed_cli.py' not in text or '"$cli_installer" install' not in text:
+        findings.append("shared AI installer does not execute the reviewed program installer")
     return findings
 
 
@@ -340,7 +327,7 @@ def check(contract: dict | None = None) -> int:
         + check_contract_derived()
         + check_workflow_downloads()
         + check_no_network_to_shell()
-        + check_vendor_pin_shape()
+        + check_vendor_pin_shape(contract)
     )
     if findings:
         raise ParityError("\n".join(f"  {item}" for item in findings))

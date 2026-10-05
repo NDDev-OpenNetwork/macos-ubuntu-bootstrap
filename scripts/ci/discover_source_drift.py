@@ -269,6 +269,9 @@ def _pins(contract: dict[str, Any]) -> list[tuple[str, str, str, Callable[[str],
          lambda n: _npm_latest("wrangler", n), []),
         ("codex", contract["harnesses"]["codex"]["version"], "npm:@openai/codex",
          lambda n: _npm_latest("@openai/codex", n), []),
+        ("gddy", contract["user_tools"]["gddy"]["version"], "github:godaddy/cli",
+         lambda n: _github_latest("godaddy/cli", n),
+         ["gddy-x86_64-unknown-linux-gnu.tar.gz", "gddy-aarch64-unknown-linux-gnu.tar.gz", "gddy-aarch64-apple-darwin.tar.gz"]),
         ("gitleaks", tools["gitleaks"]["version"], "github:gitleaks/gitleaks",
          lambda n: _github_latest("gitleaks/gitleaks", n), []),
         ("osv-scanner", tools["osv-scanner"]["version"], "github:google/osv-scanner",
@@ -300,6 +303,11 @@ def _pins(contract: dict[str, Any]) -> list[tuple[str, str, str, Callable[[str],
          lambda n: _github_latest("01mf02/jaq", n), []),
         ("kotlin-lsp", tools["kotlin-lsp"]["version"], "github:Kotlin/kotlin-lsp",
          lambda n: _github_latest("Kotlin/kotlin-lsp", n), []),
+    ] + [
+        (f"{name}-setup", spec["source"]["tag"], f"github:{spec['source']['setup_system']}",
+         lambda n, repo=spec["source"]["setup_system"]: _github_latest(repo, n), [])
+        for name in contract["harnesses"]["active"]
+        for spec in [contract["harnesses"][name]]
     ]
 
 

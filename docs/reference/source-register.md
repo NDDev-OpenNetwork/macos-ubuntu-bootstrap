@@ -221,3 +221,41 @@ The bootstrap still verifies the complete installer digest before execution.
 Its existing vendor-managed stable-channel contract is unchanged: this is an
 installer integrity pin, not a claim that the vendor's stable binary is frozen.
 Native platform validation supplies installation evidence separately.
+
+## Seven harnesses and GoDaddy CLI (0.3.0, 2026-10-05)
+
+The seven `NDDev-OpenNetwork/*-setup-system` 0.0.88 release baselines provide
+the reviewed program versions, archive sizes, URLs, executable members and
+SHA-256 digests. Those bytes are imported into the bootstrap contract, not
+resolved from `latest` at install time. `scripts/managed_cli.py` is the single
+program installer on Linux amd64/arm64 and macOS arm64. It verifies the entire
+installed tree and preserves prior owner-held launchers. Configuration profiles
+and authentication remain the setup-system and owner's responsibilities.
+
+GoDaddy publishes hashed platform archives at
+<https://github.com/godaddy/cli/releases/tag/v0.2.25>. The older exclusion that
+claimed no public hashed artifact existed is superseded. The three supported
+archives are bound by their GitHub asset digest and published checksum file.
+The vendor's mutable self-update command is not run by bootstrap.
+
+The earlier native-installer reviews above are historical evidence. As of
+0.3.0, Claude and Grok use pinned program artifacts, so an HTML geo-block page
+or a changed install script cannot enter the execution path. CLI payload probes
+run with temporary configuration homes and no account credentials.
+
+Linux Cursor runtime compatibility: the 2026.10.01-e373342 payload bundles
+Node 24.5.0. A native Ubuntu 26.04 version probe crashed with SIGSEGV; the
+same JavaScript entry passed version and help probes under bootstrap Node
+24.21.0, including a 200% CPU-quota cgroup. The precise upstream cause was not
+established. The Linux launcher therefore uses the existing receipt-verified
+Node 24 dependency and binds its binary digest in the CLI receipt. No alternate
+Node is resolved from PATH and no vendor payload file is modified. Apple Silicon
+retains the bundled runtime. Native launch, dependency-tampering controls and
+repeat verification cover this composition; account/API access is not asserted.
+
+Static artifact transport uses HTTP/1.1. A native Linux xAI download stalled
+after a small HTTP/2 body, while the same exact URL completed with HTTP/1.1
+and matched the reviewed digest. A separate interrupted HTTP/1.1 transfer
+completed by range-resume and matched the same digest. Only transport failures
+are retried, at most twice and explicitly logged; immutable-pin mismatches and
+HTTP refusal are not retried. No partial file reaches extraction or execution.

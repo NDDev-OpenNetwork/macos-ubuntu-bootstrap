@@ -11,13 +11,15 @@ Authentication is owner-controlled and happens after installation:
 2. Codex CLI: codex login
 3. Claude Code: claude (follow the vendor sign-in flow)
 4. Grok Build: grok login
-5. Desktop applications: launch and sign in interactively where desired
+5. Antigravity, Cursor, OpenCode and Pi: use each vendor's interactive sign-in
+6. GoDaddy CLI: gddy auth login
+7. Desktop applications: launch and sign in interactively where desired
 
 The bootstrap never reads, prints, stores, or transfers credentials.
 EOF
     ;;
   check)
-    for cmd in gh codex claude grok; do
+    for cmd in gh agy claude codex cursor-agent grok opencode pi gddy; do
       if command -v "$cmd" >/dev/null 2>&1; then
         printf '[ok] %s installed\n' "$cmd"
       else

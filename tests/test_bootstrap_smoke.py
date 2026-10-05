@@ -23,7 +23,7 @@ def run(*args: str) -> subprocess.CompletedProcess[str]:
 def test_contract_and_version_match() -> None:
     contract = json.loads((ROOT / "config/rldyour-contract.json").read_text())
     assert contract["adapter"]["version"] == (ROOT / "VERSION").read_text().strip()
-    assert contract["harnesses"]["active"] == ["codex", "claude-code", "grok-build"]
+    assert contract["harnesses"]["active"] == ["antigravity", "claude-code", "codex", "cursor", "grok-build", "opencode", "pi"]
     assert "browser_automation" not in contract
 
 
@@ -39,10 +39,11 @@ def test_plan_matrix() -> None:
         assert result.returncode == 0, result.stdout + result.stderr
 
 
-def test_ai_plan_names_three_vendor_clis() -> None:
+def test_ai_plan_names_all_seven_vendor_clis_and_godaddy() -> None:
     result = run("--platform", "macos", "--no-gui", "--skip-system", "--skip-lsps", "--skip-checks")
     assert result.returncode == 0
-    assert "Codex, Claude Code, Grok Build" in result.stdout
+    for name in ["antigravity", "claude-code", "codex", "cursor", "grok-build", "opencode", "pi", "gddy"]:
+        assert f"[plan] {name} " in result.stdout
 
 
 def test_unrestricted_launchers_use_vendor_flags() -> None:
@@ -52,10 +53,15 @@ def test_unrestricted_launchers_use_vendor_flags() -> None:
     assert 'grok --permission-mode bypassPermissions --always-approve' in common
 
 
-def test_codex_install_uses_receipt_bound_ubuntu_npm_without_publishing_it() -> None:
+def test_vendor_cli_install_uses_verified_standalone_payloads_without_npm() -> None:
     common = (ROOT / "scripts/lib/common.sh").read_text()
-    assert '$HOME/.local/share/rldyour/node/v24.21.0/bin/npm' in common
-    assert '"$npm_bin" install --global' in common
+    start = common.index("rldyour::install_vendor_ai_clis()")
+    end = common.index("rldyour::install_ai_launchers()", start)
+    block = common[start:end]
+    assert 'managed_cli.py' in block
+    assert '"$cli_installer" install' in block
+    assert 'npm install' not in block
+    assert 'bash "$claude_script"' not in block
 
 
 def test_ubuntu_profile_is_explicit() -> None:

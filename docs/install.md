@@ -32,10 +32,24 @@ client files only after deployment, when the public host name, SSH account and
 server Ed25519 public host key are known. The complete workflow is in the
 [desktop-server reference](reference/desktop-server.md).
 
-Every profile installs official Codex, Claude Code, and Grok Build distributions
-through verified downloads. `cx`, `cl`, and `gk` launch them without approval or
-permission prompts. Authentication is performed afterward with
-`scripts/auth-handoff.sh` and is never automated by bootstrap.
+Every profile installs all seven official vendor CLIs: Antigravity (`agy`),
+Claude Code (`claude`), Codex (`codex`), Cursor (`cursor-agent`), Grok Build
+(`grok`), OpenCode (`opencode`), and Pi (`pi`). Program versions and full
+platform-artifact digests are imported from the published 0.0.88 setup-system
+baselines. These are the vendor programs, not configuration mutations: setup
+profiles, authentication and running agent sessions remain untouched.
+
+`scripts/managed_cli.py` downloads exact artifacts, verifies byte length and
+SHA-256 before extraction or execution, and writes a receipt covering the whole
+payload, including bundled runtimes and auxiliary files. A repeat apply checks
+that receipt and performs no download. Existing owner-held PATH launchers are
+moved to private backups before replacement; divergent managed payloads are
+refused and preserved. No network response is executed as a shell script.
+The `cx`, `cl` and `gk` convenience launchers retain their previous behavior.
+Linux Cursor uses the already-required, verified bootstrap Node 24 runtime; its
+launcher and receipt bind that dependency without changing the vendor archive.
+A missing, modified or incompatible-major Node is refused, never replaced by an
+ambient PATH command. macOS keeps the bundled Cursor runtime.
 
 Herdr is a required terminal tool on macOS and every Ubuntu profile. Both
 platforms install the pinned architecture-specific binary from the official
@@ -51,9 +65,9 @@ Ubuntu also pins the operator CLIs already used on the estate hosts: `doctl`,
 `stripe`, and the Google Cloud SDK (`gcloud`/`gsutil`/`bq`) as hashed release
 archives, plus `resend` and `wrangler` as exact npm versions installed through
 Bun. Unmanaged copies already on `~/.local/bin` are adopted aside and replaced
-with the managed launcher. `gh` remains an apt package. Operator-authored
-wrappers (`cf`, `cfapi`) and CLIs without a public hashed artifact (`gddy`) stay
-outside this contract.
+with the managed launcher. `gh` remains an apt package. GoDaddy CLI (`gddy`) is installed from the official `godaddy/cli` release,
+with exact per-platform digest and payload receipts. Operator-authored
+wrappers (`cf`, `cfapi`) remain outside this contract.
 
 GUI profiles install current Google Chrome stable. macOS also installs the
 desktop applications listed in the contract. Ubuntu GUI installs RustDesk and

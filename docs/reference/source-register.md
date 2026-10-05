@@ -221,3 +221,24 @@ The bootstrap still verifies the complete installer digest before execution.
 Its existing vendor-managed stable-channel contract is unchanged: this is an
 installer integrity pin, not a claim that the vendor's stable binary is frozen.
 Native platform validation supplies installation evidence separately.
+
+## Seven harnesses and GoDaddy CLI (0.3.0, 2026-10-05)
+
+The seven `NDDev-OpenNetwork/*-setup-system` 0.0.88 release baselines provide
+the reviewed program versions, archive sizes, URLs, executable members and
+SHA-256 digests. Those bytes are imported into the bootstrap contract, not
+resolved from `latest` at install time. `scripts/managed_cli.py` is the single
+program installer on Linux amd64/arm64 and macOS arm64. It verifies the entire
+installed tree and preserves prior owner-held launchers. Configuration profiles
+and authentication remain the setup-system and owner's responsibilities.
+
+GoDaddy publishes hashed platform archives at
+<https://github.com/godaddy/cli/releases/tag/v0.2.25>. The older exclusion that
+claimed no public hashed artifact existed is superseded. The three supported
+archives are bound by their GitHub asset digest and published checksum file.
+The vendor's mutable self-update command is not run by bootstrap.
+
+The earlier native-installer reviews above are historical evidence. As of
+0.3.0, Claude and Grok use pinned program artifacts, so an HTML geo-block page
+or a changed install script cannot enter the execution path. CLI payload probes
+run with temporary configuration homes and no account credentials.

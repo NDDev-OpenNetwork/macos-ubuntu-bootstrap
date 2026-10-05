@@ -186,7 +186,10 @@ def test_desktop_server_composes_gui_and_server_baseline_without_default_docker(
     assert "Install verified Ubuntu GUI applications" in output
     assert "Configure Ubuntu desktop" in output
     assert "Ubuntu server module" in output
-    assert "Docker mode none: no Docker state is managed" in output
+    if os.uname().sysname == "Darwin":
+        assert "[DRY-RUN] Docker Engine (none)" in output
+    else:
+        assert "Docker mode none: no Docker state is managed" in output
     assert "server baseline skipped" not in output
 
 

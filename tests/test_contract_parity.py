@@ -213,6 +213,7 @@ def test_user_tools_match_the_contract() -> None:
         name: spec
         for name, spec in declared.items()
         if not _user_tool_install_method(spec).startswith("npm-")
+        and _user_tool_install_method(spec) != "verified-cli-artifact"
     }
     registry = {
         name: spec

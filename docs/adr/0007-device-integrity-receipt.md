@@ -41,19 +41,17 @@ every lane exercises both the write and the comparison.
 rather than prose. Each entry names the command, the prefix its owner publishes
 into, and whether that prefix is enforced:
 
-- `enforcement: owned-prefix` — this repository installs the harness and chose
-  the target, so resolving outside it is drift. `codex` is installed from a
-  verified npm tarball into a prefix this repository names, so a `codex` coming
-  from a package-manager global instead is exactly the condition the policy
-  exists to catch, and is reported by name.
-- `enforcement: observe-only` — the vendor's own installer picks the target and
-  may change it between releases. `claude-code` and `grok-build` are recorded so
-  drift is visible, but this repository does not own those paths and will not
-  fail a device for them. Enforcing a path we do not choose would fail a correct
-  install.
+- `enforcement: owned-prefix` — every one of the seven harness programs is
+  now installed from an exact vendor artifact into its own bootstrap prefix.
+  Resolution outside that prefix is drift, including a package-manager global
+  shadowing the managed launcher.
+- `enforcement: observe-only` remains a supported contract vocabulary for
+  external owners; no current harness uses it after the 0.3.0 convergence.
 
-An all-`observe-only` block would be the previous no-op with more words, so a
-test requires at least one enforced harness.
+The device receipt also records `managed_clis`: complete program-payload
+verification, exact declared versions and CLI receipt digests for the seven
+harnesses and gddy. Changing a bundled library is drift even when the executable
+and PATH link still match. Collection reads program trees, never account state.
 
 ## What the receipt does not assert
 

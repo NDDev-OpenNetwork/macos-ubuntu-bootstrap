@@ -20,7 +20,7 @@ and what the receipt does and does not assert. `harnesses.detection` in the
 contract is what makes one-owner-per-harness checkable — do not describe an
 enforcement this repository cannot observe.
 
-## Contract 0.2.11
+## Contract 0.3.0
 
 - macOS supports `desktop`, with optional GUI, no Docker, and source-analysis
   plus local-check tooling.
@@ -37,7 +37,8 @@ enforcement this repository cannot observe.
   host that develops, deploys and tests locally. It still composes the full
   server baseline and exposes XRDP only on loopback through an owner-managed
   SSH tunnel. It never owns credentials.
-- All profiles receive Codex CLI, Claude Code, Grok Build, zsh configuration,
+- All profiles receive the seven vendor CLIs (Antigravity, Claude Code, Codex,
+  Cursor, Grok Build, OpenCode and Pi), GoDaddy CLI, zsh configuration,
   modern terminal tools, source-quality tools, and applicable language servers.
 - `terminal_tools` in the contract owns the interactive tool boundary. Every
   command `templates/terminal/zshrc` guards must appear in `shared` and be

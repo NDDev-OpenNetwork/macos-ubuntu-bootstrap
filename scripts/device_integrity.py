@@ -263,6 +263,7 @@ def policy_hashes() -> dict[str, str]:
         "integrity_policy": Path(__file__).resolve(),
         "installer_policy": ROOT / "scripts/lib/common.sh",
         "ubuntu_installer": ROOT / "scripts/ubuntu/install.sh",
+        "cli_installer": ROOT / "scripts/managed_cli.py",
         "contract": CONTRACT_PATH,
     }
     desktop_dir = ROOT / "templates/desktop"
@@ -516,6 +517,23 @@ def _verify_harness_ownership(state: dict[str, Any]) -> list[str]:
     return drifts
 
 
+def _managed_cli_state(home: Path) -> dict[str, dict[str, Any]]:
+    """Read only program payloads, never a harness's configuration or accounts."""
+    import importlib.util
+    module_spec = importlib.util.spec_from_file_location("bootstrap_managed_cli", ROOT / "scripts/managed_cli.py")
+    assert module_spec is not None and module_spec.loader is not None
+    module = importlib.util.module_from_spec(module_spec)
+    module_spec.loader.exec_module(module)
+    platform = module.platform_key()
+    result = {}
+    for name, spec in module.specifications(load_contract()).items():
+        try:
+            result[name] = {"status": "PROVEN", **module.verify(home, name, spec, platform)}
+        except (module.CLIError, OSError, ValueError) as error:
+            result[name] = {"status": "NOT_PROVEN", "reason": str(error)}
+    return result
+
+
 def _desktop_entry_state(home: Path) -> dict[str, dict[str, Any]]:
     """Collect each declared desktop entry and its pinned icon assets."""
     contract = load_contract()
@@ -583,6 +601,7 @@ def collect_state(*, home: Path, profile: str) -> dict[str, Any]:
         "user_tools": _user_tool_state(bin_dir, home),
         "desktop_entries": _desktop_entry_state(home),
         "harnesses": _harness_state(home),
+        "managed_clis": _managed_cli_state(home),
     }
 
 
@@ -779,6 +798,13 @@ def _verify_contract_versions(state: dict[str, Any], *, profile: str = "desktop"
                     f"{name}: installed SHA-256 {observed_sha or 'absent'} != "
                     f"contract {expected_asset.get('sha256')}"
                 )
+
+    if "managed_clis" in state:
+        programs = state["managed_clis"]
+        for name in [*contract["harnesses"]["active"], "gddy"]:
+            entry = programs.get(name, {})
+            if entry.get("status") != "PROVEN":
+                drifts.append(f"{name}: managed CLI payload {entry.get('reason', 'was not proven')}")
 
     # Harness ownership is profile-independent.
     drifts.extend(_verify_harness_ownership(state))

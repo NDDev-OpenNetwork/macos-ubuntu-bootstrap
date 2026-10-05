@@ -90,7 +90,8 @@ def test_declared_hosted_artifact_count_matches_the_matrix_expansion() -> None:
 def test_installation_audit_covers_every_contract_install_domain() -> None:
     audit_ids = {item["id"] for item in MATRIX["installation_audit"]}
     assert {
-        "ai-cli-codex", "ai-cli-claude-code", "ai-cli-grok-build",
+        "ai-cli-antigravity", "ai-cli-claude-code", "ai-cli-codex", "ai-cli-cursor",
+        "ai-cli-grok-build", "ai-cli-opencode", "ai-cli-pi", "operator-cli-gddy",
         "macos-homebrew-formulae-and-casks", "ubuntu-apt-baseline",
         "ubuntu-pinned-source-tools", "ubuntu-node-uv-bun",
         "ubuntu-go-gopls-rust-dart", "herdr", "google-chrome", "rustdesk",

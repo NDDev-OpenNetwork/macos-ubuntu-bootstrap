@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "adapter_version": "0.2.11",
+  "adapter_version": "0.3.0",
   "verified_on": "2026-08-28",
   "expected_hosted_artifact_instances": 26,
   "status_vocabulary": [
@@ -481,48 +481,6 @@
   ],
   "installation_audit": [
     {
-      "id": "ai-cli-codex",
-      "inventory_ref": "rldyour-contract.json#/harnesses/codex",
-      "source": "official npm registry tarball",
-      "version_discovery": "reviewed registry metadata",
-      "integrity": "exact version and SHA-512",
-      "architectures": [
-        "amd64",
-        "arm64"
-      ],
-      "idempotency": "managed content-addressed publication and launcher verification",
-      "partial_failure": "staged download; unmanaged destinations preserved",
-      "update_policy": "reviewed pin update only"
-    },
-    {
-      "id": "ai-cli-claude-code",
-      "inventory_ref": "rldyour-contract.json#/harnesses/claude-code",
-      "source": "official vendor installer",
-      "version_discovery": "vendor stable channel",
-      "integrity": "reviewed installer SHA-256 before execution",
-      "architectures": [
-        "amd64",
-        "arm64"
-      ],
-      "idempotency": "vendor installer plus strict command verification",
-      "partial_failure": "downloaded temporary script; no network pipe",
-      "update_policy": "reviewed installer digest update"
-    },
-    {
-      "id": "ai-cli-grok-build",
-      "inventory_ref": "rldyour-contract.json#/harnesses/grok-build",
-      "source": "official vendor installer",
-      "version_discovery": "vendor stable channel",
-      "integrity": "reviewed installer SHA-256 before execution",
-      "architectures": [
-        "amd64",
-        "arm64"
-      ],
-      "idempotency": "vendor installer plus strict command verification",
-      "partial_failure": "downloaded temporary script; no network pipe",
-      "update_policy": "reviewed installer digest update"
-    },
-    {
       "id": "macos-homebrew-formulae-and-casks",
       "inventory_ref": "scripts/macos/install.sh#BREW_SOURCE_PACKAGES,GUI_CASKS",
       "source": "Homebrew signed pkg bootstrap and formula/cask repositories",
@@ -705,6 +663,118 @@
       "idempotency": "explicit flags, syntax/context validation and service-state preservation",
       "partial_failure": "backup/validate/rollback for SSH and Fail2ban; UFW allow-before-enable",
       "update_policy": "no implicit package upgrade or automatic reboot policy change"
+    },
+    {
+      "id": "ai-cli-antigravity",
+      "inventory_ref": "rldyour-contract.json#/harnesses/antigravity",
+      "source": "official vendor platform artifact; pins bound to released setup-system baseline",
+      "version_discovery": "reviewed setup-system release 0.0.88",
+      "integrity": "exact archive byte length and SHA-256; full installed payload receipt",
+      "architectures": [
+        "amd64",
+        "arm64"
+      ],
+      "idempotency": "verify complete existing tree and owner-held launcher; no download on repeat",
+      "partial_failure": "staged, bounded download; previous launchers preserved until verified publication",
+      "update_policy": "reviewed pin update only; credentials and live sessions untouched"
+    },
+    {
+      "id": "ai-cli-claude-code",
+      "inventory_ref": "rldyour-contract.json#/harnesses/claude-code",
+      "source": "official vendor platform artifact; pins bound to released setup-system baseline",
+      "version_discovery": "reviewed setup-system release 0.0.88",
+      "integrity": "exact archive byte length and SHA-256; full installed payload receipt",
+      "architectures": [
+        "amd64",
+        "arm64"
+      ],
+      "idempotency": "verify complete existing tree and owner-held launcher; no download on repeat",
+      "partial_failure": "staged, bounded download; previous launchers preserved until verified publication",
+      "update_policy": "reviewed pin update only; credentials and live sessions untouched"
+    },
+    {
+      "id": "ai-cli-codex",
+      "inventory_ref": "rldyour-contract.json#/harnesses/codex",
+      "source": "official vendor platform artifact; pins bound to released setup-system baseline",
+      "version_discovery": "reviewed setup-system release 0.0.88",
+      "integrity": "exact archive byte length and SHA-256; full installed payload receipt",
+      "architectures": [
+        "amd64",
+        "arm64"
+      ],
+      "idempotency": "verify complete existing tree and owner-held launcher; no download on repeat",
+      "partial_failure": "staged, bounded download; previous launchers preserved until verified publication",
+      "update_policy": "reviewed pin update only; credentials and live sessions untouched"
+    },
+    {
+      "id": "ai-cli-cursor",
+      "inventory_ref": "rldyour-contract.json#/harnesses/cursor",
+      "source": "official vendor platform artifact; pins bound to released setup-system baseline",
+      "version_discovery": "reviewed setup-system release 0.0.88",
+      "integrity": "exact archive byte length and SHA-256; full installed payload receipt",
+      "architectures": [
+        "amd64",
+        "arm64"
+      ],
+      "idempotency": "verify complete existing tree and owner-held launcher; no download on repeat",
+      "partial_failure": "staged, bounded download; previous launchers preserved until verified publication",
+      "update_policy": "reviewed pin update only; credentials and live sessions untouched"
+    },
+    {
+      "id": "ai-cli-grok-build",
+      "inventory_ref": "rldyour-contract.json#/harnesses/grok-build",
+      "source": "official vendor platform artifact; pins bound to released setup-system baseline",
+      "version_discovery": "reviewed setup-system release 0.0.88",
+      "integrity": "exact archive byte length and SHA-256; full installed payload receipt",
+      "architectures": [
+        "amd64",
+        "arm64"
+      ],
+      "idempotency": "verify complete existing tree and owner-held launcher; no download on repeat",
+      "partial_failure": "staged, bounded download; previous launchers preserved until verified publication",
+      "update_policy": "reviewed pin update only; credentials and live sessions untouched"
+    },
+    {
+      "id": "ai-cli-opencode",
+      "inventory_ref": "rldyour-contract.json#/harnesses/opencode",
+      "source": "official vendor platform artifact; pins bound to released setup-system baseline",
+      "version_discovery": "reviewed setup-system release 0.0.88",
+      "integrity": "exact archive byte length and SHA-256; full installed payload receipt",
+      "architectures": [
+        "amd64",
+        "arm64"
+      ],
+      "idempotency": "verify complete existing tree and owner-held launcher; no download on repeat",
+      "partial_failure": "staged, bounded download; previous launchers preserved until verified publication",
+      "update_policy": "reviewed pin update only; credentials and live sessions untouched"
+    },
+    {
+      "id": "ai-cli-pi",
+      "inventory_ref": "rldyour-contract.json#/harnesses/pi",
+      "source": "official vendor platform artifact; pins bound to released setup-system baseline",
+      "version_discovery": "reviewed setup-system release 0.0.88",
+      "integrity": "exact archive byte length and SHA-256; full installed payload receipt",
+      "architectures": [
+        "amd64",
+        "arm64"
+      ],
+      "idempotency": "verify complete existing tree and owner-held launcher; no download on repeat",
+      "partial_failure": "staged, bounded download; previous launchers preserved until verified publication",
+      "update_policy": "reviewed pin update only; credentials and live sessions untouched"
+    },
+    {
+      "id": "operator-cli-gddy",
+      "inventory_ref": "rldyour-contract.json#/user_tools/gddy",
+      "source": "official godaddy/cli GitHub release",
+      "version_discovery": "reviewed non-prerelease version tag",
+      "integrity": "release SHA-256 and byte length, verified before extraction",
+      "architectures": [
+        "amd64",
+        "arm64"
+      ],
+      "idempotency": "full managed payload receipt and launcher validation",
+      "partial_failure": "staged verified archive; previous launcher preserved",
+      "update_policy": "reviewed pinned release; no self-update during bootstrap"
     }
   ],
   "evidence_lanes": [

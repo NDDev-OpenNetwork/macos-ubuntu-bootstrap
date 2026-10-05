@@ -4,6 +4,7 @@ import hashlib
 import importlib.util
 import io
 import json
+import os
 from pathlib import Path
 import shutil
 import tarfile
@@ -118,6 +119,18 @@ def test_ubuntu_shared_user_parent_permissions_are_preserved(tmp_path, monkeypat
     root.chmod(0o775)
     with pytest.raises(cli.CLIError, match="unsafe managed program tree"):
         cli.verify(home, "check", spec, "linux/x86_64")
+
+
+def test_ubuntu_private_group_umask_cannot_make_payload_writable(tmp_path, monkeypatch):
+    home, spec, _ = fixture(tmp_path, monkeypatch)
+    previous = os.umask(0o002)
+    try:
+        cli.install(home, "check", spec, "linux/x86_64")
+    finally:
+        os.umask(previous)
+    root = cli.root_for(home, "check", spec)
+    assert all(path.stat().st_mode & 0o022 == 0 for path in root.rglob("*"))
+    cli.verify(home, "check", spec, "linux/x86_64")
 
 
 def test_missing_architecture_is_not_silently_substituted(tmp_path, monkeypatch):

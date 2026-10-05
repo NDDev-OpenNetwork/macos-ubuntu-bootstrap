@@ -209,6 +209,12 @@ def install(home: Path, name: str, spec: dict, platform: str) -> dict:
             if archive.stat().st_size != artifact["bytes"] or sha256(archive) != artifact["sha256"]:
                 raise CLIError("artifact integrity mismatch before extraction")
             unpack(archive, payload, spec, artifact)
+            # Archives can omit parent-directory entries. pathlib then creates
+            # those parents with the host umask (0775 on Ubuntu), rather than
+            # the explicit leaf mode. Normalize only our private staging tree.
+            for directory_entry in payload.rglob("*"):
+                if directory_entry.is_dir():
+                    directory_entry.chmod(0o755)
             binary = payload / safe_relative(artifact["member"])
             if not binary.is_file() or binary.is_symlink():
                 raise CLIError("reviewed executable member is absent")

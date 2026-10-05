@@ -5,6 +5,18 @@ Versioning; the contract version in `config/rldyour-contract.json` moves with it
 
 ## [Unreleased]
 
+## [0.3.1] - 2026-10-05
+
+- Refresh the two stale pins found by a complete authenticated source audit:
+  delta 0.20.1 and Homebrew installer 7.0.8. Verify both Linux delta archives
+  and the Homebrew package digest, Apple installer identity and notarization.
+- Let local source discovery reuse the authenticated gh metadata client without
+  extracting credentials; retain the existing scoped CI-token path and require
+  HTTPS before attaching an API credential.
+- Check all seven declared program artifact tables against their published
+  setup-system baselines, including version, archive shape, URL, size, SHA-256
+  and executable member. Current release tags alone no longer hide pin drift.
+
 ## [0.3.0] - 2026-10-05
 
 - Converge all profiles on the canonical seven harness CLIs using verified

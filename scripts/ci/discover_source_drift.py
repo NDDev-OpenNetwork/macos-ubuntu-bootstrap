@@ -62,6 +62,8 @@ import argparse
 import json
 import os
 import re
+import shutil
+import subprocess
 import sys
 import urllib.error
 import urllib.parse
@@ -128,7 +130,21 @@ def _get(url: str) -> Any:
     """
     request = urllib.request.Request(url, headers={"User-Agent": USER_AGENT})
     token = os.environ.get("GITHUB_TOKEN", "")
-    if token and urllib.parse.urlsplit(url).hostname == GITHUB_API_HOST:
+    parsed = urllib.parse.urlsplit(url)
+    # A local operator normally authenticates through gh's credential store,
+    # not an exported CI token. Reuse that client rather than extracting its
+    # token or spending the anonymous API quota for every source.
+    if (not token and parsed.scheme == "https" and parsed.hostname == GITHUB_API_HOST
+            and parsed.port in (None, 443) and parsed.username is None and shutil.which("gh")):
+        endpoint = parsed.path + ("?" + parsed.query if parsed.query else "")
+        try:
+            result = subprocess.run(["gh", "api", "--hostname", "github.com", "--method", "GET", endpoint],
+                                    capture_output=True, text=True, check=True, timeout=TIMEOUT_SECONDS + 10)
+            return json.loads(result.stdout)
+        except (subprocess.SubprocessError, json.JSONDecodeError) as error:
+            # Do not include the client stderr or credential-store details.
+            raise OSError("authenticated GitHub metadata client unavailable") from error
+    if token and parsed.scheme == "https" and parsed.hostname == GITHUB_API_HOST and parsed.username is None:
         request.add_header("Authorization", f"Bearer {token}")
     with urllib.request.urlopen(request, timeout=TIMEOUT_SECONDS) as response:  # noqa: S310
         return json.loads(response.read().decode("utf-8"))
@@ -145,6 +161,30 @@ def _normalize(value: str) -> str:
     """
     value = value.strip().rsplit("/", 1)[-1]
     return re.sub(r"^(bun-v|go|v)", "", value)
+
+
+def _setup_catalogue(spec: dict[str, Any], name: str) -> tuple[str, list[str]]:
+    """A current setup tag must also describe the exact bytes we install."""
+    source = spec["source"]
+    repository = source["setup_system"]
+    harness = repository.rsplit("/", 1)[-1].removesuffix("-setup-system")
+    url = f"https://raw.githubusercontent.com/{repository}/{source['tag']}/references/{harness}-baseline.json"
+    data = _get(url).get("software_artifacts")
+    if not isinstance(data, dict) or not data.get("version"):
+        raise DiscoveryError(f"{name}: published setup baseline has no software artifact table")
+    if data["version"] != spec["version"] or data.get("shape") != spec["shape"]:
+        raise DiscoveryError(f"{name}: program version or archive shape differs from its declared setup baseline")
+    for platform, artifact in spec["artifacts"].items():
+        published = data.get("platforms", {}).get(platform)
+        if not isinstance(published, dict):
+            raise DiscoveryError(f"{name}: setup baseline lacks platform {platform}")
+        normalized = dict(published)
+        normalized["sha256"] = normalized.get("sha256", "").removeprefix("sha256:")
+        normalized.setdefault("member", data["command"])
+        for field in ("url", "bytes", "sha256", "member"):
+            if artifact.get(field) != normalized.get(field):
+                raise DiscoveryError(f"{name}: {platform} {field} differs from its declared setup baseline")
+    return data["version"], []
 
 
 def _require_fixed_url(url: str, name: str) -> None:
@@ -306,6 +346,11 @@ def _pins(contract: dict[str, Any]) -> list[tuple[str, str, str, Callable[[str],
     ] + [
         (f"{name}-setup", spec["source"]["tag"], f"github:{spec['source']['setup_system']}",
          lambda n, repo=spec["source"]["setup_system"]: _github_latest(repo, n), [])
+        for name in contract["harnesses"]["active"]
+        for spec in [contract["harnesses"][name]]
+    ] + [
+        (f"{name}-catalogue", spec["version"], f"setup:{spec['source']['setup_system']}@{spec['source']['tag']}",
+         lambda n, spec=spec: _setup_catalogue(spec, n), [])
         for name in contract["harnesses"]["active"]
         for spec in [contract["harnesses"][name]]
     ]

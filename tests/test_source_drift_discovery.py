@@ -13,6 +13,8 @@ from __future__ import annotations
 import importlib.util
 import json
 import sys
+import subprocess
+from types import SimpleNamespace
 import urllib.error
 from pathlib import Path
 
@@ -29,6 +31,30 @@ sys.modules["discover_source_drift"] = drift
 SPEC.loader.exec_module(drift)
 
 CONTRACT = json.loads((ROOT / "config/rldyour-contract.json").read_text(encoding="utf-8"))
+
+
+def test_local_github_metadata_reuses_gh_without_reading_token(monkeypatch):
+    monkeypatch.delenv("GITHUB_TOKEN", raising=False)
+    monkeypatch.setattr(drift.shutil, "which", lambda command: "/usr/bin/gh")
+    calls = []
+    monkeypatch.setattr(drift.subprocess, "run", lambda command, **kwargs:
+                        calls.append(command) or SimpleNamespace(stdout='{"tag_name":"v1.2.3"}'))
+    monkeypatch.setattr(drift.urllib.request, "urlopen", lambda *args, **kwargs:
+                        pytest.fail("anonymous request should not consume API quota"))
+    assert drift._get("https://api.github.com/repos/example/tool/releases/latest") == {"tag_name": "v1.2.3"}
+    assert calls == [["gh", "api", "--hostname", "github.com", "--method", "GET", "/repos/example/tool/releases/latest"]]
+    assert "auth" not in calls[0] and "token" not in calls[0]
+
+
+def test_gh_client_failure_is_unknown_without_exporting_details(monkeypatch):
+    monkeypatch.delenv("GITHUB_TOKEN", raising=False)
+    monkeypatch.setattr(drift.shutil, "which", lambda command: "/usr/bin/gh")
+    def failure(command, **kwargs):
+        raise subprocess.CalledProcessError(1, command, stderr="synthetic sensitive client detail")
+    monkeypatch.setattr(drift.subprocess, "run", failure)
+    with pytest.raises(OSError, match="metadata client unavailable") as caught:
+        drift._get("https://api.github.com/repos/example/tool/releases/latest")
+    assert "synthetic sensitive" not in str(caught.value)
 
 
 def _contract_with(**overrides) -> dict:
@@ -157,6 +183,8 @@ def test_the_unknown_tolerance_is_the_boundary() -> None:
 
 def test_a_newer_upstream_is_reported_as_behind(monkeypatch) -> None:
     monkeypatch.setattr(drift, "_npm_latest", lambda pkg, name: ("999.0.0", []))
+    probes = [row for row in drift._pins(CONTRACT) if row[0] == "codex"]
+    monkeypatch.setattr(drift, "_pins", lambda contract: probes)
     findings = {item.name: item for item in drift.discover(CONTRACT)}
     assert findings["codex"].status == "behind"
     assert findings["codex"].latest == "999.0.0"
@@ -207,6 +235,8 @@ def test_an_intentional_hold_reads_as_a_decision(monkeypatch) -> None:
     """A held pin must not look like an oversight."""
     monkeypatch.setattr(drift, "_npm_latest", lambda pkg, name: ("999.0.0", []))
     monkeypatch.setitem(drift.INTENTIONAL_HOLDS, "codex", "held pending vendor advisory")
+    probes = [row for row in drift._pins(CONTRACT) if row[0] == "codex"]
+    monkeypatch.setattr(drift, "_pins", lambda contract: probes)
     findings = {item.name: item for item in drift.discover(CONTRACT)}
     assert findings["codex"].status == "held"
     assert findings["codex"].detail == "held pending vendor advisory"
@@ -235,10 +265,11 @@ def test_discovery_cannot_write_the_contract() -> None:
     import re as _re
 
     source = MODULE_PATH.read_text(encoding="utf-8")
-    for forbidden in ("write_text", "write_bytes", "urlretrieve", "subprocess", "os.remove"):
+    for forbidden in ("write_text", "write_bytes", "urlretrieve", "os.remove"):
         assert forbidden not in source, (
             f"discovery gained {forbidden!r}; it must only read metadata"
         )
+
     # `open(` alone matches `urlopen(`, which is how this script reads. Look for
     # a write mode instead.
     assert not _re.search(r"\bopen\([^)]*['\"][wax]", source), (
@@ -246,8 +277,30 @@ def test_discovery_cannot_write_the_contract() -> None:
     )
 
 
+def test_authenticated_discovery_preserves_contract_bytes(tmp_path, monkeypatch, capsys):
+    contract_path = tmp_path / "contract.json"
+    contract_path.write_text(json.dumps(CONTRACT))
+    before = contract_path.read_bytes()
+    bin_dir = tmp_path / "bin"
+    bin_dir.mkdir()
+    gh = bin_dir / "gh"
+    gh.write_text('#!/bin/sh\n'
+                  '[ "$1" = api ] && [ "$2" = --hostname ] && [ "$3" = github.com ] '
+                  '&& [ "$4" = --method ] && [ "$5" = GET ] || exit 99\n'
+                  'printf \'{"tag_name":"v1.2.3","assets":[]}\\n\'\n')
+    gh.chmod(0o755)
+    monkeypatch.delenv("GITHUB_TOKEN", raising=False)
+    monkeypatch.setenv("PATH", str(bin_dir))
+    monkeypatch.setattr(drift, "_pins", lambda contract: [
+        ("fixture", "1.2.3", "github:example/tool", lambda name: drift._github_latest("example/tool", name), [])])
+    assert drift.main(["--contract", str(contract_path), "--json"]) == 0
+    assert contract_path.read_bytes() == before
+    assert json.loads(capsys.readouterr().out)[0]["status"] == "current"
+
+
 @pytest.mark.parametrize("url,expected", [
     ("https://api.github.com/repos/x/y/releases/latest", True),
+    ("http://api.github.com/repos/x/y/releases/latest", False),
     # A lookalike host that merely contains the API host as a substring.
     ("https://evil.example.invalid/api.github.com/repos/x/y", False),
     ("https://api.github.com.evil.example.invalid/repos/x/y", False),
@@ -282,6 +335,18 @@ def test_the_token_goes_only_to_the_github_api_host(monkeypatch, url, expected) 
     drift._get(url)
     carried = any("secret-value" in value for value in seen.values())
     assert carried is expected, f"{url}: token carried={carried}, expected {expected}"
+
+
+@pytest.mark.parametrize("field", ["url", "bytes", "sha256", "member"])
+def test_setup_provenance_rejects_byte_metadata_drift(monkeypatch, field):
+    spec = json.loads(json.dumps(CONTRACT["harnesses"]["opencode"]))
+    published = {"version": spec["version"], "command": spec["command"], "shape": spec["shape"],
+                 "platforms": json.loads(json.dumps(spec["artifacts"]))}
+    monkeypatch.setattr(drift, "_get", lambda url: {"software_artifacts": published})
+    assert drift._setup_catalogue(spec, "fixture")[0] == spec["version"]
+    spec["artifacts"]["linux/x86_64"][field] = 1 if field == "bytes" else "changed"
+    with pytest.raises(drift.DiscoveryError, match="differs from its declared setup baseline"):
+        drift._setup_catalogue(spec, "fixture")
 
 
 # ----------------- unknown twice running is not a rate limit -----------------

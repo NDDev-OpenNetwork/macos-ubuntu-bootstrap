@@ -5,6 +5,12 @@ Versioning; the contract version in `config/rldyour-contract.json` moves with it
 
 ## [Unreleased]
 
+## [0.3.2] - 2026-10-05
+
+- Make source-discovery unit tests independent of live HTTP and gh requests.
+  Test malformed previous snapshots with synthetic findings and provide an
+  offline Rust channel fixture; unexpected network calls now fail immediately.
+
 ## [0.3.1] - 2026-10-05
 
 - Refresh the two stale pins found by a complete authenticated source audit:

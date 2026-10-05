@@ -106,6 +106,20 @@ def test_nonfile_launcher_is_preserved(tmp_path, monkeypatch):
     assert (home / ".local/bin/check-cli").is_dir()
 
 
+def test_ubuntu_shared_user_parent_permissions_are_preserved(tmp_path, monkeypatch):
+    home, spec, _ = fixture(tmp_path, monkeypatch)
+    shared = home / ".local/share/rldyour"
+    shared.mkdir(parents=True)
+    shared.chmod(0o775)
+    cli.install(home, "check", spec, "linux/x86_64")
+    assert shared.stat().st_mode & 0o777 == 0o775
+    root = cli.root_for(home, "check", spec)
+    assert root.stat().st_mode & 0o022 == 0
+    root.chmod(0o775)
+    with pytest.raises(cli.CLIError, match="unsafe managed program tree"):
+        cli.verify(home, "check", spec, "linux/x86_64")
+
+
 def test_missing_architecture_is_not_silently_substituted(tmp_path, monkeypatch):
     home, spec, calls = fixture(tmp_path, monkeypatch)
     with pytest.raises(cli.CLIError, match="no reviewed artifact"):

@@ -59,7 +59,10 @@ def directory(path: Path) -> None:
         directory(path.parent)
         path.mkdir(mode=0o755)
     metadata = path.stat()
-    if not stat.S_ISDIR(metadata.st_mode) or metadata.st_uid != os.getuid() or metadata.st_mode & 0o022:
+    # Existing shared user parents may be group-writable under Ubuntu's normal
+    # private-user-group umask. Preserve their permissions. Program roots and
+    # every payload entry are checked more strictly by verify_root/tree_state.
+    if not stat.S_ISDIR(metadata.st_mode) or metadata.st_uid != os.getuid() or metadata.st_mode & 0o002:
         raise CLIError(f"foreign-owned or writable program directory preserved: {path}")
 
 

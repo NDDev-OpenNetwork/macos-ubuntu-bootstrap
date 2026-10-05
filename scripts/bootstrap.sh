@@ -36,7 +36,7 @@ Default:
             desktop-server and server accept an explicit rootful or rootless alternative
 
 Profiles:
-  - desktop:        source editing, LSP/quality tools, three vendor AI CLIs, and
+  - desktop:        source editing, LSP/quality tools, seven vendor AI CLIs, and
                     optional GUI apps. No Docker or project runtime.
   - desktop-builds: Ubuntu-only — everything desktop has, PLUS Docker rootful for
                     local builds/tests. Receives the server Docker layer without the

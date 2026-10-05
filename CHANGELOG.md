@@ -7,6 +7,8 @@ Versioning; the contract version in `config/rldyour-contract.json` moves with it
 
 ## [0.3.2] - 2026-10-05
 
+- Align the command-line profile help with the seven installed vendor AI CLIs.
+
 - Make source-discovery unit tests independent of live HTTP and gh requests.
   Test malformed previous snapshots with synthetic findings and provide an
   offline Rust channel fixture; unexpected network calls now fail immediately.

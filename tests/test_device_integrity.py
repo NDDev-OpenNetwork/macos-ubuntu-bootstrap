@@ -154,8 +154,10 @@ def test_receipt_rejects_group_writable_mode(tmp_path: Path) -> None:
 # ----------------------------- contract version verification -----------------------------
 
 
-def test_verify_contract_versions_passes_when_state_matches() -> None:
+def test_verify_contract_versions_passes_when_state_matches(monkeypatch) -> None:
     """A state whose versions all match the contract must not raise."""
+    monkeypatch.setattr(di, "_current_os", lambda: "linux")
+    monkeypatch.setattr(di.os, "uname", lambda: os.uname_result(("Linux", "fixture", "fixture", "fixture", "x86_64")))
     contract = di.load_contract()
     runtime_support = contract["runtime_support"]
     state = {
@@ -202,7 +204,9 @@ def test_verify_contract_versions_passes_when_state_matches() -> None:
     di._verify_contract_versions(state)
 
 
-def test_verify_contract_versions_detects_runtime_drift() -> None:
+def test_verify_contract_versions_detects_runtime_drift(monkeypatch) -> None:
+    monkeypatch.setattr(di, "_current_os", lambda: "linux")
+    monkeypatch.setattr(di.os, "uname", lambda: os.uname_result(("Linux", "fixture", "fixture", "fixture", "x86_64")))
     contract = di.load_contract()
     runtime_support = contract["runtime_support"]
     state = {
@@ -340,7 +344,9 @@ def _server_state_all_required_tools_present() -> dict[str, object]:
     }
 
 
-def test_server_profile_requires_compiled_hosts_pinned_tools_and_herdr() -> None:
+def test_server_profile_requires_compiled_hosts_pinned_tools_and_herdr(monkeypatch) -> None:
+    monkeypatch.setattr(di, "_current_os", lambda: "linux")
+    monkeypatch.setattr(di.os, "uname", lambda: os.uname_result(("Linux", "fixture", "fixture", "fixture", "x86_64")))
     state = _server_state_all_required_tools_present()
     di._verify_contract_versions(state, profile="server")
     state["runtime_hosts"]["go"]["normalized"] = "absent"
@@ -348,8 +354,10 @@ def test_server_profile_requires_compiled_hosts_pinned_tools_and_herdr() -> None
         di._verify_contract_versions(state, profile="server")
 
 
-def test_server_profile_still_requires_node_uv_bun() -> None:
+def test_server_profile_still_requires_node_uv_bun(monkeypatch) -> None:
     """node/uv/bun are provisioned on every profile; a server drift still fails."""
+    monkeypatch.setattr(di, "_current_os", lambda: "linux")
+    monkeypatch.setattr(di.os, "uname", lambda: os.uname_result(("Linux", "fixture", "fixture", "fixture", "x86_64")))
     state = _server_state_all_required_tools_present()
     state["runtime_hosts"]["node"]["normalized"] = "0.0.0"
     with pytest.raises(di.IntegrityError, match="node: installed 0.0.0"):
@@ -725,7 +733,7 @@ def _fake_harness(home: Path, prefix_rel: str, command: str) -> Path:
 
 
 def test_every_active_harness_has_a_detection_entry() -> None:
-    """The policy names three harnesses; all three must be observable."""
+    """The policy names seven harnesses; every one must be observable."""
     detection = CONTRACT["harnesses"]["detection"]
     for name in CONTRACT["harnesses"]["active"]:
         assert name in detection, f"{name} is active but has no detection entry"
@@ -747,7 +755,7 @@ def test_at_least_one_harness_is_actually_enforced() -> None:
 
 def test_harness_inside_its_owned_prefix_is_not_drift(tmp_path, monkeypatch) -> None:
     home = tmp_path / "home"
-    codex = _fake_harness(home, ".local/share/rldyour/npm/bin", "codex")
+    codex = _fake_harness(home, ".local/share/rldyour/cli/codex/0.160.0/bin", "codex")
     bin_dir = home / ".local/bin"
     bin_dir.mkdir(parents=True, exist_ok=True)
     (bin_dir / "codex").symlink_to(codex)
@@ -762,7 +770,7 @@ def test_harness_inside_its_owned_prefix_is_not_drift(tmp_path, monkeypatch) -> 
 def test_a_second_copy_shadowing_the_owner_is_reported(tmp_path, monkeypatch) -> None:
     """The exact failure the one-owner-per-harness policy exists to catch."""
     home = tmp_path / "home"
-    _fake_harness(home, ".local/share/rldyour/npm/bin", "codex")
+    _fake_harness(home, ".local/share/rldyour/cli/codex/0.160.0/bin", "codex")
     impostor = _fake_harness(home, ".bun/bin", "codex")
     monkeypatch.setenv("PATH", str(impostor.parent))
     monkeypatch.setattr(Path, "home", classmethod(lambda cls: home))
@@ -774,8 +782,8 @@ def test_a_second_copy_shadowing_the_owner_is_reported(tmp_path, monkeypatch) ->
     assert str(impostor) in drifts[0]
 
 
-def test_observe_only_harnesses_never_produce_drift(tmp_path, monkeypatch) -> None:
-    """The vendor installer owns those targets; recording is not enforcing."""
+def test_claude_and_grok_shadowing_is_reported(tmp_path, monkeypatch) -> None:
+    """Pinned native programs have the same ownership boundary as other harnesses."""
     home = tmp_path / "home"
     claude = _fake_harness(home, "somewhere/else", "claude")
     grok = _fake_harness(home, "another/place", "grok")
@@ -785,7 +793,7 @@ def test_observe_only_harnesses_never_produce_drift(tmp_path, monkeypatch) -> No
     state = {"harnesses": di._harness_state(home)}
     assert state["harnesses"]["claude-code"]["inside_owned_prefix"] == "False"
     assert state["harnesses"]["grok-build"]["inside_owned_prefix"] == "False"
-    assert di._verify_harness_ownership(state) == []
+    assert len(di._verify_harness_ownership(state)) == 2
 
 
 def _contract_drifts(state: dict, platform: str, monkeypatch) -> str:

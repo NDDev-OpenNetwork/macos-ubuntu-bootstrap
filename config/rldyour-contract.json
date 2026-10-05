@@ -2,7 +2,7 @@
   "schema_version": 2,
   "adapter": {
     "id": "macos-ubuntu-bootstrap",
-    "version": "0.2.11"
+    "version": "0.3.0"
   },
   "support_evidence": {
     "path": "config/support-evidence-matrix.json",
@@ -136,55 +136,279 @@
   "harnesses": {
     "policy": "vendor-official",
     "active": [
-      "codex",
+      "antigravity",
       "claude-code",
-      "grok-build"
+      "codex",
+      "cursor",
+      "grok-build",
+      "opencode",
+      "pi"
     ],
-    "codex": {
-      "version": "0.160.0",
-      "install_method": "verified-npm-tarball",
-      "launcher": "cx",
-      "sha512": "904b551b38d101800c3b0271377f5b19c9daecb4f7203420abae0d349fdd0d37eee0ecd96a870973235be7f80627f21517f563ee82bb1369b79e64da9fb9698e"
+    "antigravity": {
+      "version": "1.2.15",
+      "command": "agy",
+      "install_method": "verified-cli-artifact",
+      "shape": "gzip-tar",
+      "source": {
+        "setup_system": "NDDev-OpenNetwork/antigravity-setup-system",
+        "tag": "0.0.88"
+      },
+      "artifacts": {
+        "linux/x86_64": {
+          "url": "https://storage.googleapis.com/antigravity-public/antigravity-cli/1.2.15-5434575321694208/linux-x64/cli_linux_x64.tar.gz",
+          "bytes": 61200461,
+          "sha256": "bbd4a4b29f0e9fe1fc2e1345b5d44fa08540e43014da46bc2c4bf70cf05745d8",
+          "member": "antigravity"
+        },
+        "linux/arm64": {
+          "url": "https://storage.googleapis.com/antigravity-public/antigravity-cli/1.2.15-5434575321694208/linux-arm/cli_linux_arm64.tar.gz",
+          "bytes": 57506222,
+          "sha256": "851bdabda3b2eb679d0d46b469629b91752d1f1d7497185107408b60c58c2e32",
+          "member": "antigravity"
+        },
+        "macos/arm64": {
+          "url": "https://storage.googleapis.com/antigravity-public/antigravity-cli/1.2.15-5434575321694208/darwin-arm/cli_mac_arm64.tar.gz",
+          "bytes": 53696937,
+          "sha256": "66f7e9e8750a506e8a2caaedaadf479f023820f712015c9c55cfb91a2891521b",
+          "member": "antigravity"
+        }
+      }
     },
     "claude-code": {
-      "channel": "stable",
-      "install_method": "verified-vendor-script",
-      "launcher": "cl",
-      "installer_url": "https://claude.ai/install.sh",
-      "installer_sha256": "3a68d3406cf674e17bed1733a4dcf37805e2e47d87417700007d7e1aa766a944"
+      "version": "2.1.288",
+      "command": "claude",
+      "install_method": "verified-cli-artifact",
+      "shape": "gzip-tar",
+      "source": {
+        "setup_system": "NDDev-OpenNetwork/claude-setup-system",
+        "tag": "0.0.88"
+      },
+      "artifacts": {
+        "linux/x86_64": {
+          "url": "https://registry.npmjs.org/@anthropic-ai/claude-code-linux-x64/-/claude-code-linux-x64-2.1.288.tgz",
+          "bytes": 110072430,
+          "sha256": "b54d6a2c6bdd78f2c83139d1223598641686aab9e562c47cf537dd200653fa90",
+          "member": "package/claude"
+        },
+        "linux/arm64": {
+          "url": "https://registry.npmjs.org/@anthropic-ai/claude-code-linux-arm64/-/claude-code-linux-arm64-2.1.288.tgz",
+          "bytes": 110330238,
+          "sha256": "a4e46f12f30ec01b978e3aa1a78fbc9c2fdd3a6478d0cc068c4a8f7d23cb5b75",
+          "member": "package/claude"
+        },
+        "macos/arm64": {
+          "url": "https://registry.npmjs.org/@anthropic-ai/claude-code-darwin-arm64/-/claude-code-darwin-arm64-2.1.288.tgz",
+          "bytes": 100276471,
+          "sha256": "7cb1cbd826e6aa5ffc347e15193776c59373f840f40ec0fe3acfdcae342864da",
+          "member": "package/claude"
+        }
+      },
+      "launcher": "cl"
+    },
+    "codex": {
+      "version": "0.160.0",
+      "command": "codex",
+      "install_method": "verified-cli-artifact",
+      "shape": "gzip-tar",
+      "source": {
+        "setup_system": "NDDev-OpenNetwork/codex-setup-system",
+        "tag": "0.0.88"
+      },
+      "artifacts": {
+        "linux/x86_64": {
+          "url": "https://registry.npmjs.org/@openai/codex/-/codex-0.160.0-linux-x64.tgz",
+          "bytes": 163273896,
+          "sha256": "37a41d61c3399182b8c727b77090cc7a1566bd849d0f09070a0bbc6fec4c58dc",
+          "member": "package/vendor/x86_64-unknown-linux-musl/bin/codex"
+        },
+        "linux/arm64": {
+          "url": "https://registry.npmjs.org/@openai/codex/-/codex-0.160.0-linux-arm64.tgz",
+          "bytes": 155716078,
+          "sha256": "9286a7e01d500ab224c9e5b4b223b7adf5dd901fba23efd6a438316426798b17",
+          "member": "package/vendor/aarch64-unknown-linux-musl/bin/codex"
+        },
+        "macos/arm64": {
+          "url": "https://registry.npmjs.org/@openai/codex/-/codex-0.160.0-darwin-arm64.tgz",
+          "bytes": 134311083,
+          "sha256": "fc789bcd655d903f92e1a23c8dc5315ba38f43b3586eafb7bd3b195970b57466",
+          "member": "package/vendor/aarch64-apple-darwin/bin/codex"
+        }
+      },
+      "launcher": "cx"
+    },
+    "cursor": {
+      "version": "2026.10.01-e373342",
+      "command": "cursor-agent",
+      "install_method": "verified-cli-artifact",
+      "shape": "gzip-tar",
+      "source": {
+        "setup_system": "NDDev-OpenNetwork/cursor-setup-system",
+        "tag": "0.0.88"
+      },
+      "artifacts": {
+        "linux/x86_64": {
+          "url": "https://downloads.cursor.com/lab/2026.10.01-e373342/linux/x64/agent-cli-package.tar.gz",
+          "bytes": 182613962,
+          "sha256": "a79726c6e644520e993970be4c45775a6889802b67abe461a677a53219ae28e8",
+          "member": "dist-package/cursor-agent"
+        },
+        "linux/arm64": {
+          "url": "https://downloads.cursor.com/lab/2026.10.01-e373342/linux/arm64/agent-cli-package.tar.gz",
+          "bytes": 180560415,
+          "sha256": "785c5f6bf2a60eb1121e27ed8c14f5ee07ed1b5b6692324f2d9a997238245eb5",
+          "member": "dist-package/cursor-agent"
+        },
+        "macos/arm64": {
+          "url": "https://downloads.cursor.com/lab/2026.10.01-e373342/darwin/arm64/agent-cli-package.tar.gz",
+          "bytes": 176796992,
+          "sha256": "629e51de43a0b7fb3b86f5ebc7e579f7df7df941b39f29e82945cde750145afc",
+          "member": "dist-package/cursor-agent"
+        }
+      },
+      "linux_runtime_entry": "dist-package/index.js",
+      "linux_node_major": 24
     },
     "grok-build": {
-      "channel": "stable",
-      "install_method": "verified-vendor-script",
-      "launcher": "gk",
-      "installer_url": "https://x.ai/cli/install.sh",
-      "installer_sha256": "7fd6fdc75d9418b2e58356726fcbf1ae849416f773925da07d0ccc7a60d3e791"
+      "version": "1.0.49",
+      "command": "grok",
+      "install_method": "verified-cli-artifact",
+      "shape": "raw",
+      "source": {
+        "setup_system": "NDDev-OpenNetwork/grok-setup-system",
+        "tag": "0.0.88"
+      },
+      "artifacts": {
+        "linux/x86_64": {
+          "url": "https://x.ai/cli/grok-1.0.49-linux-x86_64",
+          "bytes": 175805280,
+          "sha256": "2cc2ef5dcaa0509b56cdfb9559e27fabe322a0d893810e5129f507110e9b9c6c",
+          "member": "grok"
+        },
+        "linux/arm64": {
+          "url": "https://x.ai/cli/grok-1.0.49-linux-aarch64",
+          "bytes": 146642280,
+          "sha256": "df7e60362b1934b6f09e1e64b6d75a8c94b1bd9bf68c2803da273e4c6ed9a451",
+          "member": "grok"
+        },
+        "macos/arm64": {
+          "url": "https://x.ai/cli/grok-1.0.49-macos-aarch64",
+          "bytes": 154433376,
+          "sha256": "184f4cb1ba2a8eefaa2c2f267b9102bdb13c32dce53db7f7e3095b88f5fe0cce",
+          "member": "grok"
+        }
+      },
+      "launcher": "gk"
+    },
+    "opencode": {
+      "version": "1.18.34",
+      "command": "opencode",
+      "install_method": "verified-cli-artifact",
+      "shape": "gzip-tar",
+      "source": {
+        "setup_system": "NDDev-OpenNetwork/opencode-setup-system",
+        "tag": "0.0.88"
+      },
+      "artifacts": {
+        "linux/x86_64": {
+          "url": "https://registry.npmjs.org/opencode-linux-x64/-/opencode-linux-x64-1.18.34.tgz",
+          "bytes": 60309530,
+          "sha256": "b83e8ac66d752d05ead4b6a439d3a2cfa32bcd9817c708825a389b5d5cba4f19",
+          "member": "package/bin/opencode"
+        },
+        "linux/arm64": {
+          "url": "https://registry.npmjs.org/opencode-linux-arm64/-/opencode-linux-arm64-1.18.34.tgz",
+          "bytes": 60094599,
+          "sha256": "6f212b830b26bf72012f1665559ddb5fd7e928294971d3d1c99a0f9097a3d311",
+          "member": "package/bin/opencode"
+        },
+        "macos/arm64": {
+          "url": "https://registry.npmjs.org/opencode-darwin-arm64/-/opencode-darwin-arm64-1.18.34.tgz",
+          "bytes": 45264760,
+          "sha256": "9a336191ee84c8f54364b5d1990ec87abb2acbb00dea189f11dda5e968d7bf05",
+          "member": "package/bin/opencode"
+        }
+      }
+    },
+    "pi": {
+      "version": "1.0.0",
+      "command": "pi",
+      "install_method": "verified-cli-artifact",
+      "shape": "gzip-tar",
+      "source": {
+        "setup_system": "NDDev-OpenNetwork/pi-setup-system",
+        "tag": "0.0.88"
+      },
+      "artifacts": {
+        "linux/x86_64": {
+          "url": "https://github.com/earendil-works/pi/releases/download/v1.0.0/pi-linux-x64.tar.gz",
+          "bytes": 42549511,
+          "sha256": "8fd5543a52a889d60ad57ccbf6c969e73c75c5240aae18ac40b506947a63dc38",
+          "member": "pi/pi"
+        },
+        "linux/arm64": {
+          "url": "https://github.com/earendil-works/pi/releases/download/v1.0.0/pi-linux-arm64.tar.gz",
+          "bytes": 42646353,
+          "sha256": "b60b3fda830a43c1dc3f5edb5fc7b681f22a0a930b48cdac13b97570c6045819",
+          "member": "pi/pi"
+        },
+        "macos/arm64": {
+          "url": "https://github.com/earendil-works/pi/releases/download/v1.0.0/pi-darwin-arm64.tar.gz",
+          "bytes": 31004152,
+          "sha256": "97291e7d2eb2d7d95ab1f67d26de7902302201bc8786c132bbbc9e53fa8526cc",
+          "member": "pi/pi"
+        }
+      }
     },
     "detection": {
-      "_doc": "Where each active harness must resolve on an installed device, so the one-owner-per-harness policy is checkable instead of prose. `enforcement: owned-prefix` means this repository installs the harness and a resolution outside `owned_prefix_default` is drift -- normally a second copy from a package-manager global shadowing the managed one. `enforcement: observe-only` means the vendor's own installer chooses the target: the path is recorded so drift is visible, but this repository does not own it and will not fail on it.",
-      "codex": {
-        "command": "codex",
+      "_doc": "Every active vendor program is installed from a reviewed platform artifact, under one bootstrap-owned program prefix. Configuration remains owned by the setup system and account state by the user.",
+      "antigravity": {
+        "command": "agy",
         "enforcement": "owned-prefix",
-        "owned_prefix_default": "${HOME}/.local/share/rldyour/npm",
-        "owned_prefix_env": "RLDYOUR_CODEX_NPM_PREFIX",
-        "owner": "rldyour::install_vendor_ai_clis",
-        "rationale": "Installed from the verified npm tarball into a prefix this repository chooses, then linked as ~/.local/bin/codex. A codex resolving anywhere else means another installer won."
+        "owned_prefix_default": "${HOME}/.local/share/rldyour/cli/antigravity",
+        "owner": "scripts/managed_cli.py",
+        "rationale": "Verified archive and full payload receipt; configuration and credentials are preserved."
       },
       "claude-code": {
         "command": "claude",
-        "enforcement": "observe-only",
-        "owned_prefix_default": "${HOME}/.local/share/claude",
-        "owned_prefix_env": "RLDYOUR_CLAUDE_HOME",
-        "owner": "vendor installer https://claude.ai/install.sh",
-        "rationale": "The reviewed vendor script picks its own target and may change it between releases. Recording where claude resolves is evidence; enforcing a path this repository does not choose would fail on a correct install."
+        "enforcement": "owned-prefix",
+        "owned_prefix_default": "${HOME}/.local/share/rldyour/cli/claude-code",
+        "owner": "scripts/managed_cli.py",
+        "rationale": "Verified archive and full payload receipt; configuration and credentials are preserved."
+      },
+      "codex": {
+        "command": "codex",
+        "enforcement": "owned-prefix",
+        "owned_prefix_default": "${HOME}/.local/share/rldyour/cli/codex",
+        "owner": "scripts/managed_cli.py",
+        "rationale": "Verified archive and full payload receipt; configuration and credentials are preserved."
+      },
+      "cursor": {
+        "command": "cursor-agent",
+        "enforcement": "owned-prefix",
+        "owned_prefix_default": "${HOME}/.local/share/rldyour/cli/cursor",
+        "owner": "scripts/managed_cli.py",
+        "rationale": "Verified archive and full payload receipt; configuration and credentials are preserved."
       },
       "grok-build": {
         "command": "grok",
-        "enforcement": "observe-only",
-        "owned_prefix_default": "${HOME}/.grok",
-        "owned_prefix_env": "RLDYOUR_GROK_HOME",
-        "owner": "vendor installer https://x.ai/cli/install.sh",
-        "rationale": "Same boundary as claude-code: the vendor installer owns the target."
+        "enforcement": "owned-prefix",
+        "owned_prefix_default": "${HOME}/.local/share/rldyour/cli/grok-build",
+        "owner": "scripts/managed_cli.py",
+        "rationale": "Verified archive and full payload receipt; configuration and credentials are preserved."
+      },
+      "opencode": {
+        "command": "opencode",
+        "enforcement": "owned-prefix",
+        "owned_prefix_default": "${HOME}/.local/share/rldyour/cli/opencode",
+        "owner": "scripts/managed_cli.py",
+        "rationale": "Verified archive and full payload receipt; configuration and credentials are preserved."
+      },
+      "pi": {
+        "command": "pi",
+        "enforcement": "owned-prefix",
+        "owned_prefix_default": "${HOME}/.local/share/rldyour/cli/pi",
+        "owner": "scripts/managed_cli.py",
+        "rationale": "Verified archive and full payload receipt; configuration and credentials are preserved."
       }
     }
   },
@@ -593,6 +817,41 @@
         "desktop-server",
         "server"
       ]
+    },
+    "gddy": {
+      "version": "0.2.25",
+      "command": "gddy",
+      "bin_target": "${HOME}/.local/bin/gddy",
+      "os": [
+        "linux",
+        "macos"
+      ],
+      "install_method": "verified-cli-artifact",
+      "shape": "gzip-tar",
+      "source": {
+        "repository": "godaddy/cli",
+        "tag": "v0.2.25"
+      },
+      "artifacts": {
+        "linux/x86_64": {
+          "url": "https://github.com/godaddy/cli/releases/download/v0.2.25/gddy-x86_64-unknown-linux-gnu.tar.gz",
+          "bytes": 11184785,
+          "sha256": "57895f3ec18813243ca22c9ff26cfc6198bed5bcdee364f0d1f7d8074bbc8734",
+          "member": "gddy"
+        },
+        "linux/arm64": {
+          "url": "https://github.com/godaddy/cli/releases/download/v0.2.25/gddy-aarch64-unknown-linux-gnu.tar.gz",
+          "bytes": 11150169,
+          "sha256": "872d0f888344f6527360c4a6dc473d88a726cfe081af0c5c1bc50436d5cf88c3",
+          "member": "gddy"
+        },
+        "macos/arm64": {
+          "url": "https://github.com/godaddy/cli/releases/download/v0.2.25/gddy-aarch64-apple-darwin.tar.gz",
+          "bytes": 8818525,
+          "sha256": "b3bc56750e294b6eaa757d3be8e68ec9bcbfbf4eeebe3949aa929350f4c14392",
+          "member": "gddy"
+        }
+      }
     }
   },
   "desktop_entries": {
@@ -814,7 +1073,15 @@
     },
     "immutable-upstream-artifact": [
       "homebrew-pkg",
-      "herdr"
+      "herdr",
+      "antigravity",
+      "claude-code",
+      "codex",
+      "cursor",
+      "grok-build",
+      "opencode",
+      "pi",
+      "gddy"
     ],
     "rolling-homebrew-formula": [
       "actionlint",
@@ -899,8 +1166,7 @@
       "svelte-language-server@0.18.4",
       "sql-language-server@1.7.1",
       "typescript@7.0.2",
-      "yaml-language-server@1.24.0",
-      "@openai/codex"
+      "yaml-language-server@1.24.0"
     ],
     "provenance_may_declare": [
       "homebrew_prefix",
@@ -1046,13 +1312,13 @@
             "rldyour::privilege::operation",
             "rldyour::privilege::preflight"
           ],
-        "scripts/ubuntu/desktop.sh": [
-          "rldyour::privilege::refresh"
-        ],
-        "scripts/ubuntu/remote-desktop.sh": [
-          "rldyour::privilege::root_exec"
-        ],
-        "scripts/ubuntu/server.sh": [
+          "scripts/ubuntu/desktop.sh": [
+            "rldyour::privilege::refresh"
+          ],
+          "scripts/ubuntu/remote-desktop.sh": [
+            "rldyour::privilege::root_exec"
+          ],
+          "scripts/ubuntu/server.sh": [
             "rldyour::privilege::as_root"
           ]
         },

@@ -2,7 +2,7 @@
 
 Plan-first bootstrap for Apple Silicon macOS, Ubuntu 24.04/26.04 desktops,
 headless Ubuntu servers, and an Ubuntu 24.04 amd64 remote desktop server. The
-current contract is `0.2.11`.
+current contract is `0.3.0`.
 
 ## Profiles
 
@@ -15,7 +15,8 @@ current contract is `0.2.11`.
 | Ubuntu `server` | none | rootful by default | production server/container host |
 
 Every profile receives the zsh-first terminal environment, source-analysis
-tools, language servers, Codex CLI, Claude Code, Grok Build, and the launchers
+tools, language servers, all seven AI CLIs (Antigravity, Claude Code, Codex,
+Cursor, Grok Build, OpenCode and Pi), GoDaddy CLI (`gddy`), and the launchers
 `cx`, `cl`, and `gk`. The interactive terminal tools the shell template binds
 aliases to are the same set on both platforms — `config/rldyour-contract.json`
 declares them under `terminal_tools.shared`, and a test fails if either

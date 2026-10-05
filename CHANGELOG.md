@@ -5,6 +5,25 @@ Versioning; the contract version in `config/rldyour-contract.json` moves with it
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-10-05
+
+- Converge all profiles on the canonical seven harness CLIs using verified
+  vendor artifacts from the released setup-system 0.0.88 baselines. Add
+  Antigravity, Cursor, OpenCode and Pi; pin native Claude and Grok programs,
+  avoiding mutable installer scripts and regional HTML responses.
+- Add GoDaddy CLI 0.2.25 from official, hashed platform release archives.
+- Use HTTP/1.1 for static artifact downloads and at most two logged range-resume
+  retries for interrupted transports; final length and SHA-256 remain required.
+- Use one portable program installer with bounded staged downloads, complete
+  payload receipts, owner-held launcher backups and offline repeat apply.
+  Preserve harness configuration, authentication and live processes.
+- Run Linux Cursor with the existing verified Node 24 runtime, preserving the
+  vendor payload and binding the dependency in its receipt. The bundled Node
+  24.5 crashed on native Ubuntu 26.04; bootstrap Node 24.21 passed version/help
+  probes, including the bounded bootstrap cgroup. macOS retains its vendor runtime.
+- Require all seven commands and GoDaddy CLI in strict verification and device
+  receipts; reject shadowed commands and modified auxiliary runtime files.
+
 ## [0.2.11] - 2026-10-04
 
 - Poll the `bootstrap-gate` check-run for a bounded window in `release.yml`

@@ -1,0 +1,382 @@
+#!/usr/bin/env python3
+"""Install the seven vendor CLIs and gddy from reviewed, platform-specific bytes.
+
+Only program payloads and PATH launchers are managed here. Harness configuration,
+accounts, credentials and running sessions are outside this installer's boundary.
+"""
+from __future__ import annotations
+
+import argparse
+import fcntl
+import hashlib
+import json
+import os
+from pathlib import Path, PurePosixPath
+import re
+import shutil
+import shlex
+import stat
+import subprocess
+import tarfile
+import tempfile
+import time
+import uuid
+
+ROOT = Path(__file__).resolve().parents[1]
+CONTRACT = ROOT / "config/rldyour-contract.json"
+MARKER = "macos-ubuntu-bootstrap-managed-cli-v1"
+
+
+class CLIError(RuntimeError):
+    pass
+
+
+def sha256(path: Path) -> str:
+    h = hashlib.sha256()
+    with path.open("rb") as stream:
+        for block in iter(lambda: stream.read(1024 * 1024), b""):
+            h.update(block)
+    return h.hexdigest()
+
+
+def platform_key() -> str:
+    system = {"Darwin": "macos", "Linux": "linux"}.get(os.uname().sysname)
+    arch = {"arm64": "arm64", "aarch64": "arm64", "x86_64": "x86_64", "amd64": "x86_64"}.get(os.uname().machine)
+    if system is None or arch is None:
+        raise CLIError("no reviewed CLI artifacts for this platform")
+    return f"{system}/{arch}"
+
+
+def specifications(contract: dict) -> dict[str, dict]:
+    entries = {name: contract["harnesses"][name] for name in contract["harnesses"]["active"]}
+    entries["gddy"] = contract["user_tools"]["gddy"]
+    return entries
+
+
+def directory(path: Path) -> None:
+    if path.is_symlink():
+        raise CLIError(f"symlinked program directory preserved: {path}")
+    if not path.exists():
+        directory(path.parent)
+        path.mkdir(mode=0o755)
+    metadata = path.stat()
+    # Existing shared user parents may be group-writable under Ubuntu's normal
+    # private-user-group umask. Preserve their permissions. Program roots and
+    # every payload entry are checked more strictly by verify_root/tree_state.
+    if not stat.S_ISDIR(metadata.st_mode) or metadata.st_uid != os.getuid() or metadata.st_mode & 0o002:
+        raise CLIError(f"foreign-owned or writable program directory preserved: {path}")
+
+
+def root_for(home: Path, name: str, spec: dict) -> Path:
+    if not re.fullmatch(r"[a-z][a-z0-9-]*", name) or not re.fullmatch(r"[A-Za-z0-9.+-]+", spec["version"]):
+        raise CLIError("unsafe program identity or version")
+    return home / ".local/share/rldyour/cli" / name / spec["version"]
+
+
+def artifact_for(spec: dict, platform: str) -> dict:
+    artifact = spec.get("artifacts", {}).get(platform)
+    if not isinstance(artifact, dict):
+        raise CLIError(f"no reviewed artifact for {spec['command']} on {platform}")
+    if not re.fullmatch(r"[0-9a-f]{64}", artifact.get("sha256", "")) or artifact.get("bytes", 0) <= 0:
+        raise CLIError("artifact digest and byte length are required")
+    if not artifact.get("url", "").startswith("https://"):
+        raise CLIError("artifact URL must use HTTPS")
+    return artifact
+
+
+def download(artifact: dict, destination: Path) -> None:
+    # Static payloads do not need HTTP/2 multiplexing. Some vendor CDN edges
+    # stall large HTTP/2 bodies; HTTP/1.1 and bounded range-resume handle those
+    # transport failures while the final size/digest remain mandatory.
+    for attempt in range(3):
+        command = ["curl", "--http1.1", "--fail", "--location", "--silent", "--show-error",
+                   "--proto", "=https", "--proto-redir", "=https", "--connect-timeout", "20",
+                   "--max-time", "120", "--output", str(destination)]
+        if attempt and destination.exists() and destination.stat().st_size:
+            command += ["--continue-at", "-"]
+        try:
+            subprocess.run([*command, artifact["url"]], check=True, timeout=130)
+            break
+        except (subprocess.CalledProcessError, subprocess.TimeoutExpired) as error:
+            if attempt == 2 or isinstance(error, subprocess.CalledProcessError) and error.returncode not in (18, 28, 52, 55, 56, 92):
+                raise
+            print(f"[warn] artifact transport attempt {attempt + 1}/3 failed; bounded resume", flush=True)
+    if destination.stat().st_size != artifact["bytes"] or sha256(destination) != artifact["sha256"]:
+        raise CLIError("downloaded artifact differs from reviewed bytes; nothing executed")
+
+
+def safe_relative(value: str) -> Path:
+    item = PurePosixPath(value)
+    if item.is_absolute() or ".." in item.parts or not item.parts or "\\" in value:
+        raise CLIError(f"unsafe archive path: {value!r}")
+    return Path(*item.parts)
+
+
+def unpack(archive: Path, destination: Path, spec: dict, artifact: dict) -> None:
+    if artifact.get("shape", spec.get("shape")) == "raw":
+        shutil.copyfile(archive, destination / safe_relative(artifact["member"]))
+        return
+    if artifact.get("shape", spec.get("shape")) != "gzip-tar":
+        raise CLIError("unsupported reviewed archive shape")
+    with tarfile.open(archive, "r:gz") as bundle:
+        seen = set()
+        total = 0
+        for member in bundle:
+            # Ignore only the conventional archive root directory.
+            if member.isdir() and member.name in (".", "./"):
+                continue
+            relative = safe_relative(member.name)
+            if relative in seen:
+                raise CLIError(f"duplicate archive path: {relative}")
+            seen.add(relative)
+            if len(seen) > 50000:
+                raise CLIError("archive entry count exceeds reviewed payload bound")
+            target = destination / relative
+            if member.isdir():
+                target.mkdir(parents=True, exist_ok=True, mode=0o755)
+            elif member.isfile():
+                total += member.size
+                if total > 3 * 1024**3:
+                    raise CLIError("inflated archive exceeds program payload bound")
+                target.parent.mkdir(parents=True, exist_ok=True, mode=0o755)
+                with bundle.extractfile(member) as source, target.open("xb") as output:
+                    shutil.copyfileobj(source, output)
+                target.chmod(0o755 if member.mode & 0o111 else 0o644)
+            else:
+                raise CLIError(f"archive links and special files are refused: {relative}")
+
+
+def tree_state(root: Path) -> dict:
+    entries = {}
+    for path in sorted(root.rglob("*")):
+        if path.name == ".bootstrap-cli-receipt.json" and path.parent == root:
+            continue
+        metadata = path.lstat()
+        if metadata.st_uid != os.getuid() or metadata.st_mode & 0o022 or path.is_symlink():
+            raise CLIError(f"program tree ownership/mode drift: {path}")
+        relative = str(path.relative_to(root))
+        if path.is_dir():
+            entries[relative] = {"type": "directory", "mode": stat.S_IMODE(metadata.st_mode)}
+        elif path.is_file():
+            entries[relative] = {"type": "file", "mode": stat.S_IMODE(metadata.st_mode), "sha256": sha256(path)}
+        else:
+            raise CLIError(f"unexpected program payload entry: {path}")
+    return entries
+
+
+def expected_header(name: str, spec: dict, platform: str, artifact: dict) -> dict:
+    return {"schema": MARKER, "name": name, "version": spec["version"], "platform": platform,
+            "artifact": artifact, "command": spec["command"]}
+
+
+def node_runtime(home: Path, spec: dict, platform: str) -> dict | None:
+    if not platform.startswith("linux/") or not spec.get("linux_runtime_entry"):
+        return None
+    runtime = json.loads(CONTRACT.read_text())["runtime_support"]
+    version = runtime["ubuntu_node_lts"]
+    if version.split(".", 1)[0] != str(spec["linux_node_major"]):
+        raise CLIError("Cursor requires a reviewed Node major; runtime pin is incompatible")
+    root = home / ".local/share/rldyour/node" / f"v{version}"
+    binary = root / "bin/node"
+    receipt = root / ".rldyour-runtime-receipt"
+    for path in (root, binary, receipt):
+        if path.is_symlink() or not path.exists() or path.stat().st_uid != os.getuid() or path.stat().st_mode & 0o022:
+            raise CLIError(f"missing or unsafe bootstrap Node dependency: {path}")
+    lines = receipt.read_text().splitlines()
+    arch = "x64" if platform.endswith("/x86_64") else "arm64"
+    required = ["# Managed by macos-ubuntu-bootstrap: ubuntu-runtime-v1", "runtime=node",
+                f"version={version}", "archive_sha256=" + runtime["ubuntu_node_sha256"][arch]]
+    if any(lines.count(value) != 1 for value in required):
+        raise CLIError("bootstrap Node dependency receipt differs from its reviewed pin")
+    hashes = [line.removeprefix("sha256_bin_node=") for line in lines if line.startswith("sha256_bin_node=")]
+    if len(hashes) != 1 or not re.fullmatch(r"[0-9a-f]{64}", hashes[0]) or sha256(binary) != hashes[0]:
+        raise CLIError("bootstrap Node dependency payload differs from its receipt")
+    return {"version": version, "path": str(binary), "sha256": hashes[0]}
+
+
+def launch_target(home: Path, name: str, spec: dict, platform: str, artifact: dict) -> Path:
+    root = root_for(home, name, spec)
+    return root / ".bootstrap-launcher" if platform.startswith("linux/") and spec.get("linux_runtime_entry") else root / safe_relative(artifact["member"])
+
+
+def cursor_launcher(root: Path, spec: dict, runtime: dict) -> str:
+    node = shlex.quote(runtime["path"])
+    entry = shlex.quote(str(root / safe_relative(spec["linux_runtime_entry"])))
+    return f'''#!/bin/sh
+# Managed by macos-ubuntu-bootstrap: cursor-node-runtime-v1
+export CURSOR_INVOKED_AS="$(basename "$0")"
+if [ -z "${{NODE_COMPILE_CACHE:-}}" ] && [ -n "${{HOME:-}}" ]; then
+  export NODE_COMPILE_CACHE="${{XDG_CACHE_HOME:-$HOME/.cache}}/cursor-compile-cache"
+fi
+case "${{AGENT_CLI_CREDENTIAL_STORE:-}}" in
+  file) exec {node} {entry} "$@" ;;
+  *) exec {node} --use-system-ca {entry} "$@" ;;
+esac
+'''
+
+
+def verify_root(home: Path, name: str, spec: dict, platform: str) -> dict:
+    root = root_for(home, name, spec)
+    artifact = artifact_for(spec, platform)
+    if root.is_symlink() or not root.is_dir() or root.stat().st_uid != os.getuid() or root.stat().st_mode & 0o022:
+        raise CLIError(f"missing or unsafe managed program tree: {root}")
+    receipt = root / ".bootstrap-cli-receipt.json"
+    if receipt.is_symlink() or not receipt.is_file() or receipt.stat().st_uid != os.getuid() or stat.S_IMODE(receipt.stat().st_mode) != 0o600:
+        raise CLIError(f"missing or unsafe CLI receipt: {receipt}")
+    state = json.loads(receipt.read_text())
+    if not isinstance(state, dict):
+        raise CLIError("CLI receipt is not an object")
+    header = expected_header(name, spec, platform, artifact)
+    runtime = node_runtime(home, spec, platform)
+    if runtime is not None:
+        header["runtime"] = runtime
+    if {key: state.get(key) for key in header} != header or state.get("tree") != tree_state(root):
+        raise CLIError(f"managed program receipt or payload differs: {name}")
+    binary = root / safe_relative(artifact["member"])
+    if not binary.is_file() or not os.access(binary, os.X_OK):
+        raise CLIError(f"missing executable for {name}")
+    binary = launch_target(home, name, spec, platform, artifact)
+    if runtime is not None and binary.read_text() != cursor_launcher(root, spec, runtime):
+        raise CLIError("Cursor runtime launcher differs from its reviewed dependency")
+    return {"version": spec["version"], "resolved": str(binary), "receipt_sha256": sha256(receipt)}
+
+
+def verify(home: Path, name: str, spec: dict, platform: str) -> dict:
+    state = verify_root(home, name, spec, platform)
+    binary = Path(state["resolved"])
+    for command in [spec["command"], *spec.get("aliases", [])]:
+        link = home / ".local/bin" / command
+        if not link.is_symlink() or link.lstat().st_uid != os.getuid() or os.readlink(link) != str(binary):
+            raise CLIError(f"managed CLI launcher differs: {link}")
+    return state
+
+
+def install(home: Path, name: str, spec: dict, platform: str) -> dict:
+    artifact = artifact_for(spec, platform)
+    root = root_for(home, name, spec)
+    directory(root.parent)
+    directory(home / ".local/bin")
+    commands = [spec["command"], *spec.get("aliases", [])]
+    for command in commands:
+        if not re.fullmatch(r"[a-z][a-z0-9-]*", command):
+            raise CLIError("unsafe command name")
+        link = home / ".local/bin" / command
+        if (link.exists() or link.is_symlink()) and (link.lstat().st_uid != os.getuid() or not (link.is_file() or link.is_symlink())):
+            raise CLIError(f"foreign-owned or non-file launcher preserved: {link}")
+    if root.exists() or root.is_symlink():
+        verify_root(home, name, spec, platform)
+    else:
+        with tempfile.TemporaryDirectory(prefix=".stage-", dir=root.parent) as temporary:
+            stage = Path(temporary)
+            archive = stage / "download"
+            payload = stage / "payload"
+            payload.mkdir(mode=0o755)
+            download(artifact, archive)
+            # Independently validate even when a caller supplies its downloader.
+            if archive.stat().st_size != artifact["bytes"] or sha256(archive) != artifact["sha256"]:
+                raise CLIError("artifact integrity mismatch before extraction")
+            unpack(archive, payload, spec, artifact)
+            # Archives can omit parent-directory entries. pathlib then creates
+            # those parents with the host umask (0775 on Ubuntu), rather than
+            # the explicit leaf mode. Normalize only our private staging tree.
+            for directory_entry in payload.rglob("*"):
+                if directory_entry.is_dir():
+                    directory_entry.chmod(0o755)
+            binary = payload / safe_relative(artifact["member"])
+            if not binary.is_file() or binary.is_symlink():
+                raise CLIError("reviewed executable member is absent")
+            binary.chmod(0o755)
+            probe_home = stage / "probe-home"
+            probe_home.mkdir(mode=0o700)
+            probe_environment = {"PATH": os.defpath, "HOME": str(probe_home), "LC_ALL": "C",
+                                 "XDG_CONFIG_HOME": str(probe_home / "config"),
+                                 "XDG_CACHE_HOME": str(probe_home / "cache"),
+                                 "XDG_DATA_HOME": str(probe_home / "data"),
+                                 "CODEX_HOME": str(probe_home / "codex")}
+            runtime = node_runtime(home, spec, platform)
+            argv = [str(binary), "--version"]
+            if runtime is not None:
+                entry = payload / safe_relative(spec["linux_runtime_entry"])
+                if not entry.is_file():
+                    raise CLIError("Cursor's reviewed JavaScript entry is absent")
+                argv = [runtime["path"], "--use-system-ca", str(entry), "--version"]
+                probe_environment["CURSOR_INVOKED_AS"] = spec["command"]
+            version = subprocess.run(argv, capture_output=True, text=True, timeout=30,
+                                     check=True, env=probe_environment, cwd=stage)
+            if not re.search(r"(?<![\d.])" + re.escape(spec["version"]) + r"(?![\d.])", version.stdout + version.stderr):
+                raise CLIError(f"reviewed program reports another version: {name}")
+            receipt = expected_header(name, spec, platform, artifact)
+            if runtime is not None:
+                receipt["runtime"] = runtime
+                launcher = payload / ".bootstrap-launcher"
+                launcher.write_text(cursor_launcher(root, spec, runtime))
+                launcher.chmod(0o755)
+            receipt["tree"] = tree_state(payload)
+            record = payload / ".bootstrap-cli-receipt.json"
+            record.write_text(json.dumps(receipt, sort_keys=True, indent=2) + "\n")
+            record.chmod(0o600)
+            os.rename(payload, root)
+    binary = launch_target(home, name, spec, platform, artifact)
+    for command in commands:
+        link = home / ".local/bin" / command
+        if link.is_symlink() and os.readlink(link) == str(binary):
+            continue
+        token = str(uuid.uuid4())
+        temporary_link = link.parent / f".{command}-{token}"
+        temporary_link.symlink_to(binary)
+        try:
+            if link.exists() or link.is_symlink():
+                backup = home / ".local/share/rldyour/backups/cli" / f"{time.time_ns()}-{token}"
+                directory(backup)
+                backup.chmod(0o700)
+                os.rename(link, backup / command)
+            os.replace(temporary_link, link)
+        finally:
+            temporary_link.unlink(missing_ok=True)
+    return verify(home, name, spec, platform)
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("operation", choices=("install", "verify"))
+    parser.add_argument("--plan", action="store_true")
+    parser.add_argument("--platform", choices=("auto", "macos", "ubuntu"), default="auto")
+    arguments = parser.parse_args()
+    try:
+        entries = specifications(json.loads(CONTRACT.read_text()))
+        platform = platform_key()
+        if arguments.platform != "auto":
+            system = "linux" if arguments.platform == "ubuntu" else "macos"
+            # macOS support is Apple Silicon only, even when its read-only plan
+            # is evaluated on a Linux x86_64 CI runner.
+            selected = "macos/arm64" if system == "macos" else system + "/" + platform.split("/", 1)[1]
+            if not arguments.plan and selected != platform:
+                raise CLIError("CLI apply must run on the selected operating system")
+            platform = selected
+        home = Path.home()
+        lock = None
+        if arguments.operation == "install" and not arguments.plan:
+            lock_root = home / ".local/share/rldyour/cli"
+            directory(lock_root)
+            lock_path = lock_root / ".install.lock"
+            if lock_path.is_symlink():
+                raise CLIError("symlinked install lock preserved")
+            lock = lock_path.open("a")
+            if os.fstat(lock.fileno()).st_uid != os.getuid():
+                raise CLIError("foreign-owned install lock preserved")
+            fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        for name, spec in entries.items():
+            artifact = artifact_for(spec, platform)
+            if arguments.plan:
+                print(f"[plan] {name} {spec['version']} {artifact['url']} SHA256={artifact['sha256']}")
+            else:
+                result = install(home, name, spec, platform) if arguments.operation == "install" else verify(home, name, spec, platform)
+                print(f"[ok] {name} {result['version']} verified ({platform})")
+    except (CLIError, OSError, ValueError, subprocess.SubprocessError, tarfile.TarError) as error:
+        print(f"managed-cli: {error}", file=__import__("sys").stderr)
+        return 1
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

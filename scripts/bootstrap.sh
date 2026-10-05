@@ -225,6 +225,7 @@ fi
 
 export RLDYOUR_DRY_RUN=$((1 - APPLY))
 export RLDYOUR_PROFILE=$PROFILE
+export RLDYOUR_TARGET_PLATFORM=$PLATFORM
 if [ "$GUI_MODE" = "enabled" ]; then
   export RLDYOUR_GUI_ENABLED=1
 else

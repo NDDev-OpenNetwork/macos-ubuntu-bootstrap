@@ -332,46 +332,24 @@ rldyour::install_managed_file() {
   rldyour::log "ok" "installed managed file: ${dest}"
 }
 
-# Official vendor installers are mutable URLs. The bootstrap downloads them to
-# a temporary file and verifies the reviewed script digest before execution.
-RLDYOUR_CLAUDE_INSTALLER_URL="https://claude.ai/install.sh"
-RLDYOUR_CLAUDE_INSTALLER_SHA256="3a68d3406cf674e17bed1733a4dcf37805e2e47d87417700007d7e1aa766a944"
-RLDYOUR_GROK_INSTALLER_URL="https://x.ai/cli/install.sh"
-RLDYOUR_GROK_INSTALLER_SHA256="7fd6fdc75d9418b2e58356726fcbf1ae849416f773925da07d0ccc7a60d3e791"
-RLDYOUR_CODEX_VERSION="0.160.0"
-RLDYOUR_CODEX_TARBALL="https://registry.npmjs.org/@openai/codex/-/codex-0.160.0.tgz"
-RLDYOUR_CODEX_SHA512="904b551b38d101800c3b0271377f5b19c9daecb4f7203420abae0d349fdd0d37eee0ecd96a870973235be7f80627f21517f563ee82bb1369b79e64da9fb9698e"
-
+# Program pins come from the released seven setup-system baselines. One shared
+# installer owns exact vendor payloads on both supported operating systems.
 rldyour::install_vendor_ai_clis() {
-  rldyour::section "Install official AI CLIs (Codex, Claude Code, Grok Build)"
+  rldyour::section "Install seven verified AI CLIs and GoDaddy CLI"
+  local cli_installer
+  cli_installer="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)/managed_cli.py"
   if [ "${RLDYOUR_DRY_RUN:-1}" -eq 1 ]; then
-    rldyour::log "info" "[DRY-RUN] install verified @openai/codex ${RLDYOUR_CODEX_VERSION} package"
-    rldyour::log "info" "[DRY-RUN] execute reviewed Anthropic native installer after SHA-256 verification"
-    rldyour::log "info" "[DRY-RUN] execute reviewed xAI native installer after SHA-256 verification"
+    rldyour::_isolated_python python3 "$cli_installer" install --plan --platform "${RLDYOUR_TARGET_PLATFORM:-auto}" || return 1
   else
-    local stage codex_tgz claude_script grok_script npm_bin
-    stage="$(mktemp -d)" || return 1
-    codex_tgz="$stage/codex.tgz"
-    claude_script="$stage/claude-install.sh"
-    grok_script="$stage/grok-install.sh"
-    rldyour::download_verified_sha512_file "$RLDYOUR_CODEX_TARBALL" "$RLDYOUR_CODEX_SHA512" "$codex_tgz" || return 1
-    npm_bin="$(command -v npm 2>/dev/null || true)"
-    if [ -z "$npm_bin" ] && [ -x "$HOME/.local/share/rldyour/node/v24.21.0/bin/npm" ]; then
-      npm_bin="$HOME/.local/share/rldyour/node/v24.21.0/bin/npm"
-    fi
-    [ -n "$npm_bin" ] || {
-      rldyour::log "error" "npm is unavailable for the verified Codex package installation"
-      return 1
-    }
-    "$npm_bin" install --global --prefix "$HOME/.local/share/rldyour/npm" "$codex_tgz" || return 1
-    mkdir -p "$HOME/.local/bin" || return 1
-    ln -sfn "$HOME/.local/share/rldyour/npm/bin/codex" "$HOME/.local/bin/codex" || return 1
-    rldyour::download_verified_file "$RLDYOUR_CLAUDE_INSTALLER_URL" "$RLDYOUR_CLAUDE_INSTALLER_SHA256" "$claude_script" || return 1
-    bash "$claude_script" stable || return 1
-    rldyour::download_verified_file "$RLDYOUR_GROK_INSTALLER_URL" "$RLDYOUR_GROK_INSTALLER_SHA256" "$grok_script" || return 1
-    bash "$grok_script" || return 1
+    rldyour::_isolated_python python3 "$cli_installer" install || return 1
   fi
   rldyour::install_ai_launchers
+}
+
+rldyour::verify_managed_clis() {
+  local cli_installer
+  cli_installer="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)/managed_cli.py"
+  rldyour::_isolated_python python3 "$cli_installer" verify
 }
 
 rldyour::install_ai_launchers() {
@@ -656,7 +634,7 @@ PY
 
 rldyour::verify_terminal_environment() {
   local shell_dump expected_bin="$HOME/.local/bin"
-  local -a required_cmds=(codex claude grok cx cl gk)
+  local -a required_cmds=(agy claude codex cursor-agent grok opencode pi gddy cx cl gk)
   command -v zsh >/dev/null 2>&1 || {
     rldyour::log "error" "zsh is required for managed terminal verification"
     return 1
@@ -681,7 +659,7 @@ for line in sys.argv[1].splitlines():
         values[key] = value
 expected_bin = sys.argv[2]
 required = {"__RLDYOUR_PATH__"}
-required.update(f"__RLDYOUR_CMD_{name}__" for name in ("codex", "claude", "grok", "cx", "cl", "gk"))
+required.update(f"__RLDYOUR_CMD_{name}__" for name in ("agy", "claude", "codex", "cursor-agent", "grok", "opencode", "pi", "gddy", "cx", "cl", "gk"))
 commands = [
     key[len("__RLDYOUR_CMD_"):-len("__")]
     for key in values

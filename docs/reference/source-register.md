@@ -259,3 +259,25 @@ and matched the reviewed digest. A separate interrupted HTTP/1.1 transfer
 completed by range-resume and matched the same digest. Only transport failures
 are retried, at most twice and explicitly logged; immutable-pin mismatches and
 HTTP refusal are not retried. No partial file reaches extraction or execution.
+
+## Complete source audit (0.3.1, 2026-10-05)
+
+Local discovery reuses `gh api --method GET` on the exact HTTPS GitHub API
+host when no CI token is exported. It never extracts a token from the client's
+credential store or exports client stderr. CI retains its existing scoped
+`GITHUB_TOKEN` path; plaintext HTTP and lookalike hosts receive no credential.
+The read-only contract test runs a real synthetic gh executable and requires
+the contract bytes to remain unchanged.
+
+The audit also fetches each declared setup release's public baseline and compares
+the program version, archive shape and every supported platform's URL, size,
+SHA-256 and member. A current setup tag with altered local artifact metadata
+is a violation, not a current result. This closes the gap between checking a
+release name and checking the exact software that bootstrap installs.
+
+The complete audit found two stale pins: delta 0.20.1 and Homebrew 7.0.8.
+Both Linux delta archives were downloaded and independently hashed. The
+Homebrew package digest matched the released asset and its Apple notarization
+and Developer ID Installer identity matched team 927JGANW46. macOS Homebrew
+formulae remain intentionally rolling; an already working Homebrew installation
+is preserved.

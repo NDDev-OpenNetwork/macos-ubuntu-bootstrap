@@ -163,7 +163,7 @@ PINNED_SOURCE_TOOLS=(
   # rldyour::ensure_git_delta_config configures delta as the global git pager on
   # both platforms, but Ubuntu never installed it, so the call silently skipped
   # on every Linux desktop.
-  "delta;0.19.2;tar1;delta;delta;delta;8e695c5f586a8c53d6c3b01be0b4a422ed218bfed2a56191caebe373a1c18ab2;0bfce159a5cddd5feb3d6db4a616d883ff51253ce08ac7ec11cb1d208cfaab9e;https://github.com/dandavison/delta/releases/download/0.19.2/delta-0.19.2-x86_64-unknown-linux-gnu.tar.gz;https://github.com/dandavison/delta/releases/download/0.19.2/delta-0.19.2-aarch64-unknown-linux-gnu.tar.gz"
+  "delta;0.20.1;tar1;delta;delta;delta;50f08c879f84c81ceb220e476491a7f492d2c9c671e79918cc44badf961a6240;da7f4338f593572ff426ae153e0870e2fdc72729416eff551b40cdeb67940db8;https://github.com/dandavison/delta/releases/download/0.20.1/delta-0.20.1-x86_64-unknown-linux-gnu.tar.gz;https://github.com/dandavison/delta/releases/download/0.20.1/delta-0.20.1-aarch64-unknown-linux-gnu.tar.gz"
   "yq;4.54.1;tar0;yq_linux_amd64;yq_linux_arm64;yq;e68a456f90c577af3fe4960184b3a3cf5c461e0348407c10f107da3a5fec8972;8c27f6e7476fb5acefb9352e3d30f6bc2dc93f1956eb92e8da727173fb7ec6d3;https://github.com/mikefarah/yq/releases/download/v4.54.1/yq_linux_amd64.tar.gz;https://github.com/mikefarah/yq/releases/download/v4.54.1/yq_linux_arm64.tar.gz"
   # The archive also ships an `sg` shim. It is not published: upstream prints a
   # deprecation banner and exits non-zero, and on a host that has util-linux it

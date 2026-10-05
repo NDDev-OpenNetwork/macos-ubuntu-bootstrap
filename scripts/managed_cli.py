@@ -14,6 +14,7 @@ import os
 from pathlib import Path, PurePosixPath
 import re
 import shutil
+import shlex
 import stat
 import subprocess
 import tarfile
@@ -156,6 +157,52 @@ def expected_header(name: str, spec: dict, platform: str, artifact: dict) -> dic
             "artifact": artifact, "command": spec["command"]}
 
 
+def node_runtime(home: Path, spec: dict, platform: str) -> dict | None:
+    if not platform.startswith("linux/") or not spec.get("linux_runtime_entry"):
+        return None
+    runtime = json.loads(CONTRACT.read_text())["runtime_support"]
+    version = runtime["ubuntu_node_lts"]
+    if version.split(".", 1)[0] != str(spec["linux_node_major"]):
+        raise CLIError("Cursor requires a reviewed Node major; runtime pin is incompatible")
+    root = home / ".local/share/rldyour/node" / f"v{version}"
+    binary = root / "bin/node"
+    receipt = root / ".rldyour-runtime-receipt"
+    for path in (root, binary, receipt):
+        if path.is_symlink() or not path.exists() or path.stat().st_uid != os.getuid() or path.stat().st_mode & 0o022:
+            raise CLIError(f"missing or unsafe bootstrap Node dependency: {path}")
+    lines = receipt.read_text().splitlines()
+    arch = "x64" if platform.endswith("/x86_64") else "arm64"
+    required = ["# Managed by macos-ubuntu-bootstrap: ubuntu-runtime-v1", "runtime=node",
+                f"version={version}", "archive_sha256=" + runtime["ubuntu_node_sha256"][arch]]
+    if any(lines.count(value) != 1 for value in required):
+        raise CLIError("bootstrap Node dependency receipt differs from its reviewed pin")
+    hashes = [line.removeprefix("sha256_bin_node=") for line in lines if line.startswith("sha256_bin_node=")]
+    if len(hashes) != 1 or not re.fullmatch(r"[0-9a-f]{64}", hashes[0]) or sha256(binary) != hashes[0]:
+        raise CLIError("bootstrap Node dependency payload differs from its receipt")
+    return {"version": version, "path": str(binary), "sha256": hashes[0]}
+
+
+def launch_target(home: Path, name: str, spec: dict, platform: str, artifact: dict) -> Path:
+    root = root_for(home, name, spec)
+    return root / ".bootstrap-launcher" if platform.startswith("linux/") and spec.get("linux_runtime_entry") else root / safe_relative(artifact["member"])
+
+
+def cursor_launcher(root: Path, spec: dict, runtime: dict) -> str:
+    node = shlex.quote(runtime["path"])
+    entry = shlex.quote(str(root / safe_relative(spec["linux_runtime_entry"])))
+    return f'''#!/bin/sh
+# Managed by macos-ubuntu-bootstrap: cursor-node-runtime-v1
+export CURSOR_INVOKED_AS="$(basename "$0")"
+if [ -z "${{NODE_COMPILE_CACHE:-}}" ] && [ -n "${{HOME:-}}" ]; then
+  export NODE_COMPILE_CACHE="${{XDG_CACHE_HOME:-$HOME/.cache}}/cursor-compile-cache"
+fi
+case "${{AGENT_CLI_CREDENTIAL_STORE:-}}" in
+  file) exec {node} {entry} "$@" ;;
+  *) exec {node} --use-system-ca {entry} "$@" ;;
+esac
+'''
+
+
 def verify_root(home: Path, name: str, spec: dict, platform: str) -> dict:
     root = root_for(home, name, spec)
     artifact = artifact_for(spec, platform)
@@ -165,12 +212,20 @@ def verify_root(home: Path, name: str, spec: dict, platform: str) -> dict:
     if receipt.is_symlink() or not receipt.is_file() or receipt.stat().st_uid != os.getuid() or stat.S_IMODE(receipt.stat().st_mode) != 0o600:
         raise CLIError(f"missing or unsafe CLI receipt: {receipt}")
     state = json.loads(receipt.read_text())
+    if not isinstance(state, dict):
+        raise CLIError("CLI receipt is not an object")
     header = expected_header(name, spec, platform, artifact)
+    runtime = node_runtime(home, spec, platform)
+    if runtime is not None:
+        header["runtime"] = runtime
     if {key: state.get(key) for key in header} != header or state.get("tree") != tree_state(root):
         raise CLIError(f"managed program receipt or payload differs: {name}")
     binary = root / safe_relative(artifact["member"])
     if not binary.is_file() or not os.access(binary, os.X_OK):
         raise CLIError(f"missing executable for {name}")
+    binary = launch_target(home, name, spec, platform, artifact)
+    if runtime is not None and binary.read_text() != cursor_launcher(root, spec, runtime):
+        raise CLIError("Cursor runtime launcher differs from its reviewed dependency")
     return {"version": spec["version"], "resolved": str(binary), "receipt_sha256": sha256(receipt)}
 
 
@@ -226,17 +281,30 @@ def install(home: Path, name: str, spec: dict, platform: str) -> dict:
                                  "XDG_CACHE_HOME": str(probe_home / "cache"),
                                  "XDG_DATA_HOME": str(probe_home / "data"),
                                  "CODEX_HOME": str(probe_home / "codex")}
-            version = subprocess.run([str(binary), "--version"], capture_output=True, text=True, timeout=30,
+            runtime = node_runtime(home, spec, platform)
+            argv = [str(binary), "--version"]
+            if runtime is not None:
+                entry = payload / safe_relative(spec["linux_runtime_entry"])
+                if not entry.is_file():
+                    raise CLIError("Cursor's reviewed JavaScript entry is absent")
+                argv = [runtime["path"], "--use-system-ca", str(entry), "--version"]
+                probe_environment["CURSOR_INVOKED_AS"] = spec["command"]
+            version = subprocess.run(argv, capture_output=True, text=True, timeout=30,
                                      check=True, env=probe_environment, cwd=stage)
             if not re.search(r"(?<![\d.])" + re.escape(spec["version"]) + r"(?![\d.])", version.stdout + version.stderr):
                 raise CLIError(f"reviewed program reports another version: {name}")
             receipt = expected_header(name, spec, platform, artifact)
+            if runtime is not None:
+                receipt["runtime"] = runtime
+                launcher = payload / ".bootstrap-launcher"
+                launcher.write_text(cursor_launcher(root, spec, runtime))
+                launcher.chmod(0o755)
             receipt["tree"] = tree_state(payload)
             record = payload / ".bootstrap-cli-receipt.json"
             record.write_text(json.dumps(receipt, sort_keys=True, indent=2) + "\n")
             record.chmod(0o600)
             os.rename(payload, root)
-    binary = root / safe_relative(artifact["member"])
+    binary = launch_target(home, name, spec, platform, artifact)
     for command in commands:
         link = home / ".local/bin" / command
         if link.is_symlink() and os.readlink(link) == str(binary):
@@ -267,7 +335,9 @@ def main() -> int:
         platform = platform_key()
         if arguments.platform != "auto":
             system = "linux" if arguments.platform == "ubuntu" else "macos"
-            selected = system + "/" + platform.split("/", 1)[1]
+            # macOS support is Apple Silicon only, even when its read-only plan
+            # is evaluated on a Linux x86_64 CI runner.
+            selected = "macos/arm64" if system == "macos" else system + "/" + platform.split("/", 1)[1]
             if not arguments.plan and selected != platform:
                 raise CLIError("CLI apply must run on the selected operating system")
             platform = selected

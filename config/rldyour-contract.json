@@ -264,7 +264,9 @@
           "sha256": "629e51de43a0b7fb3b86f5ebc7e579f7df7df941b39f29e82945cde750145afc",
           "member": "dist-package/cursor-agent"
         }
-      }
+      },
+      "linux_runtime_entry": "dist-package/index.js",
+      "linux_node_major": 24
     },
     "grok-build": {
       "version": "1.0.49",

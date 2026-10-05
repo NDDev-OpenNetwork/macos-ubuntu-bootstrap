@@ -7,6 +7,8 @@ import json
 import os
 from pathlib import Path
 import shutil
+import sys
+import subprocess
 import tarfile
 
 import pytest
@@ -164,3 +166,63 @@ def test_canonical_seven_and_godaddy_have_reviewed_artifacts_for_every_target():
         if name != "gddy":
             assert spec["source"]["setup_system"].startswith("NDDev-OpenNetwork/")
             assert contract["harnesses"]["detection"][name]["enforcement"] == "owned-prefix"
+
+
+def test_macos_plan_on_linux_uses_supported_apple_silicon_and_writes_nothing(tmp_path, monkeypatch, capsys):
+    monkeypatch.setattr(cli, "platform_key", lambda: "linux/x86_64")
+    monkeypatch.setattr(Path, "home", classmethod(lambda cls: tmp_path))
+    monkeypatch.setattr(sys, "argv", ["managed_cli.py", "install", "--plan", "--platform", "macos"])
+    assert cli.main() == 0
+    output = capsys.readouterr().out
+    assert "darwin-arm" in output or "apple-darwin" in output
+    assert "[plan] gddy " in output
+    assert list(tmp_path.iterdir()) == []
+
+
+def cursor_runtime_fixture(tmp_path, monkeypatch):
+    home, spec, calls = fixture(tmp_path, monkeypatch)
+    spec.update(linux_runtime_entry="package/lib/runtime.js", linux_node_major=24)
+    contract = json.loads(cli.CONTRACT.read_text())["runtime_support"]
+    version = contract["ubuntu_node_lts"]
+    root = home / ".local/share/rldyour/node" / f"v{version}"
+    (root / "bin").mkdir(parents=True)
+    node = root / "bin/node"
+    node.write_text("#!/bin/sh\nprintf 'check-cli 1.2.3\\n'\n")
+    node.chmod(0o755)
+    receipt = root / ".rldyour-runtime-receipt"
+    receipt.write_text("\n".join([
+        "# Managed by macos-ubuntu-bootstrap: ubuntu-runtime-v1", "runtime=node",
+        f"version={version}", "archive_sha256=" + contract["ubuntu_node_sha256"]["x64"],
+        "sha256_bin_node=" + cli.sha256(node),
+    ]) + "\n")
+    receipt.chmod(0o600)
+    return home, spec, calls, node
+
+
+def test_linux_cursor_launcher_uses_and_binds_verified_bootstrap_node(tmp_path, monkeypatch):
+    home, spec, _, node = cursor_runtime_fixture(tmp_path, monkeypatch)
+    cli.install(home, "cursor", spec, "linux/x86_64")
+    binary = home / ".local/bin/check-cli"
+    assert binary.resolve().name == ".bootstrap-launcher"
+    result = subprocess.run([str(binary), "--version"], capture_output=True, text=True,
+                            env={"PATH": os.defpath, "HOME": str(home)}, check=True)
+    assert "1.2.3" in result.stdout
+    node.write_text("changed Node dependency")
+    with pytest.raises(cli.CLIError, match="Node dependency payload differs"):
+        cli.verify(home, "cursor", spec, "linux/x86_64")
+
+
+def test_cursor_runtime_does_not_fall_back_to_unverified_path_node(tmp_path, monkeypatch):
+    home, spec, _, node = cursor_runtime_fixture(tmp_path, monkeypatch)
+    node.unlink()
+    with pytest.raises(cli.CLIError, match="Node dependency"):
+        cli.install(home, "cursor", spec, "linux/x86_64")
+    assert not (home / ".local/bin/check-cli").exists()
+
+
+def test_macos_cursor_retains_vendor_runtime_without_linux_dependency(tmp_path, monkeypatch):
+    home, spec, _ = fixture(tmp_path, monkeypatch)
+    spec.update(linux_runtime_entry="package/lib/runtime.js", linux_node_major=24)
+    spec["artifacts"]["macos/arm64"] = spec["artifacts"]["linux/x86_64"]
+    cli.install(home, "cursor", spec, "macos/arm64")
+    assert (home / ".local/bin/check-cli").resolve().name == "check-cli"

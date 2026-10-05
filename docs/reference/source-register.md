@@ -242,3 +242,13 @@ The earlier native-installer reviews above are historical evidence. As of
 0.3.0, Claude and Grok use pinned program artifacts, so an HTML geo-block page
 or a changed install script cannot enter the execution path. CLI payload probes
 run with temporary configuration homes and no account credentials.
+
+Linux Cursor runtime compatibility: the 2026.10.01-e373342 payload bundles
+Node 24.5.0. A native Ubuntu 26.04 version probe crashed with SIGSEGV; the
+same JavaScript entry passed version and help probes under bootstrap Node
+24.21.0, including a 200% CPU-quota cgroup. The precise upstream cause was not
+established. The Linux launcher therefore uses the existing receipt-verified
+Node 24 dependency and binds its binary digest in the CLI receipt. No alternate
+Node is resolved from PATH and no vendor payload file is modified. Apple Silicon
+retains the bundled runtime. Native launch, dependency-tampering controls and
+repeat verification cover this composition; account/API access is not asserted.

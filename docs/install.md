@@ -46,6 +46,10 @@ that receipt and performs no download. Existing owner-held PATH launchers are
 moved to private backups before replacement; divergent managed payloads are
 refused and preserved. No network response is executed as a shell script.
 The `cx`, `cl` and `gk` convenience launchers retain their previous behavior.
+Linux Cursor uses the already-required, verified bootstrap Node 24 runtime; its
+launcher and receipt bind that dependency without changing the vendor archive.
+A missing, modified or incompatible-major Node is refused, never replaced by an
+ambient PATH command. macOS keeps the bundled Cursor runtime.
 
 Herdr is a required terminal tool on macOS and every Ubuntu profile. Both
 platforms install the pinned architecture-specific binary from the official

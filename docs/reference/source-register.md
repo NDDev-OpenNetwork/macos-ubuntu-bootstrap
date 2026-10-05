@@ -252,3 +252,10 @@ Node 24 dependency and binds its binary digest in the CLI receipt. No alternate
 Node is resolved from PATH and no vendor payload file is modified. Apple Silicon
 retains the bundled runtime. Native launch, dependency-tampering controls and
 repeat verification cover this composition; account/API access is not asserted.
+
+Static artifact transport uses HTTP/1.1. A native Linux xAI download stalled
+after a small HTTP/2 body, while the same exact URL completed with HTTP/1.1
+and matched the reviewed digest. A separate interrupted HTTP/1.1 transfer
+completed by range-resume and matched the same digest. Only transport failures
+are retried, at most twice and explicitly logged; immutable-pin mismatches and
+HTTP refusal are not retried. No partial file reaches extraction or execution.

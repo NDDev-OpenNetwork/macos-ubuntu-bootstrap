@@ -12,6 +12,8 @@ Versioning; the contract version in `config/rldyour-contract.json` moves with it
   Antigravity, Cursor, OpenCode and Pi; pin native Claude and Grok programs,
   avoiding mutable installer scripts and regional HTML responses.
 - Add GoDaddy CLI 0.2.25 from official, hashed platform release archives.
+- Use HTTP/1.1 for static artifact downloads and at most two logged range-resume
+  retries for interrupted transports; final length and SHA-256 remain required.
 - Use one portable program installer with bounded staged downloads, complete
   payload receipts, owner-held launcher backups and offline repeat apply.
   Preserve harness configuration, authentication and live processes.

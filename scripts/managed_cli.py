@@ -85,10 +85,22 @@ def artifact_for(spec: dict, platform: str) -> dict:
 
 
 def download(artifact: dict, destination: Path) -> None:
-    subprocess.run(["curl", "--fail", "--location", "--silent", "--show-error",
-                    "--proto", "=https", "--proto-redir", "=https", "--connect-timeout", "20",
-                    "--max-time", "300", "--output", str(destination), artifact["url"]],
-                   check=True, timeout=310)
+    # Static payloads do not need HTTP/2 multiplexing. Some vendor CDN edges
+    # stall large HTTP/2 bodies; HTTP/1.1 and bounded range-resume handle those
+    # transport failures while the final size/digest remain mandatory.
+    for attempt in range(3):
+        command = ["curl", "--http1.1", "--fail", "--location", "--silent", "--show-error",
+                   "--proto", "=https", "--proto-redir", "=https", "--connect-timeout", "20",
+                   "--max-time", "120", "--output", str(destination)]
+        if attempt and destination.exists() and destination.stat().st_size:
+            command += ["--continue-at", "-"]
+        try:
+            subprocess.run([*command, artifact["url"]], check=True, timeout=130)
+            break
+        except (subprocess.CalledProcessError, subprocess.TimeoutExpired) as error:
+            if attempt == 2 or isinstance(error, subprocess.CalledProcessError) and error.returncode not in (18, 28, 52, 55, 56, 92):
+                raise
+            print(f"[warn] artifact transport attempt {attempt + 1}/3 failed; bounded resume", flush=True)
     if destination.stat().st_size != artifact["bytes"] or sha256(destination) != artifact["sha256"]:
         raise CLIError("downloaded artifact differs from reviewed bytes; nothing executed")
 

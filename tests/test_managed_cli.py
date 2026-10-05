@@ -226,3 +226,34 @@ def test_macos_cursor_retains_vendor_runtime_without_linux_dependency(tmp_path, 
     spec["artifacts"]["macos/arm64"] = spec["artifacts"]["linux/x86_64"]
     cli.install(home, "cursor", spec, "macos/arm64")
     assert (home / ".local/bin/check-cli").resolve().name == "check-cli"
+
+
+def test_partial_transport_resumes_and_checks_complete_digest(tmp_path, monkeypatch):
+    value = b"verified complete program archive"
+    destination = tmp_path / "download"
+    artifact = {"url": "https://example.invalid/program", "bytes": len(value),
+                "sha256": hashlib.sha256(value).hexdigest()}
+    calls = []
+    def partial_then_complete(command, **kwargs):
+        calls.append(command)
+        if len(calls) == 1:
+            destination.write_bytes(value[:7])
+            raise subprocess.CalledProcessError(18, command)
+        assert "--continue-at" in command
+        destination.write_bytes(value)
+    monkeypatch.setattr(cli.subprocess, "run", partial_then_complete)
+    cli.download(artifact, destination)
+    assert len(calls) == 2
+    assert all("--http1.1" in call for call in calls)
+
+
+def test_transport_retries_are_bounded(tmp_path, monkeypatch, capsys):
+    calls = []
+    def always_timeout(command, **kwargs):
+        calls.append(command)
+        raise subprocess.CalledProcessError(28, command)
+    monkeypatch.setattr(cli.subprocess, "run", always_timeout)
+    with pytest.raises(subprocess.CalledProcessError):
+        cli.download({"url": "https://example.invalid/program"}, tmp_path / "download")
+    assert len(calls) == 3
+    assert capsys.readouterr().out.count("bounded resume") == 2

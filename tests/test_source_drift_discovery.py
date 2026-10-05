@@ -33,6 +33,23 @@ SPEC.loader.exec_module(drift)
 CONTRACT = json.loads((ROOT / "config/rldyour-contract.json").read_text(encoding="utf-8"))
 
 
+@pytest.fixture(autouse=True)
+def prevent_live_network(monkeypatch):
+    run = drift.subprocess.run
+    def unexpected(*args, **kwargs):
+        pytest.fail("source discovery unit tests must use synthetic metadata")
+    monkeypatch.setattr(drift.urllib.request, "urlopen", unexpected)
+    monkeypatch.setattr(drift.subprocess, "run", unexpected)
+    return run
+
+
+@pytest.fixture
+def offline_rust(monkeypatch):
+    # JSON metadata fixtures do not cover the separate TOML transport.
+    monkeypatch.setattr(drift, "_rust_stable", lambda name:
+                        (CONTRACT["runtime_support"]["ubuntu_rust"], []))
+
+
 def test_local_github_metadata_reuses_gh_without_reading_token(monkeypatch):
     monkeypatch.delenv("GITHUB_TOKEN", raising=False)
     monkeypatch.setattr(drift.shutil, "which", lambda command: "/usr/bin/gh")
@@ -88,7 +105,7 @@ def test_every_upstream_tag_spelling_normalizes(raw: str, expected: str) -> None
 # ----------------------------- fail-closed -----------------------------
 
 
-def test_a_missing_required_asset_is_a_violation(monkeypatch) -> None:
+def test_a_missing_required_asset_is_a_violation(monkeypatch, offline_rust) -> None:
     """A release that no longer publishes an architecture we install is drift."""
     monkeypatch.setattr(drift, "_get", lambda url: {
         "tag_name": "v9.9.9",
@@ -101,7 +118,7 @@ def test_a_missing_required_asset_is_a_violation(monkeypatch) -> None:
     assert "aarch64" in uv.detail
 
 
-def test_a_mutable_download_url_is_a_violation(monkeypatch) -> None:
+def test_a_mutable_download_url_is_a_violation(monkeypatch, offline_rust) -> None:
     """A moving target defeats the point of pinning."""
     monkeypatch.setattr(drift, "_get", lambda url: {
         "tag_name": "v9.9.9",
@@ -113,14 +130,14 @@ def test_a_mutable_download_url_is_a_violation(monkeypatch) -> None:
     assert "mutable URL" in findings["herdr"].detail
 
 
-def test_a_source_publishing_nothing_is_a_violation(monkeypatch) -> None:
+def test_a_source_publishing_nothing_is_a_violation(monkeypatch, offline_rust) -> None:
     monkeypatch.setattr(drift, "_get", lambda url: [] if "nodejs" in url else {"tag_name": None})
     findings = {item.name: item for item in drift.discover(CONTRACT)}
     assert findings["node"].status == "violation"
     assert findings["uv"].status == "violation"
 
 
-def test_violations_fail_the_run(monkeypatch, capsys) -> None:
+def test_violations_fail_the_run(monkeypatch, capsys, offline_rust) -> None:
     monkeypatch.setattr(drift, "_get", lambda url: {"tag_name": None})
     assert drift.main(["--json"]) == 1
     assert "source-drift-violation" in capsys.readouterr().err
@@ -277,7 +294,8 @@ def test_discovery_cannot_write_the_contract() -> None:
     )
 
 
-def test_authenticated_discovery_preserves_contract_bytes(tmp_path, monkeypatch, capsys):
+def test_authenticated_discovery_preserves_contract_bytes(tmp_path, monkeypatch, capsys,
+                                                        prevent_live_network):
     contract_path = tmp_path / "contract.json"
     contract_path.write_text(json.dumps(CONTRACT))
     before = contract_path.read_bytes()
@@ -291,6 +309,8 @@ def test_authenticated_discovery_preserves_contract_bytes(tmp_path, monkeypatch,
     gh.chmod(0o755)
     monkeypatch.delenv("GITHUB_TOKEN", raising=False)
     monkeypatch.setenv("PATH", str(bin_dir))
+    # The only available client is the synthetic script above.
+    monkeypatch.setattr(drift.subprocess, "run", prevent_live_network)
     monkeypatch.setattr(drift, "_pins", lambda contract: [
         ("fixture", "1.2.3", "github:example/tool", lambda name: drift._github_latest("example/tool", name), [])])
     assert drift.main(["--contract", str(contract_path), "--json"]) == 0
@@ -395,7 +415,7 @@ def test_without_a_previous_snapshot_nothing_escalates() -> None:
     assert drift.report(now, previous=None) == 0
 
 
-def test_an_unusable_previous_snapshot_skips_the_check(tmp_path, capsys) -> None:
+def test_an_unusable_previous_snapshot_skips_the_check(tmp_path, capsys, monkeypatch) -> None:
     """Retention is not evidence about a pin.
 
     Refusing to check for drift because last week's artifact aged out, or came
@@ -404,5 +424,6 @@ def test_an_unusable_previous_snapshot_skips_the_check(tmp_path, capsys) -> None
     """
     broken = tmp_path / "previous.json"
     broken.write_text("<!DOCTYPE html>not json", encoding="utf-8")
-    assert drift.main(["--json", "--previous", str(broken)]) in (0, 1)
+    monkeypatch.setattr(drift, "discover", lambda contract: [_finding("fixture", "current")])
+    assert drift.main(["--json", "--previous", str(broken)]) == 0
     assert "previous snapshot unusable" in capsys.readouterr().err

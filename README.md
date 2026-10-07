@@ -83,6 +83,25 @@ bash scripts/auth-handoff.sh check
 
 ## Validation
 
+### Harness applications
+
+Ubuntu CLI harnesses and desktop applications have separate lifecycles. The
+`config/harness-apps.json` manifest records which of the eight standard harness
+identities has an official Ubuntu desktop application. Run the module from the
+repository root:
+
+```bash
+python3 scripts/ubuntu/harness-apps.py plan
+python3 scripts/ubuntu/harness-apps.py verify
+python3 scripts/ubuntu/harness-apps.py install
+```
+
+The installer uses only vendor package channels or a reviewed, digest-pinned
+official archive. It never signs in, writes harness configuration, or creates
+`.codex`, `.claude`, provider memory, or project state. Grok Build, OpenCode,
+Pi and Devin remain explicitly CLI/TUI/web-only until their vendors publish an
+official Ubuntu desktop application.
+
 ```bash
 bash scripts/ci/setup-test-env.sh
 bash scripts/ci/lint.sh

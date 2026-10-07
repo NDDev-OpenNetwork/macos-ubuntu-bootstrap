@@ -1,0 +1,65 @@
+{
+  "schema": 1,
+  "platform": "ubuntu-amd64",
+  "apps": {
+    "antigravity": {
+      "cli": "agy",
+      "desktop": true,
+      "title": "Antigravity IDE",
+      "install": "verified-tarball",
+      "version": "2.5.5",
+      "url": "https://edgedl.me.gvt1.com/edgedl/release2/j0qc3/antigravity/stable/2.5.5-4923483625488384/linux-x64/Antigravity%20IDE.tar.gz",
+      "bytes": 240837095,
+      "sha256": "0c5233b297d2b3aebb61af49f8944012c2953d361a5ebb16978490636917f831",
+      "install_root": "/opt/antigravity/2.5.5"
+    },
+    "claude-code": {
+      "cli": "claude",
+      "desktop": true,
+      "title": "Claude Desktop",
+      "install": "apt",
+      "package": "claude-desktop",
+      "source": "https://downloads.claude.ai/claude-desktop/apt/stable"
+    },
+    "codex": {
+      "cli": "codex",
+      "desktop": true,
+      "title": "ChatGPT / Codex",
+      "install": "apt-package",
+      "package": "chatgpt",
+      "source": "https://persistent.oaistatic.com/codex-app-prod/linux/deb/latest/chatgpt_amd64.deb"
+    },
+    "cursor": {
+      "cli": "cursor-agent",
+      "desktop": true,
+      "title": "Cursor",
+      "install": "apt",
+      "package": "cursor",
+      "source": "https://downloads.cursor.com/aptrepo"
+    },
+    "grok-build": {
+      "cli": "grok",
+      "desktop": false,
+      "title": "Grok Build",
+      "install": "cli-only"
+    },
+    "opencode": {
+      "cli": "opencode",
+      "desktop": false,
+      "title": "OpenCode",
+      "install": "cli-only"
+    },
+    "pi": {
+      "cli": "pi",
+      "desktop": false,
+      "title": "Pi Coding Agent",
+      "install": "cli-only"
+    },
+    "devin": {
+      "cli": "devin",
+      "desktop": false,
+      "title": "Devin CLI",
+      "install": "cli-only"
+    }
+  }
+}

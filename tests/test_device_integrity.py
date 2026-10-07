@@ -733,7 +733,7 @@ def _fake_harness(home: Path, prefix_rel: str, command: str) -> Path:
 
 
 def test_every_active_harness_has_a_detection_entry() -> None:
-    """The policy names seven harnesses; every one must be observable."""
+    """The policy names eight harnesses; every one must be observable."""
     detection = CONTRACT["harnesses"]["detection"]
     for name in CONTRACT["harnesses"]["active"]:
         assert name in detection, f"{name} is active but has no detection entry"

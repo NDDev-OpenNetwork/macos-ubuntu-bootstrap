@@ -152,9 +152,9 @@ def test_command_shadowing_is_refused(tmp_path, monkeypatch):
         cli.verify(home, "check", spec, "linux/x86_64")
 
 
-def test_canonical_seven_and_godaddy_have_reviewed_artifacts_for_every_target():
+def test_canonical_eight_and_godaddy_have_reviewed_artifacts_for_every_target():
     contract = json.loads((ROOT / "config/rldyour-contract.json").read_text())
-    expected = {"antigravity", "claude-code", "codex", "cursor", "grok-build", "opencode", "pi"}
+    expected = {"antigravity", "claude-code", "codex", "cursor", "grok-build", "opencode", "pi", "devin"}
     assert set(contract["harnesses"]["active"]) == expected
     specs = cli.specifications(contract)
     assert set(specs) == expected | {"gddy"}
@@ -164,7 +164,10 @@ def test_canonical_seven_and_godaddy_have_reviewed_artifacts_for_every_target():
             assert spec["version"] in artifact["url"]
             cli.safe_relative(artifact["member"])
         if name != "gddy":
-            assert spec["source"]["setup_system"].startswith("NDDev-OpenNetwork/")
+            if name == "devin":
+                assert spec["source"]["manifest"].startswith("https://")
+            else:
+                assert spec["source"]["setup_system"].startswith("NDDev-OpenNetwork/")
             assert contract["harnesses"]["detection"][name]["enforcement"] == "owned-prefix"
 
 

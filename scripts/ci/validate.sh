@@ -60,8 +60,8 @@ if ubuntu.get('gui_architectures') != ['amd64']:
 harnesses = data.get('harnesses', {})
 if harnesses.get('policy') != 'vendor-official':
     raise SystemExit('AI CLI policy must require official vendor distributions')
-if harnesses.get('active') != ['antigravity', 'claude-code', 'codex', 'cursor', 'grok-build', 'opencode', 'pi']:
-    raise SystemExit('active AI CLI set must match the canonical seven setup systems')
+if harnesses.get('active') != ['antigravity', 'claude-code', 'codex', 'cursor', 'grok-build', 'opencode', 'pi', 'devin']:
+    raise SystemExit('active AI CLI set must match the canonical eight harness systems')
 print(f'contract-ok:{adapter_id}')
 PY
 

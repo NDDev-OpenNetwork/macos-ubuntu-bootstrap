@@ -291,7 +291,7 @@ required_cmds=(
   biome oxlint markdownlint-cli2 prettier
   starship atuin carapace
   cmake-language-server
-  agy claude codex cursor-agent grok opencode pi gddy cx cl gk
+  agy claude codex cursor-agent grok opencode pi devin gddy cx cl gk
   doctl stripe gcloud gsutil bq resend wrangler
 )
 for cmd in "${required_cmds[@]}"; do

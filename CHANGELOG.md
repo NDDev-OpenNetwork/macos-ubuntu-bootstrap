@@ -5,6 +5,10 @@ Versioning; the contract version in `config/rldyour-contract.json` moves with it
 
 ## [Unreleased]
 
+- Add Devin CLI and Devin Desktop to the managed Ubuntu harness set, register
+  OpenCode Desktop, and support one GUI-enabled bootstrap apply for all official
+  harness applications.
+
 ## [0.3.2] - 2026-10-05
 
 - Align the command-line profile help with the seven installed vendor AI CLIs.

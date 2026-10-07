@@ -23,7 +23,7 @@ def run(*args: str) -> subprocess.CompletedProcess[str]:
 def test_contract_and_version_match() -> None:
     contract = json.loads((ROOT / "config/rldyour-contract.json").read_text())
     assert contract["adapter"]["version"] == (ROOT / "VERSION").read_text().strip()
-    assert contract["harnesses"]["active"] == ["antigravity", "claude-code", "codex", "cursor", "grok-build", "opencode", "pi"]
+    assert contract["harnesses"]["active"] == ["antigravity", "claude-code", "codex", "cursor", "grok-build", "opencode", "pi", "devin"]
     assert "browser_automation" not in contract
 
 
@@ -39,11 +39,25 @@ def test_plan_matrix() -> None:
         assert result.returncode == 0, result.stdout + result.stderr
 
 
-def test_ai_plan_names_all_seven_vendor_clis_and_godaddy() -> None:
+def test_ai_plan_names_all_eight_vendor_clis_and_godaddy() -> None:
     result = run("--platform", "macos", "--no-gui", "--skip-system", "--skip-lsps", "--skip-checks")
     assert result.returncode == 0
-    for name in ["antigravity", "claude-code", "codex", "cursor", "grok-build", "opencode", "pi", "gddy"]:
+    for name in ["antigravity", "claude-code", "codex", "cursor", "grok-build", "opencode", "pi", "devin", "gddy"]:
         assert f"[plan] {name} " in result.stdout
+
+
+def test_combined_app_mode_requires_gui_ubuntu():
+    for args in [("--platform", "macos"), ("--platform", "ubuntu", "--profile", "server")]:
+        result = run(*args, "--with-harness-apps")
+        assert result.returncode == 2
+        assert "--with-harness-apps" in result.stderr
+
+
+def test_combined_plan_is_read_only_and_reports_app_module():
+    result = run("--platform", "ubuntu", "--profile", "desktop", "--with-harness-apps",
+                 "--skip-system", "--skip-ai", "--skip-lsps", "--skip-checks")
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert "harness application module plan complete" in result.stdout
 
 
 def test_unrestricted_launchers_use_vendor_flags() -> None:

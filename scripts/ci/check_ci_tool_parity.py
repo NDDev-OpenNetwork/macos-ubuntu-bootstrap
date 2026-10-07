@@ -299,7 +299,7 @@ def _python_shell_handoffs(path: Path, text: str) -> list[str]:
 
 
 def check_vendor_pin_shape(contract: dict | None = None) -> list[str]:
-    """Reject incomplete or mutable platform pins for any of the seven CLIs."""
+    """Reject incomplete or mutable platform pins for any of the eight CLIs."""
     findings: list[str] = []
     contract = contract if contract is not None else load_contract()
     entries = {name: contract["harnesses"][name] for name in contract["harnesses"]["active"]}

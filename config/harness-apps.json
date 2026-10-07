@@ -19,7 +19,17 @@
       "title": "Claude Desktop",
       "install": "apt",
       "package": "claude-desktop",
-      "source": "https://downloads.claude.ai/claude-desktop/apt/stable"
+      "source": "https://downloads.claude.ai/claude-desktop/apt/stable",
+      "apt_source": {
+        "uri": "https://downloads.claude.ai/claude-desktop/apt/stable",
+        "suite": "stable",
+        "components": ["main"],
+        "key_url": "https://downloads.claude.ai/claude-desktop/key.asc",
+        "sha256": "bd70a5e4a268002704024ceba7f8446024114e94f3f0bdd11c23a9e592be81c6",
+        "keyring": "/usr/share/keyrings/claude-desktop-archive-keyring.asc",
+        "source_file": "/etc/apt/sources.list.d/claude-desktop.list",
+        "format": "deb"
+      }
     },
     "codex": {
       "cli": "codex",
@@ -27,7 +37,10 @@
       "title": "ChatGPT / Codex",
       "install": "apt-package",
       "package": "chatgpt",
-      "source": "https://persistent.oaistatic.com/codex-app-prod/linux/deb/latest/chatgpt_amd64.deb"
+      "source": "https://persistent.oaistatic.com/codex-app-prod/linux/deb/pool/main/c/chatgpt/chatgpt_26.1002.52244_amd64.deb",
+      "version": "26.1002.52244",
+      "bytes": 497492494,
+      "sha256": "9498e417131a278bce35bfff6275d252c0d332f17afc0313e0b782749f4d348a"
     },
     "cursor": {
       "cli": "cursor-agent",
@@ -35,7 +48,18 @@
       "title": "Cursor",
       "install": "apt",
       "package": "cursor",
-      "source": "https://downloads.cursor.com/aptrepo"
+      "source": "https://downloads.cursor.com/aptrepo",
+      "apt_source": {
+        "uri": "https://downloads.cursor.com/aptrepo",
+        "suite": "stable",
+        "components": ["main"],
+        "key_url": "https://downloads.cursor.com/keys/anysphere.asc",
+        "sha256": "9d2adcc95efdf65e6e76f964968734551ab70181634781f9d5952b271895ec03",
+        "normalized_sha256": "0504fa8c1fdb830025bce4110cc741e5f725473c4564220a0663bdeaa0aef567",
+        "keyring": "/usr/share/keyrings/anysphere.gpg",
+        "source_file": "/etc/apt/sources.list.d/cursor.sources",
+        "format": "deb822"
+      }
     },
     "grok-build": {
       "cli": "grok",
@@ -45,9 +69,14 @@
     },
     "opencode": {
       "cli": "opencode",
-      "desktop": false,
-      "title": "OpenCode",
-      "install": "cli-only"
+      "desktop": true,
+      "title": "OpenCode Desktop",
+      "install": "apt-package",
+      "package": "opencode",
+      "source": "https://opencode.ai/files/bin/2.0.24/opencode-desktop-linux-amd64.deb",
+      "version": "2.0.24",
+      "bytes": 197873396,
+      "sha256": "e69f2e7d535fdfcfb504fa39dade7ef76316bd499fe112c5312ec4352b8ae30d"
     },
     "pi": {
       "cli": "pi",
@@ -57,9 +86,23 @@
     },
     "devin": {
       "cli": "devin",
-      "desktop": false,
-      "title": "Devin CLI",
-      "install": "cli-only"
+      "desktop": true,
+      "title": "Devin Desktop",
+      "install": "apt",
+      "package": "devin-desktop",
+      "source": "https://windsurf-stable.codeiumdata.com/wVxQEIWkwPUEAGf3/apt",
+      "apt_source": {
+        "uri": "https://windsurf-stable.codeiumdata.com/wVxQEIWkwPUEAGf3/apt",
+        "suite": "stable",
+        "components": ["main"],
+        "key_url": "https://windsurf-stable.codeiumdata.com/wVxQEIWkwPUEAGf3/windsurf.gpg",
+        "sha256": "fafcd1e301aeb47cabd3804d9bcdce3794a60393f9d2cf392e8efcc349f22822",
+        "normalized_sha256": "59dfc57985225a69461ea66e3e9bee77aa7ad353623e94bcb317e21e9ca303ab",
+        "keyring": "/etc/apt/keyrings/devin-desktop.gpg",
+        "source_file": "/etc/apt/sources.list.d/devin-desktop.list",
+        "format": "deb",
+        "architectures": ["amd64"]
+      }
     }
   }
 }

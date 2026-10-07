@@ -26,6 +26,7 @@ LOCAL_EXECUTION_POLICY="${RLDYOUR_LOCAL_EXECUTION_POLICY:-container-execution-on
 HARDEN_SSH="${RLDYOUR_HARDEN_SSH:-0}"
 ENABLE_UFW="${RLDYOUR_ENABLE_UFW:-0}"
 WITH_FAIL2BAN="${RLDYOUR_WITH_FAIL2BAN:-0}"
+WITH_HARNESS_APPS="${RLDYOUR_WITH_HARNESS_APPS:-0}"
 REMOTE_DESKTOP_USER="${RLDYOUR_REMOTE_DESKTOP_USER:-$(id -un)}"
 # Login shell change is explicit opt-in only; never mutated silently.
 SET_LOGIN_SHELL="${RLDYOUR_SET_LOGIN_SHELL:-0}"
@@ -1776,6 +1777,25 @@ install_gui_apps() {
   fi
 }
 
+install_harness_apps() {
+  if [ "$WITH_HARNESS_APPS" -eq 1 ]; then
+    local harness_apps_script
+    harness_apps_script="$REPO_ROOT/scripts/ubuntu/harness-apps.py"
+    [ -f "$harness_apps_script" ] || {
+      GUI_LAYER_FAILED=1
+      rldyour::log "error" "harness application module is missing"
+      return 0
+    }
+    if [ "$RLDYOUR_DRY_RUN" -eq 1 ]; then
+      python3 "$harness_apps_script" plan >/dev/null
+      rldyour::log "info" "harness application module plan complete"
+    elif ! python3 "$harness_apps_script" install; then
+      GUI_LAYER_FAILED=1
+      rldyour::log "error" "harness application installation failed"
+    fi
+  fi
+}
+
 run_server_layer() {
   local resolved_user=""
   # No Docker or server-baseline work for the plain desktop profile. Server,
@@ -1930,6 +1950,8 @@ main() {
   # verify.sh requires. Ordering it last keeps the failure fatal, which it must be,
   # while making it fatal to itself instead of to the whole device.
   [ "$SKIP_AI" -eq 1 ] || install_ai_runtimes
+  # Applications verify CLI presence, so compose them after the CLI layer.
+  install_harness_apps
 
   # Every optional-layer failure is reported here, once, after every layer has
   # been attempted. The user-tool result used to be reported earlier, before

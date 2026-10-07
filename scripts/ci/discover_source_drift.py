@@ -262,6 +262,14 @@ def _npm_latest(package: str, name: str) -> tuple[str, list[str]]:
     return version, []
 
 
+def _devin_latest(name: str) -> tuple[str, list[str]]:
+    data = _get("https://static.devin.ai/cli/current/manifest.json")
+    version = data.get("version")
+    if not version:
+        raise DiscoveryError(f"{name}: Devin CLI manifest published no version")
+    return version, []
+
+
 # --------------------------------------------------------------------------
 # The pin inventory: contract location -> official probe.
 # --------------------------------------------------------------------------
@@ -343,16 +351,20 @@ def _pins(contract: dict[str, Any]) -> list[tuple[str, str, str, Callable[[str],
          lambda n: _github_latest("01mf02/jaq", n), []),
         ("kotlin-lsp", tools["kotlin-lsp"]["version"], "github:Kotlin/kotlin-lsp",
          lambda n: _github_latest("Kotlin/kotlin-lsp", n), []),
+        ("devin", contract["harnesses"]["devin"]["version"], "static.devin.ai CLI manifest",
+         _devin_latest, []),
     ] + [
         (f"{name}-setup", spec["source"]["tag"], f"github:{spec['source']['setup_system']}",
          lambda n, repo=spec["source"]["setup_system"]: _github_latest(repo, n), [])
         for name in contract["harnesses"]["active"]
         for spec in [contract["harnesses"][name]]
+        if "setup_system" in spec.get("source", {})
     ] + [
         (f"{name}-catalogue", spec["version"], f"setup:{spec['source']['setup_system']}@{spec['source']['tag']}",
          lambda n, spec=spec: _setup_catalogue(spec, n), [])
         for name in contract["harnesses"]["active"]
         for spec in [contract["harnesses"][name]]
+        if "setup_system" in spec.get("source", {})
     ]
 
 

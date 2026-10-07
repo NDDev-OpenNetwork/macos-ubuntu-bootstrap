@@ -36,7 +36,7 @@ required_cmds=(
   vscode-html-language-server vscode-css-language-server vscode-json-language-server
   taplo marksman terraform-ls cmake-language-server
   herdr
-  agy claude codex cursor-agent grok opencode pi gddy cx cl gk
+  agy claude codex cursor-agent grok opencode pi devin gddy cx cl gk
 )
 for cmd in "${required_cmds[@]}"; do
   rldyour::require_cmd "$cmd" required

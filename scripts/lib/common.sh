@@ -332,10 +332,10 @@ rldyour::install_managed_file() {
   rldyour::log "ok" "installed managed file: ${dest}"
 }
 
-# Program pins come from the released seven setup-system baselines. One shared
+# Program pins come from the released eight-harness baseline. One shared
 # installer owns exact vendor payloads on both supported operating systems.
 rldyour::install_vendor_ai_clis() {
-  rldyour::section "Install seven verified AI CLIs and GoDaddy CLI"
+  rldyour::section "Install eight verified AI CLIs and GoDaddy CLI"
   local cli_installer
   cli_installer="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)/managed_cli.py"
   if [ "${RLDYOUR_DRY_RUN:-1}" -eq 1 ]; then

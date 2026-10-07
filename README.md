@@ -15,8 +15,8 @@ current contract is `0.3.2`.
 | Ubuntu `server` | none | rootful by default | production server/container host |
 
 Every profile receives the zsh-first terminal environment, source-analysis
-tools, language servers, all seven AI CLIs (Antigravity, Claude Code, Codex,
-Cursor, Grok Build, OpenCode and Pi), GoDaddy CLI (`gddy`), and the launchers
+tools, language servers, all eight AI CLIs (Antigravity, Claude Code, Codex,
+Cursor, Grok Build, OpenCode, Pi and Devin), GoDaddy CLI (`gddy`), and the launchers
 `cx`, `cl`, and `gk`. The interactive terminal tools the shell template binds
 aliases to are the same set on both platforms — `config/rldyour-contract.json`
 declares them under `terminal_tools.shared`, and a test fails if either
@@ -60,6 +60,7 @@ bash scripts/bootstrap.sh --platform macos
 bash scripts/bootstrap.sh --platform macos --no-gui
 bash scripts/bootstrap.sh --platform ubuntu --profile desktop
 bash scripts/bootstrap.sh --platform ubuntu --profile desktop-builds
+bash scripts/bootstrap.sh --platform ubuntu --profile desktop-builds --with-harness-apps
 bash scripts/bootstrap.sh --platform ubuntu --profile desktop-server
 bash scripts/bootstrap.sh --platform ubuntu --profile desktop-server --docker-mode rootful
 bash scripts/bootstrap.sh --platform ubuntu --profile server
@@ -68,6 +69,7 @@ bash scripts/bootstrap.sh --platform ubuntu --profile server
 bash scripts/bootstrap.sh --platform macos --apply
 bash scripts/bootstrap.sh --platform ubuntu --profile desktop --apply
 bash scripts/bootstrap.sh --platform ubuntu --profile desktop-builds --apply
+bash scripts/bootstrap.sh --platform ubuntu --profile desktop-builds --with-harness-apps --apply
 bash scripts/bootstrap.sh --platform ubuntu --profile desktop-server --apply
 bash scripts/bootstrap.sh --platform ubuntu --profile desktop-server --docker-mode rootful --apply
 bash scripts/bootstrap.sh --platform ubuntu --profile server --apply
@@ -97,10 +99,12 @@ python3 scripts/ubuntu/harness-apps.py install
 ```
 
 The installer uses only vendor package channels or a reviewed, digest-pinned
-official archive. It never signs in, writes harness configuration, or creates
-`.codex`, `.claude`, provider memory, or project state. Grok Build, OpenCode,
-Pi and Devin remain explicitly CLI/TUI/web-only until their vendors publish an
-official Ubuntu desktop application.
+official archive. It configures signed APT sources when needed, installs all
+available desktop harnesses in one run, and installs the OpenAI desktop package
+from its official Linux artifact when no APT source is present. It never signs
+in, writes harness configuration, or creates `.codex`, `.claude`, provider
+memory, or project state. Grok Build and Pi remain explicitly CLI/TUI/web-only
+because their vendors do not publish an official Ubuntu desktop application.
 
 ```bash
 bash scripts/ci/setup-test-env.sh

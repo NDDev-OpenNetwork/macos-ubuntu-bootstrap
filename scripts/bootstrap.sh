@@ -16,6 +16,7 @@ SKIP_CHECKS=0
 HARDEN_SSH=0
 ENABLE_UFW=0
 WITH_FAIL2BAN=0
+WITH_HARNESS_APPS=0
 
 usage() {
   cat <<'EOF'
@@ -24,6 +25,7 @@ Usage: scripts/bootstrap.sh [--platform macos|ubuntu] [--profile desktop|desktop
                            [--apply|--plan] [--skip-system] [--skip-ai]
                            [--skip-lsps] [--skip-checks] [--strict]
                            [--harden-ssh] [--enable-ufw] [--with-fail2ban]
+                           [--with-harness-apps]
 
 Entrypoint for the module installer.
 
@@ -36,7 +38,7 @@ Default:
             desktop-server and server accept an explicit rootful or rootless alternative
 
 Profiles:
-  - desktop:        source editing, LSP/quality tools, seven vendor AI CLIs, and
+  - desktop:        source editing, LSP/quality tools, eight vendor AI CLIs, and
                     optional GUI apps. No Docker or project runtime.
   - desktop-builds: Ubuntu-only — everything desktop has, PLUS Docker rootful for
                     local builds/tests. Receives the server Docker layer without the
@@ -117,6 +119,10 @@ while [ "$#" -gt 0 ]; do
       WITH_FAIL2BAN=1
       shift
       ;;
+    --with-harness-apps)
+      WITH_HARNESS_APPS=1
+      shift
+      ;;
     -h | --help)
       usage
       exit 0
@@ -189,6 +195,14 @@ if [ "$PROFILE" = "server" ] && [ "$GUI_MODE" != "disabled" ]; then
   echo "The server profile is always headless; use --profile desktop for GUI apps" >&2
   exit 2
 fi
+if [ "$WITH_HARNESS_APPS" -eq 1 ] && [ "$PLATFORM" != "ubuntu" ]; then
+  echo "--with-harness-apps is supported only on Ubuntu" >&2
+  exit 2
+fi
+if [ "$WITH_HARNESS_APPS" -eq 1 ] && [ "$GUI_MODE" != "enabled" ]; then
+  echo "--with-harness-apps requires GUI-enabled Ubuntu" >&2
+  exit 2
+fi
 
 if [ "$DOCKER_MODE" = "auto" ]; then
   if [ "$PLATFORM" = "ubuntu" ] && { [ "$PROFILE" = "server" ] || [ "$PROFILE" = "desktop-builds" ]; }; then
@@ -240,6 +254,7 @@ export RLDYOUR_SKIP_CHECKS=$SKIP_CHECKS
 export RLDYOUR_HARDEN_SSH=$HARDEN_SSH
 export RLDYOUR_ENABLE_UFW=$ENABLE_UFW
 export RLDYOUR_WITH_FAIL2BAN=$WITH_FAIL2BAN
+export RLDYOUR_WITH_HARNESS_APPS=$WITH_HARNESS_APPS
 if [ "$PROFILE" = "desktop" ]; then
   export RLDYOUR_LOCAL_EXECUTION_POLICY="source-lsp-only"
 elif [ "$PROFILE" = "desktop-builds" ]; then

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Install the seven vendor CLIs and gddy from reviewed, platform-specific bytes.
+"""Install the eight vendor CLIs and gddy from reviewed, platform-specific bytes.
 
 Only program payloads and PATH launchers are managed here. Harness configuration,
 accounts, credentials and running sessions are outside this installer's boundary.

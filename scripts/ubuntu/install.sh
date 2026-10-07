@@ -197,7 +197,7 @@ PINNED_SOURCE_TOOLS=(
   # Official JetBrains Kotlin LSP. The standalone archive includes its own JBR,
   # so no mutable system Java dependency is introduced. Upstream marks it alpha;
   # the exact release and both CDN checksums keep that boundary explicit.
-  "kotlin-lsp;263.6379.0;tar1;kotlin-lsp.sh;kotlin-lsp.sh;kotlin-lsp;ab8ca4455dc2fc5fe1a24db2bccc46c104254d2c465155c4251ee65df8f3f7cc;50999901ef8bcfa1e58561b6a8d782a72dea5620fcf92a64130807f8924a56fc;https://download-cdn.jetbrains.com/language-server/kotlin-server/263.6379.0/kotlin-server-263.6379.0.tar.gz;https://download-cdn.jetbrains.com/language-server/kotlin-server/263.6379.0/kotlin-server-263.6379.0-aarch64.tar.gz"
+  "kotlin-lsp;263.6379.0;tar1;kotlin-lsp.sh;kotlin-lsp.sh;kotlin-lsp;ab8ca4455dc2fc5fe1a24db2bccc46c104254d2c465155c4251ee65df8f3f7cc;50999901ef8bcfa1e58561b6a8d782a72dea5620fcf92a64130807f8924a56fc;https://download.jetbrains.com/language-server/kotlin-server/263.6379.0/kotlin-server-263.6379.0.tar.gz;https://download.jetbrains.com/language-server/kotlin-server/263.6379.0/kotlin-server-263.6379.0-aarch64.tar.gz"
 )
 
 # User-selected CLI tools that are not language hosts, LSPs, or scanners but

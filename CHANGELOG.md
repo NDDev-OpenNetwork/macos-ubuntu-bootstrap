@@ -5,6 +5,10 @@ Versioning; the contract version in `config/rldyour-contract.json` moves with it
 
 ## [Unreleased]
 
+- Refuse unmanaged or modified PATH launchers without making backups. Upgrade
+  intact managed symlinks atomically, retaining installed versions for running
+  sessions. Add structured CLI receipts with actual per-component change flags.
+
 - Add Devin CLI and Devin Desktop to the managed Ubuntu harness set, register
   OpenCode Desktop, and support one GUI-enabled bootstrap apply for all official
   harness applications.

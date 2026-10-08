@@ -63,7 +63,7 @@ def test_auxiliary_payload_tampering_fails_verify_and_repeat_apply(tmp_path, mon
     library.write_text("changed runtime")
     with pytest.raises(cli.CLIError, match="payload differs"):
         cli.verify(home, "check", spec, "linux/x86_64")
-    with pytest.raises(cli.CLIError, match="payload differs"):
+    with pytest.raises(cli.CLIError, match="drifted launcher preserved"):
         cli.install(home, "check", spec, "linux/x86_64")
     assert library.read_text() == "changed runtime"
 
@@ -74,7 +74,7 @@ def test_integrity_refusal_preserves_existing_launcher(tmp_path, monkeypatch):
     old.parent.mkdir(parents=True)
     old.write_bytes(b"previous owner's program\n")
     spec["artifacts"]["linux/x86_64"]["sha256"] = "0" * 64
-    with pytest.raises(cli.CLIError, match="integrity mismatch"):
+    with pytest.raises(cli.CLIError, match="unmanaged launcher preserved"):
         cli.install(home, "check", spec, "linux/x86_64")
     assert not old.is_symlink()
     assert old.read_bytes() == b"previous owner's program\n"
@@ -90,15 +90,34 @@ def test_verified_but_unsafe_archive_is_refused(tmp_path, monkeypatch, unsafe):
     assert not (tmp_path / "escape").exists()
 
 
-def test_previous_launcher_is_preserved_byte_exact(tmp_path, monkeypatch):
-    home, spec, _ = fixture(tmp_path, monkeypatch)
+def test_unmanaged_launcher_is_preserved_without_backups_or_download(tmp_path, monkeypatch):
+    home, spec, calls = fixture(tmp_path, monkeypatch)
     old = home / ".local/bin/check-cli"
     old.parent.mkdir(parents=True)
     old.write_bytes(b"previous owner's program\n")
+    with pytest.raises(cli.CLIError, match="unmanaged launcher preserved"):
+        cli.install(home, "check", spec, "linux/x86_64")
+    assert old.read_bytes() == b"previous owner's program\n"
+    assert calls == []
+    assert not (home / ".local/share/rldyour/backups").exists()
+
+
+def test_managed_launcher_upgrades_atomically_without_backup(tmp_path, monkeypatch):
+    home, spec, _ = fixture(tmp_path, monkeypatch)
     cli.install(home, "check", spec, "linux/x86_64")
-    backups = list((home / ".local/share/rldyour/backups/cli").glob("*/check-cli"))
-    assert len(backups) == 1
-    assert backups[0].read_bytes() == b"previous owner's program\n"
+    # Fixture bytes keep the same displayed version; exercise a second payload
+    # identity with a mocked version probe, leaving the old payload intact.
+    newer = dict(spec, version="1.2.4")
+    original = subprocess.run
+    def probe(argv, **kwargs):
+        if argv[-1] == "--version":
+            return subprocess.CompletedProcess(argv, 0, stdout="check-cli 1.2.4", stderr="")
+        return original(argv, **kwargs)
+    monkeypatch.setattr(cli.subprocess, "run", probe)
+    cli.install(home, "check", newer, "linux/x86_64")
+    assert (home / ".local/bin/check-cli").resolve().is_relative_to(cli.root_for(home, "check", newer))
+    assert cli.root_for(home, "check", spec).exists()
+    assert not (home / ".local/share/rldyour/backups").exists()
 
 
 def test_nonfile_launcher_is_preserved(tmp_path, monkeypatch):

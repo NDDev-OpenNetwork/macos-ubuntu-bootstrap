@@ -19,7 +19,6 @@ import stat
 import subprocess
 import tarfile
 import tempfile
-import time
 import uuid
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -263,6 +262,28 @@ def install(home: Path, name: str, spec: dict, platform: str) -> dict:
         link = home / ".local/bin" / command
         if (link.exists() or link.is_symlink()) and (link.lstat().st_uid != os.getuid() or not (link.is_file() or link.is_symlink())):
             raise CLIError(f"foreign-owned or non-file launcher preserved: {link}")
+        if link.exists() or link.is_symlink():
+            # Only an intact launcher owned by this installer may be replaced.
+            # Owner-held programs stay where they are; no implicit backups.
+            if not link.is_symlink():
+                raise CLIError(f"unmanaged launcher preserved: {link}")
+            previous = Path(os.readlink(link))
+            prefix = home / ".local/share/rldyour/cli" / name
+            try:
+                relative = previous.relative_to(prefix)
+                old_root = prefix / relative.parts[0]
+                record = old_root / ".bootstrap-cli-receipt.json"
+                if record.is_symlink() or not record.is_file():
+                    raise ValueError("missing receipt")
+                state = json.loads(record.read_text())
+                if state.get("schema") != MARKER or state.get("name") != name or state.get("command") != spec["command"] or state.get("platform") != platform:
+                    raise ValueError("foreign receipt")
+                old_spec = dict(spec, version=state["version"], artifacts={platform: state["artifact"]})
+                verified = verify_root(home, name, old_spec, platform)
+                if previous != Path(verified["resolved"]):
+                    raise ValueError("unexpected launcher target")
+            except (ValueError, KeyError, IndexError, CLIError, OSError) as error:
+                raise CLIError(f"unmanaged or drifted launcher preserved: {link}") from error
     if root.exists() or root.is_symlink():
         verify_root(home, name, spec, platform)
     else:
@@ -325,11 +346,6 @@ def install(home: Path, name: str, spec: dict, platform: str) -> dict:
         temporary_link = link.parent / f".{command}-{token}"
         temporary_link.symlink_to(binary)
         try:
-            if link.exists() or link.is_symlink():
-                backup = home / ".local/share/rldyour/backups/cli" / f"{time.time_ns()}-{token}"
-                directory(backup)
-                backup.chmod(0o700)
-                os.rename(link, backup / command)
             os.replace(temporary_link, link)
         finally:
             temporary_link.unlink(missing_ok=True)
@@ -340,6 +356,7 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("operation", choices=("install", "verify"))
     parser.add_argument("--plan", action="store_true")
+    parser.add_argument("--json", action="store_true", help="emit structured component observations")
     parser.add_argument("--platform", choices=("auto", "macos", "ubuntu"), default="auto")
     arguments = parser.parse_args()
     try:
@@ -365,13 +382,25 @@ def main() -> int:
             if os.fstat(lock.fileno()).st_uid != os.getuid():
                 raise CLIError("foreign-owned install lock preserved")
             fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        observations = []
         for name, spec in entries.items():
             artifact = artifact_for(spec, platform)
             if arguments.plan:
                 print(f"[plan] {name} {spec['version']} {artifact['url']} SHA256={artifact['sha256']}")
             else:
+                target = launch_target(home, name, spec, platform, artifact)
+                changed = arguments.operation == "install" and (
+                    not root_for(home, name, spec).exists() or any(
+                        not (home / ".local/bin" / command).is_symlink() or
+                        os.readlink(home / ".local/bin" / command) != str(target)
+                        for command in [spec["command"], *spec.get("aliases", [])]))
                 result = install(home, name, spec, platform) if arguments.operation == "install" else verify(home, name, spec, platform)
-                print(f"[ok] {name} {result['version']} verified ({platform})")
+                observations.append(dict(id=name, changed=changed, **result))
+                if not arguments.json:
+                    print(f"[ok] {name} {result['version']} verified ({platform})")
+        if arguments.json and not arguments.plan:
+            print(json.dumps({"schema": 1, "platform": platform, "components": observations,
+                              "vendor_configuration_mutated": False}, sort_keys=True))
     except (CLIError, OSError, ValueError, subprocess.SubprocessError, tarfile.TarError) as error:
         print(f"managed-cli: {error}", file=__import__("sys").stderr)
         return 1

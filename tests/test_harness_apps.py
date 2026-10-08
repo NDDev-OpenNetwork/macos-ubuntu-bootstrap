@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import subprocess
 from pathlib import Path
 
 import pytest
@@ -56,3 +57,35 @@ def test_plan_writes_nothing_and_never_invokes_installed_apps(tmp_path, monkeypa
     assert apps.main() == 0
     assert len(json.loads(capsys.readouterr().out)["apps"]) == 8
     assert list(tmp_path.iterdir()) == []
+
+
+def test_verified_updates_refuse_user_policy_before_any_package_command(monkeypatch):
+    monkeypatch.setattr(apps.os, "geteuid", lambda: 1000)
+    monkeypatch.setattr(apps.subprocess, "run", lambda *args, **kwargs: pytest.fail("Must not mutate"))
+    with pytest.raises(ValueError, match="root-owned"):
+        apps.update_verified(apps.load())
+
+
+def test_verified_updates_never_install_absent_packages_or_touch_native_owners(monkeypatch):
+    monkeypatch.setattr(apps.os, "geteuid", lambda: 0)
+    monkeypatch.setattr(apps, "architecture", lambda: "amd64")
+    monkeypatch.setattr(apps, "installed_package", lambda name: False)
+    monkeypatch.setattr(apps, "install_deb_package", lambda *args: pytest.fail("Must not install"))
+    data = {"apps": {"desktop": {"desktop": True, "install": "apt-package", "package": "fixture"},
+                     "native": {"desktop": True, "install": "apt"}, "pi": {"desktop": False}}}
+    result = apps.update_verified(data)
+    assert [item["state"] for item in result["components"]] == ["not-installed", "native-owner", "cli-only"]
+    assert not any(item["changed"] for item in result["components"])
+
+
+def test_verified_updates_do_not_downgrade_or_back_up_newer_packages(monkeypatch):
+    monkeypatch.setattr(apps.os, "geteuid", lambda: 0)
+    monkeypatch.setattr(apps, "architecture", lambda: "amd64")
+    monkeypatch.setattr(apps, "installed_package", lambda name: True)
+    monkeypatch.setattr(apps.subprocess, "check_output", lambda *args, **kwargs: "99.0")
+    monkeypatch.setattr(apps.subprocess, "run", lambda argv, **kwargs: subprocess.CompletedProcess(argv, 1))
+    monkeypatch.setattr(apps, "install_deb_package", lambda *args: pytest.fail("Must not downgrade"))
+    data = {"apps": {"fixture": {"desktop": True, "install": "apt-package", "package": "fixture", "version": "1.0"}}}
+    result = apps.update_verified(data)
+    assert result["components"][0]["state"] == "current-or-newer"
+    assert result["components"][0]["changed"] is False

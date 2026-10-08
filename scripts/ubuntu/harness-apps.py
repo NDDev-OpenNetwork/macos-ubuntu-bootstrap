@@ -57,6 +57,12 @@ def load() -> dict:
     return data
 
 
+
+def sudo_prefix() -> list[str]:
+    """Root schedulers already hold the required identity; never elevate user runs implicitly."""
+    return [] if os.geteuid() == 0 else ["sudo"]
+
+
 def installed_package(package: str) -> bool:
     return subprocess.run(
         ["dpkg-query", "-W", "-f=${Status}", package],
@@ -140,11 +146,11 @@ def publish_file(source: Path, destination: Path) -> None:
     stage = destination.with_name(destination.name + ".harness-apps-stage")
     if stage.exists() or stage.is_symlink():
         raise ValueError(f"Existing publication stage preserved: {stage}")
-    subprocess.run(["sudo", "install", "-o", "root", "-g", "root", "-m", "644", str(source), str(stage)], check=True)
+    subprocess.run([*sudo_prefix(), "install", "-o", "root", "-g", "root", "-m", "644", str(source), str(stage)], check=True)
     try:
-        subprocess.run(["sudo", "mv", "-T", str(stage), str(destination)], check=True)
+        subprocess.run([*sudo_prefix(), "mv", "-T", str(stage), str(destination)], check=True)
     finally:
-        subprocess.run(["sudo", "rm", "-f", str(stage)], check=True)
+        subprocess.run([*sudo_prefix(), "rm", "-f", str(stage)], check=True)
 
 
 def ensure_apt_source(spec: dict, arch: str) -> bool:
@@ -183,7 +189,7 @@ def ensure_apt_source(spec: dict, arch: str) -> bool:
             raise ValueError("Normalized vendor keyring differs from the manifest")
         rendered_source = Path(tmp) / "source"
         rendered_source.write_text(rendered, encoding="utf-8")
-        subprocess.run(["sudo", "install", "-d", "-m", "755", str(keyring.parent)], check=True)
+        subprocess.run([*sudo_prefix(), "install", "-d", "-m", "755", str(keyring.parent)], check=True)
         publish_file(normalized_key, keyring)
         publish_file(rendered_source, source_path)
     return True
@@ -230,14 +236,14 @@ def install_antigravity(spec: dict) -> None:
         if not (source / "antigravity-ide").is_file():
             raise SystemExit("Antigravity archive has an unexpected shape")
         root = Path(spec["install_root"])
-        subprocess.run(["sudo", "install", "-d", "-m", "755", str(root)], check=True)
-        subprocess.run(["sudo", "cp", "-a", str(source), str(root)], check=True)
-        subprocess.run(["sudo", "chown", "-R", "root:root", str(root)], check=True)
+        subprocess.run([*sudo_prefix(), "install", "-d", "-m", "755", str(root)], check=True)
+        subprocess.run([*sudo_prefix(), "cp", "-a", str(source), str(root)], check=True)
+        subprocess.run([*sudo_prefix(), "chown", "-R", "root:root", str(root)], check=True)
         binary = root / "Antigravity IDE" / "antigravity-ide"
         sandbox = root / "Antigravity IDE" / "chrome-sandbox"
-        subprocess.run(["sudo", "chmod", "755", str(binary)], check=True)
-        subprocess.run(["sudo", "chown", "root:root", str(sandbox)], check=True)
-        subprocess.run(["sudo", "chmod", "4755", str(sandbox)], check=True)
+        subprocess.run([*sudo_prefix(), "chmod", "755", str(binary)], check=True)
+        subprocess.run([*sudo_prefix(), "chown", "root:root", str(sandbox)], check=True)
+        subprocess.run([*sudo_prefix(), "chmod", "4755", str(sandbox)], check=True)
         desktop = Path(tmp) / "antigravity-ide.desktop"
         desktop.write_text(
             "[Desktop Entry]\nType=Application\nName=Antigravity IDE\n"
@@ -245,7 +251,7 @@ def install_antigravity(spec: dict) -> None:
             encoding="utf-8",
         )
         subprocess.run(
-            ["sudo", "install", "-m", "644", str(desktop),
+            [*sudo_prefix(), "install", "-m", "644", str(desktop),
              "/usr/share/applications/antigravity-ide.desktop"], check=True
         )
 
@@ -262,7 +268,14 @@ def install_deb_package(spec: dict) -> None:
             raise SystemExit(f"Downloaded package size differs from the manifest: {spec['package']}")
         if "sha256" in spec and sha256_file(archive) != spec["sha256"]:
             raise SystemExit(f"Downloaded package differs from the manifest: {spec['package']}")
-        subprocess.run(["sudo", "apt-get", "install", "-y", str(archive)], check=True)
+        fields = subprocess.check_output(
+            ["dpkg-deb", "--field", str(archive), "Package", "Version", "Architecture"],
+            text=True)
+        metadata = dict(line.split(": ", 1) for line in fields.splitlines() if ": " in line)
+        if metadata.get("Package") != spec["package"] or metadata.get("Version") != spec["version"] or metadata.get("Architecture") not in {architecture(), "all"}:
+            raise ValueError("Verified package metadata contradicts its catalogue identity")
+        subprocess.run([*sudo_prefix(), "apt-get", "-o", "DPkg::Lock::Timeout=30",
+                        "--no-remove", "install", "-y", str(archive)], check=True)
 
 
 def install(data: dict) -> int:
@@ -281,9 +294,9 @@ def install(data: dict) -> int:
         elif spec["install"] == "apt-package" and not installed_package(spec["package"]):
             deb_packages.append(spec)
     if source_changed or apt_packages:
-        subprocess.run(["sudo", "apt-get", "update"], check=True)
+        subprocess.run([*sudo_prefix(), "apt-get", "update"], check=True)
     if apt_packages:
-        subprocess.run(["sudo", "apt-get", "install", "-y", *apt_packages], check=True)
+        subprocess.run([*sudo_prefix(), "apt-get", "install", "-y", *apt_packages], check=True)
     for spec in deb_packages:
         install_deb_package(spec)
     spec = data["apps"]["antigravity"]
@@ -292,11 +305,76 @@ def install(data: dict) -> int:
     return verify(data)
 
 
+def update_verified(data: dict) -> dict:
+    """Update installed catalogue-owned apps only; native repositories own apt apps."""
+    if os.geteuid() != 0:
+        raise ValueError("verified application updates require a root-owned scheduler")
+    if architecture() != "amd64":
+        raise ValueError("verified application updates support Ubuntu amd64")
+    results = []
+    for name, spec in data["apps"].items():
+        entry = {"id": name, "changed": False, "state": "native-owner"}
+        if not spec["desktop"]:
+            entry["state"] = "cli-only"
+        elif spec["install"] == "apt-package":
+            if not installed_package(spec["package"]):
+                entry["state"] = "not-installed"
+            else:
+                old = subprocess.check_output(
+                    ["dpkg-query", "-W", "-f=${Version}", spec["package"]], text=True).strip()
+                newer = subprocess.run(
+                    ["dpkg", "--compare-versions", spec["version"], "gt", old], check=False)
+                if newer.returncode not in (0, 1):
+                    raise ValueError("package version comparison failed")
+                if newer.returncode == 0:
+                    install_deb_package(spec)
+                    actual = subprocess.check_output(
+                        ["dpkg-query", "-W", "-f=${Version}", spec["package"]], text=True).strip()
+                    if actual != spec["version"]:
+                        raise ValueError("installed package version differs from catalogue")
+                    entry.update(changed=True, state="updated")
+                else:
+                    entry["state"] = "current-or-newer"
+        elif spec["install"] == "verified-tarball" and name == "antigravity":
+            desktop = Path("/usr/share/applications/antigravity-ide.desktop")
+            if app_binary(spec).is_file():
+                entry["state"] = "current"
+            elif not desktop.exists():
+                entry["state"] = "not-installed"
+            else:
+                if desktop.is_symlink() or desktop.stat().st_uid != 0 or desktop.stat().st_mode & 0o022:
+                    raise ValueError("unmanaged desktop entry preserved")
+                match = re.fullmatch(
+                    r'\[Desktop Entry\]\nType=Application\nName=Antigravity IDE\n'
+                    r'Exec="/opt/antigravity/([0-9.]+)/Antigravity IDE/antigravity-ide" %F\n'
+                    r'Terminal=false\nCategories=Development;IDE;\n',
+                    desktop.read_text())
+                if not match:
+                    raise ValueError("custom Antigravity desktop entry preserved")
+                newer = subprocess.run(
+                    ["dpkg", "--compare-versions", spec["version"], "gt", match[1]], check=False)
+                if newer.returncode not in (0, 1):
+                    raise ValueError("application version comparison failed")
+                if newer.returncode == 0:
+                    install_antigravity(spec)
+                    if not app_binary(spec).is_file():
+                        raise ValueError("updated Antigravity binary is absent")
+                    entry.update(changed=True, state="updated")
+                else:
+                    entry["state"] = "current-or-newer"
+        results.append(entry)
+    return {"schema": 1, "components": results, "vendor_configuration_mutated": False}
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
-    parser.add_argument("operation", choices=("plan", "install", "verify"))
+    parser.add_argument("operation", choices=("plan", "install", "verify", "update-verified"))
+    parser.add_argument("--json", action="store_true")
     args = parser.parse_args()
     data = load()
+    if args.operation == "update-verified":
+        print(json.dumps(update_verified(data), sort_keys=True))
+        return 0
     if args.operation == "plan":
         print(json.dumps(data, indent=2, ensure_ascii=False))
         return 0

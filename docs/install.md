@@ -32,9 +32,9 @@ client files only after deployment, when the public host name, SSH account and
 server Ed25519 public host key are known. The complete workflow is in the
 [desktop-server reference](reference/desktop-server.md).
 
-Every profile installs all seven official vendor CLIs: Antigravity (`agy`),
+Every profile installs all eight official vendor CLIs: Antigravity (`agy`),
 Claude Code (`claude`), Codex (`codex`), Cursor (`cursor-agent`), Grok Build
-(`grok`), OpenCode (`opencode`), and Pi (`pi`). Program versions and full
+(`grok`), OpenCode (`opencode`), Pi (`pi`), and Devin (`devin`). Program versions and full
 platform-artifact digests are imported from the published 0.0.88 setup-system
 baselines. These are the vendor programs, not configuration mutations: setup
 profiles, authentication and running agent sessions remain untouched.
@@ -43,8 +43,11 @@ profiles, authentication and running agent sessions remain untouched.
 SHA-256 before extraction or execution, and writes a receipt covering the whole
 payload, including bundled runtimes and auxiliary files. A repeat apply checks
 that receipt and performs no download. Existing owner-held PATH launchers are
-moved to private backups before replacement; divergent managed payloads are
-refused and preserved. No network response is executed as a shell script.
+refused in place without creating backups. Only intact managed symlinks can
+be replaced atomically; installed version directories remain available to
+running sessions. Divergent managed payloads are refused and preserved.
+`--json` emits component receipts with actual change flags. No network response
+is executed as a shell script.
 The `cx`, `cl` and `gk` convenience launchers retain their previous behavior.
 Linux Cursor uses the already-required, verified bootstrap Node 24 runtime; its
 launcher and receipt bind that dependency without changing the vendor archive.

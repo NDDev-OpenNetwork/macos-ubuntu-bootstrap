@@ -1410,7 +1410,7 @@ ensure_rust() {
     trap - RETURN
   fi
   local tool
-  for tool in rustc cargo rust-analyzer rustfmt clippy-driver cargo-clippy cargo-fmt; do
+  for tool in rustc rustdoc cargo rust-analyzer rustfmt clippy-driver cargo-clippy cargo-fmt; do
     [ -x "$destination/bin/$tool" ] || continue
     rldyour::ubuntu::preflight_managed_link "$tool" "$HOME/.local/share/rldyour/rust"
     ensure_managed_tool_link "$tool" "$destination/bin/$tool" "$HOME/.local/share/rldyour/rust"

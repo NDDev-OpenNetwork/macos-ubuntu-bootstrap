@@ -315,7 +315,7 @@ rldyour::verify_managed_clis
 if [ "$PROFILE" != "server" ]; then
   # Go and Rust are desktop/desktop-builds language-server hosts. The server
   # profile is `container-execution-only`, so their absence there is the policy.
-  for cmd in go gopls rustc cargo rust-analyzer dart; do
+  for cmd in go gopls rustc rustdoc cargo rust-analyzer dart; do
     rldyour::require_cmd "$cmd" required
   done
   # Pinned source-analysis tools: the four CI-parity scanners, the Markdown
@@ -406,7 +406,7 @@ if [ "$PROFILE" != "server" ]; then
   fi
 else
   rldyour::require_cmd herdr required
-  for cmd in go gopls rustc cargo rust-analyzer dart; do
+  for cmd in go gopls rustc rustdoc cargo rust-analyzer dart; do
     rldyour::require_cmd "$cmd" required
   done
   for cmd in gitleaks osv-scanner actionlint hadolint markdown-oxide delta yq ast-grep just age age-keygen \

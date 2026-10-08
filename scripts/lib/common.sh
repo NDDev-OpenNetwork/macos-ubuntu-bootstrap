@@ -353,25 +353,13 @@ rldyour::verify_managed_clis() {
 }
 
 rldyour::install_ai_launchers() {
-  local bin="$HOME/.local/bin"
-  # install_managed_file is plan-aware, but this mkdir was not, so a plan
-  # created ~/.local/bin on a machine it was only supposed to describe.
-  [ "${RLDYOUR_DRY_RUN:-1}" -eq 1 ] || mkdir -p "$bin"
-  rldyour::install_managed_file "$bin/cx" "# Managed by macos-ubuntu-bootstrap: ai-launcher-cx-v1" 0755 <<'EOF'
-#!/bin/sh
-# Managed by macos-ubuntu-bootstrap: ai-launcher-cx-v1
-exec codex --dangerously-bypass-approvals-and-sandbox "$@"
-EOF
-  rldyour::install_managed_file "$bin/cl" "# Managed by macos-ubuntu-bootstrap: ai-launcher-cl-v1" 0755 <<'EOF'
-#!/bin/sh
-# Managed by macos-ubuntu-bootstrap: ai-launcher-cl-v1
-exec claude --dangerously-skip-permissions "$@"
-EOF
-  rldyour::install_managed_file "$bin/gk" "# Managed by macos-ubuntu-bootstrap: ai-launcher-gk-v1" 0755 <<'EOF'
-#!/bin/sh
-# Managed by macos-ubuntu-bootstrap: ai-launcher-gk-v1
-exec grok --permission-mode bypassPermissions --always-approve "$@"
-EOF
+  local launcher_script
+  launcher_script="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)/ai_launchers.py"
+  if [ "${RLDYOUR_DRY_RUN:-1}" -eq 1 ]; then
+    rldyour::_isolated_python python3 "$launcher_script" install --plan
+  else
+    rldyour::_isolated_python python3 "$launcher_script" install
+  fi
 }
 
 rldyour::_isolated_python() {
@@ -634,7 +622,7 @@ PY
 
 rldyour::verify_terminal_environment() {
   local shell_dump expected_bin="$HOME/.local/bin"
-  local -a required_cmds=(agy claude codex cursor-agent grok opencode pi gddy cx cl gk)
+  local -a required_cmds=(agy claude codex cursor-agent grok opencode pi devin gddy agyx agy-full cx cl cu cursor-auto gkx grok-auto gk opx opencode-auto pix pi-auto dv devin-auto ai-full)
   command -v zsh >/dev/null 2>&1 || {
     rldyour::log "error" "zsh is required for managed terminal verification"
     return 1
@@ -659,7 +647,7 @@ for line in sys.argv[1].splitlines():
         values[key] = value
 expected_bin = sys.argv[2]
 required = {"__RLDYOUR_PATH__"}
-required.update(f"__RLDYOUR_CMD_{name}__" for name in ("agy", "claude", "codex", "cursor-agent", "grok", "opencode", "pi", "gddy", "cx", "cl", "gk"))
+required.update(f"__RLDYOUR_CMD_{name}__" for name in ("agy", "claude", "codex", "cursor-agent", "grok", "opencode", "pi", "devin", "gddy", "agyx", "agy-full", "cx", "cl", "cu", "cursor-auto", "gkx", "grok-auto", "gk", "opx", "opencode-auto", "pix", "pi-auto", "dv", "devin-auto", "ai-full"))
 commands = [
     key[len("__RLDYOUR_CMD_"):-len("__")]
     for key in values

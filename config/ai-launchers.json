@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "policy": "explicit-session-wrapper-v1",
+  "vendor_configuration_mutated": false,
+  "launchers": [
+    {"name": "agyx", "aliases": ["agy-full"], "harness": "antigravity", "command": "agy", "args": ["--dangerously-skip-permissions"], "sandbox": "disabled-by-vendor-flag"},
+    {"name": "cl", "aliases": [], "harness": "claude-code", "command": "claude", "args": ["--dangerously-skip-permissions"], "sandbox": "disabled-by-vendor-flag"},
+    {"name": "cx", "aliases": [], "harness": "codex", "command": "codex", "args": ["--dangerously-bypass-approvals-and-sandbox"], "sandbox": "disabled-by-vendor-flag"},
+    {"name": "cu", "aliases": ["cursor-auto"], "harness": "cursor", "command": "cursor-agent", "args": ["--yolo", "--sandbox", "disabled", "--trust"], "sandbox": "disabled-by-vendor-flag"},
+    {"name": "gkx", "aliases": ["grok-auto", "gk"], "harness": "grok-build", "command": "grok", "args": ["--permission-mode", "bypassPermissions", "--always-approve", "--sandbox", "disabled"], "sandbox": "disabled-by-vendor-flag"},
+    {"name": "opx", "aliases": ["opencode-auto"], "harness": "opencode", "command": "opencode", "args": ["--auto"], "sandbox": "native-sandbox-flag-unavailable"},
+    {"name": "pix", "aliases": ["pi-auto"], "harness": "pi", "command": "pi", "args": ["--approve", "--tools", "read,bash,edit,write,grep,find,ls"], "sandbox": "native-sandbox-flag-unavailable"},
+    {"name": "dv", "aliases": ["devin-auto"], "harness": "devin", "command": "devin", "args": ["--permission-mode", "dangerous", "--respect-workspace-trust", "false"], "env": {"DEVIN_PERMISSION_MODE": "dangerous", "DEVIN_SANDBOX": "0"}, "sandbox": "disabled-by-default"}
+  ],
+  "dispatcher": {
+    "name": "ai-full",
+    "targets": {"antigravity": "agyx", "claude-code": "cl", "codex": "cx", "cursor": "cu", "grok-build": "gkx", "opencode": "opx", "pi": "pix", "devin": "dv"}
+  }
+}

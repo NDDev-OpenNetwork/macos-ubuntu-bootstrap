@@ -53,7 +53,8 @@ def install(path: Path, content: str, dry_run: bool) -> None:
         return
     path.parent.mkdir(parents=True, exist_ok=True)
     existing = path.read_text(encoding="utf-8", errors="replace") if path.exists() else ""
-    if path.exists() and MARKER not in existing and "macos-ubuntu-bootstrap: ai-launcher-" not in existing:
+    legacy_markers = ("macos-ubuntu-bootstrap: ai-launcher-", "rldyour-ai-cli-tools scripts/install_yolo_launchers.sh")
+    if path.exists() and MARKER not in existing and not any(marker in existing for marker in legacy_markers):
         raise RuntimeError(f"refusing to overwrite unmanaged launcher: {path}")
     with tempfile.NamedTemporaryFile("w", dir=path.parent, prefix=f".{path.name}.", delete=False, encoding="utf-8") as stream:
         stream.write(content)

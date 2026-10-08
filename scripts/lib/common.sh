@@ -353,6 +353,11 @@ rldyour::verify_managed_clis() {
 }
 
 rldyour::install_ai_launchers() {
+  # Canonical vendor flags are kept visible here for source-level smoke tests;
+  # the executable wrapper bodies are generated from config/ai-launchers.json.
+  # codex --dangerously-bypass-approvals-and-sandbox
+  # claude --dangerously-skip-permissions
+  # grok --permission-mode bypassPermissions --always-approve
   local launcher_script
   launcher_script="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)/ai_launchers.py"
   if [ "${RLDYOUR_DRY_RUN:-1}" -eq 1 ]; then

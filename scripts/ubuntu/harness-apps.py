@@ -305,6 +305,23 @@ def install(data: dict) -> int:
     return verify(data)
 
 
+
+def managed_antigravity_desktop(text: str) -> str | None:
+    """Recognize only the two published managed layouts; preserve custom entries."""
+    compact = re.fullmatch(
+        r'\[Desktop Entry\]\nType=Application\nName=Antigravity IDE\n'
+        r'Exec="/opt/antigravity/([0-9.]+)/Antigravity IDE/antigravity-ide" %F\n'
+        r'Terminal=false\nCategories=Development;IDE;\n', text)
+    workstation = re.fullmatch(
+        r'\[Desktop Entry\]\nName=Antigravity IDE\n'
+        r'Comment=Google Antigravity agent-first IDE\n'
+        r'Exec="/opt/antigravity/([0-9.]+)/Antigravity IDE/antigravity-ide" %U\n'
+        r'Icon=code\nTerminal=false\nType=Application\nCategories=Development;IDE;\n'
+        r'StartupWMClass=antigravity-ide\nMimeType=text/plain;inode/directory;\n', text)
+    match = compact or workstation
+    return match[1] if match else None
+
+
 def update_verified(data: dict) -> dict:
     """Update installed catalogue-owned apps only; native repositories own apt apps."""
     if os.geteuid() != 0:
@@ -344,15 +361,11 @@ def update_verified(data: dict) -> dict:
             else:
                 if desktop.is_symlink() or desktop.stat().st_uid != 0 or desktop.stat().st_mode & 0o022:
                     raise ValueError("unmanaged desktop entry preserved")
-                match = re.fullmatch(
-                    r'\[Desktop Entry\]\nType=Application\nName=Antigravity IDE\n'
-                    r'Exec="/opt/antigravity/([0-9.]+)/Antigravity IDE/antigravity-ide" %F\n'
-                    r'Terminal=false\nCategories=Development;IDE;\n',
-                    desktop.read_text())
+                match = managed_antigravity_desktop(desktop.read_text())
                 if not match:
                     raise ValueError("custom Antigravity desktop entry preserved")
                 newer = subprocess.run(
-                    ["dpkg", "--compare-versions", spec["version"], "gt", match[1]], check=False)
+                    ["dpkg", "--compare-versions", spec["version"], "gt", match], check=False)
                 if newer.returncode not in (0, 1):
                     raise ValueError("application version comparison failed")
                 if newer.returncode == 0:

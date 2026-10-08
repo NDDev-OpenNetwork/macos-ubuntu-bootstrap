@@ -89,3 +89,13 @@ def test_verified_updates_do_not_downgrade_or_back_up_newer_packages(monkeypatch
     result = apps.update_verified(data)
     assert result["components"][0]["state"] == "current-or-newer"
     assert result["components"][0]["changed"] is False
+
+
+def test_known_quoted_workstation_desktop_is_upgradable_but_custom_is_preserved():
+    text = ('[Desktop Entry]\nName=Antigravity IDE\n'
+            'Comment=Google Antigravity agent-first IDE\n'
+            'Exec="/opt/antigravity/2.5.5/Antigravity IDE/antigravity-ide" %U\n'
+            'Icon=code\nTerminal=false\nType=Application\nCategories=Development;IDE;\n'
+            'StartupWMClass=antigravity-ide\nMimeType=text/plain;inode/directory;\n')
+    assert apps.managed_antigravity_desktop(text) == '2.5.5'
+    assert apps.managed_antigravity_desktop(text.replace('Icon=code', 'Icon=custom')) is None
